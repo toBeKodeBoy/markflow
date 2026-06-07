@@ -1,4 +1,4 @@
-import { shallowRef, watch, onBeforeUnmount } from 'vue'
+import { shallowRef, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useNoteStore } from '../stores/note'
 import { TOC_PARSE_DEBOUNCE_MS } from '../constants'
 
@@ -49,12 +49,18 @@ export function useTocHeadings() {
     debounceTimer = setTimeout(() => parseNow(content), TOC_PARSE_DEBOUNCE_MS)
   }
 
+  function refreshHeadings(immediate = false) {
+    if (!store.tocVisible) return
+    const content = store.liveContent || store.currentNote?.content || ''
+    scheduleParse(content, immediate)
+  }
+
+  // Toc mounts via v-if after tocVisible is already true — watcher alone misses the first open.
+  onMounted(() => refreshHeadings(true))
+
   watch(
     () => store.currentNote?.id,
-    () => {
-      const content = store.liveContent || store.currentNote?.content || ''
-      scheduleParse(content, true)
-    }
+    () => refreshHeadings(true)
   )
 
   watch(
@@ -65,9 +71,7 @@ export function useTocHeadings() {
   watch(
     () => store.tocVisible,
     (visible) => {
-      if (!visible) return
-      const content = store.liveContent || store.currentNote?.content || ''
-      scheduleParse(content, true)
+      if (visible) refreshHeadings(true)
     }
   )
 
