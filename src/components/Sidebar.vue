@@ -79,6 +79,7 @@
         <!-- Context Menu -->
         <div v-if="noteContextId === note.id" class="context-menu" @click.stop>
           <button @click="startRenameNote(note.id)">重命名</button>
+          <button @click="startMoveNote(note.id)">移动到</button>
           <button class="danger" @click="deleteNote(note.id)">删除</button>
         </div>
       </div>
@@ -98,12 +99,45 @@
         </div>
       </div>
     </div>
+
+    <!-- Move Note Modal -->
+    <div v-if="movingNoteId" class="modal-overlay" @click.self="closeMoveModal">
+      <div class="modal">
+        <div class="modal-title">移动到</div>
+        <div class="move-folder-list">
+          <button
+            class="move-folder-item"
+            :class="{ current: movingNoteFolderId === undefined }"
+            :disabled="movingNoteFolderId === undefined"
+            @click="commitMoveNote(undefined)"
+          >
+            无文件夹（根目录）
+            <span v-if="movingNoteFolderId === undefined" class="move-folder-tag">当前</span>
+          </button>
+          <button
+            v-for="folder in store.folderList"
+            :key="folder.id"
+            class="move-folder-item"
+            :class="{ current: movingNoteFolderId === folder.id }"
+            :disabled="movingNoteFolderId === folder.id"
+            @click="commitMoveNote(folder.id)"
+          >
+            {{ folder.name }}
+            <span v-if="movingNoteFolderId === folder.id" class="move-folder-tag">当前</span>
+          </button>
+        </div>
+        <div class="modal-actions">
+          <button @click="closeMoveModal">取消</button>
+        </div>
+      </div>
+    </div>
   </aside>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useNoteStore } from '../stores/note'
+import { showAppNotification } from '../utils/notify'
 
 const store = useNoteStore()
 
@@ -115,6 +149,8 @@ const renamingFolderName = ref('')
 const noteContextId = ref<string | null>(null)
 const renamingNoteId = ref<string | null>(null)
 const renamingNoteName = ref('')
+const movingNoteId = ref<string | null>(null)
+const movingNoteFolderId = ref<string | undefined>(undefined)
 
 watch(showNewFolder, async (val) => {
   if (val) {
@@ -162,6 +198,33 @@ function commitRenameNote() {
     store.renameNote(renamingNoteId.value, renamingNoteName.value.trim())
   }
   renamingNoteId.value = null
+}
+
+function startMoveNote(id: string) {
+  const note = store.noteList.find(n => n.id === id)
+  if (!note) return
+  movingNoteId.value = id
+  movingNoteFolderId.value = note.folderId
+  noteContextId.value = null
+}
+
+function folderLabel(folderId: string | undefined) {
+  if (folderId === undefined) return '无文件夹（根目录）'
+  return store.folderList.find(f => f.id === folderId)?.name ?? '未知文件夹'
+}
+
+function commitMoveNote(folderId: string | undefined) {
+  if (!movingNoteId.value) return
+  if (movingNoteFolderId.value === folderId) return
+
+  store.moveNote(movingNoteId.value, folderId)
+  showAppNotification(`已移动到：${folderLabel(folderId)}`)
+  closeMoveModal()
+}
+
+function closeMoveModal() {
+  movingNoteId.value = null
+  movingNoteFolderId.value = undefined
 }
 
 function deleteNote(id: string) {

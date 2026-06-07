@@ -57,12 +57,13 @@ async function initEditor(content: string) {
 }
 
 watch(
-  [() => store.currentNote?.id, () => store.currentNote?.content],
-  ([, content]) => {
-    if (!editor || content === undefined) return
+  () => store.currentNote?.id,
+  () => {
+    if (!editor) return
+    const content = store.currentNote?.content ?? ''
+    store.setLiveContent(content)
     editor.action((ctx) => {
       if (getMarkdown()(ctx) === content) return
-      store.setLiveContent(content)
       replaceAll(content)(ctx)
     })
   }

@@ -144,6 +144,59 @@ describe('useNoteStore', () => {
     })
   })
 
+  // ===== 移动笔记 =====
+  describe('moveNote', () => {
+    it('应将笔记移动到指定文件夹', () => {
+      const store = useNoteStore()
+      const folder = store.createFolder('工作')
+      store.createNoteWithContent('# A')
+      const id = store.currentNote!.id
+
+      store.moveNote(id, folder.id)
+
+      expect(store.currentNote!.folderId).toBe(folder.id)
+      expect(store.noteList.find(n => n.id === id)?.folderId).toBe(folder.id)
+    })
+
+    it('应将笔记移回无文件夹', () => {
+      const store = useNoteStore()
+      const folder = store.createFolder('工作')
+      store.createNoteWithContent('# A', folder.id)
+      const id = store.currentNote!.id
+
+      store.moveNote(id, undefined)
+
+      expect(store.currentNote!.folderId).toBeUndefined()
+      expect(store.noteList.find(n => n.id === id)?.folderId).toBeUndefined()
+    })
+
+    it('移动到同一文件夹时不应更新', () => {
+      const store = useNoteStore()
+      const folder = store.createFolder('工作')
+      store.createNoteWithContent('# A', folder.id)
+      const id = store.currentNote!.id
+      const updatedAt = store.currentNote!.updatedAt
+
+      store.moveNote(id, folder.id)
+
+      expect(store.currentNote!.folderId).toBe(folder.id)
+      expect(store.currentNote!.updatedAt).toBe(updatedAt)
+    })
+
+    it('移动当前笔记时应同步 currentNote.folderId', () => {
+      const store = useNoteStore()
+      const f1 = store.createFolder('A')
+      const f2 = store.createFolder('B')
+      store.createNoteWithContent('# Note', f1.id)
+      const id = store.currentNote!.id
+
+      store.moveNote(id, f2.id)
+
+      expect(store.currentNote!.id).toBe(id)
+      expect(store.currentNote!.folderId).toBe(f2.id)
+    })
+  })
+
   // ===== 文件夹 =====
   describe('文件夹管理', () => {
     it('createFolder 应创建文件夹', () => {

@@ -85,9 +85,9 @@ function initEditor(content: string) {
 }
 
 watch(
-  [() => store.currentNote?.id, () => store.currentNote?.content],
-  ([, content]) => {
-    if (content === undefined) return
+  () => store.currentNote?.id,
+  () => {
+    const content = store.currentNote?.content ?? ''
     if (view?.state.doc.toString() === content) return
     initEditor(content)
   }

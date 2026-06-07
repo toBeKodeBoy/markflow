@@ -161,6 +161,21 @@ export const useNoteStore = defineStore('note', () => {
     if (currentNote.value?.id === id) currentNote.value.title = title
   }
 
+  function moveNote(id: string, folderId: string | undefined) {
+    const note = storage.getNote(id)
+    if (!note) return
+    if (note.folderId === folderId) return
+
+    note.folderId = folderId
+    note.updatedAt = Date.now()
+    storage.saveNote(note)
+    noteList.value = storage.getNoteList()
+
+    if (currentNote.value?.id === id) {
+      currentNote.value.folderId = folderId
+    }
+  }
+
   function createFolder(name: string) {
     const folder: Folder = { id: generateId(), name, order: folderList.value.length }
     folderList.value.push(folder)
@@ -190,7 +205,7 @@ export const useNoteStore = defineStore('note', () => {
     noteList, currentNote, liveContent, folderList, searchQuery, activeFolderId, filteredNoteList,
     tocVisible, tocJumpTarget, pendingLargeFileSwitch,
     loadNoteList, openNote, createNote, createNoteWithContent, setLiveContent, setTocVisible,
-    updateCurrentContent, deleteNote, renameNote, requestTocJump, clearPendingLargeFileSwitch,
+    updateCurrentContent, deleteNote, renameNote, moveNote, requestTocJump, clearPendingLargeFileSwitch,
     createFolder, deleteFolder, renameFolder
   }
 })
