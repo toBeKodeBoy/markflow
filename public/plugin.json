@@ -1,0 +1,19 @@
+{
+  "pluginName": "MarkFlow - Markdown笔记",
+  "description": "随叫随到的本地Markdown编辑器，支持实时预览、多文档管理和导出",
+  "version": "1.0.0",
+  "logo": "logo.png",
+  "main": "index.html",
+  "preload": "preload.js",
+  "development": {
+    "main": "http://localhost:5173",
+    "preload": "preload.js"
+  },
+  "features": [
+    {
+      "code": "open-editor",
+      "cmds": ["md", "markdown", "笔记", "MarkFlow", "markflow"],
+      "explain": "打开 Markdown 编辑器"
+    }
+  ]
+}
