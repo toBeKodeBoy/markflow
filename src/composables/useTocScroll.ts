@@ -1,3 +1,4 @@
+/** 从目标元素向上查找 root 范围内第一个可滚动的容器 */
 export function resolveScrollContainer(root: Element, target: Element): Element {
   if (typeof root.contains !== 'function') return root
 
@@ -12,6 +13,7 @@ export function resolveScrollContainer(root: Element, target: Element): Element 
   return root
 }
 
+/** 将容器内目标元素滚动到可见区域（带偏移边距） */
 export function scrollElementInContainer(element: Element, container: Element, margin = 16) {
   const scrollContainer = resolveScrollContainer(container, element)
   const containerRect = scrollContainer.getBoundingClientRect()

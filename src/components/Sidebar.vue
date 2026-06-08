@@ -159,6 +159,7 @@ watch(showNewFolder, async (val) => {
   }
 })
 
+/** 创建新文件夹（输入确认后调用 store） */
 function createFolder() {
   if (newFolderName.value.trim()) {
     store.createFolder(newFolderName.value.trim())
@@ -167,11 +168,13 @@ function createFolder() {
   showNewFolder.value = false
 }
 
+/** 开始文件夹重命名（初始化输入框） */
 function startRenameFolder(folder: { id: string; name: string }) {
   renamingFolderId.value = folder.id
   renamingFolderName.value = folder.name
 }
 
+/** 提交文件夹重命名 */
 function commitRenameFolder() {
   if (renamingFolderId.value && renamingFolderName.value.trim()) {
     store.renameFolder(renamingFolderId.value, renamingFolderName.value.trim())
@@ -179,11 +182,13 @@ function commitRenameFolder() {
   renamingFolderId.value = null
 }
 
+/** 右键菜单：确认后删除文件夹 */
 function showFolderMenu(folder: { id: string }) {
   // simple: just delete on right click for now
   if (confirm('删除文件夹？')) store.deleteFolder(folder.id)
 }
 
+/** 打开笔记重命名对话框 */
 function startRenameNote(id: string) {
   const note = store.noteList.find(n => n.id === id)
   if (note) {
@@ -193,6 +198,7 @@ function startRenameNote(id: string) {
   noteContextId.value = null
 }
 
+/** 提交笔记重命名 */
 function commitRenameNote() {
   if (renamingNoteId.value && renamingNoteName.value.trim()) {
     store.renameNote(renamingNoteId.value, renamingNoteName.value.trim())
@@ -200,6 +206,7 @@ function commitRenameNote() {
   renamingNoteId.value = null
 }
 
+/** 打开笔记移动对话框 */
 function startMoveNote(id: string) {
   const note = store.noteList.find(n => n.id === id)
   if (!note) return
@@ -208,11 +215,13 @@ function startMoveNote(id: string) {
   noteContextId.value = null
 }
 
+/** 获取文件夹显示名称 */
 function folderLabel(folderId: string | undefined) {
   if (folderId === undefined) return '无文件夹（根目录）'
   return store.folderList.find(f => f.id === folderId)?.name ?? '未知文件夹'
 }
 
+/** 执行笔记移动操作 */
 function commitMoveNote(folderId: string | undefined) {
   if (!movingNoteId.value) return
   if (movingNoteFolderId.value === folderId) return
@@ -222,16 +231,19 @@ function commitMoveNote(folderId: string | undefined) {
   closeMoveModal()
 }
 
+/** 关闭移动对话框 */
 function closeMoveModal() {
   movingNoteId.value = null
   movingNoteFolderId.value = undefined
 }
 
+/** 删除笔记并关闭右键菜单 */
 function deleteNote(id: string) {
   noteContextId.value = null
   store.deleteNote(id)
 }
 
+/** 格式化时间戳为相对时间（今天=时间，<7天=N天前，其他=短日期） */
 function formatDate(ts: number) {
   const d = new Date(ts)
   const now = new Date()
@@ -242,6 +254,7 @@ function formatDate(ts: number) {
   return d.toLocaleDateString('zh', { month: 'short', day: 'numeric' })
 }
 
+/** 全局点击关闭右键菜单 */
 function onGlobalClick() {
   noteContextId.value = null
 }

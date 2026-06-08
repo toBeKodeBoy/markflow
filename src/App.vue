@@ -82,11 +82,13 @@ _开始你的创作之旅吧！_
 `)
 }
 
+/** 切换视图模式：进入专注模式时保存前一个模式用于退出恢复 */
 function setViewMode(mode: ViewMode) {
   if (mode === 'focus') prevMode.value = viewMode.value
   viewMode.value = mode
 }
 
+/** 切换目录面板显隐并同步到 store */
 function toggleToc() {
   tocVisible.value = !tocVisible.value
   store.setTocVisible(tocVisible.value)
@@ -101,10 +103,12 @@ watch(() => store.pendingLargeFileSwitch, (pending) => {
   store.clearPendingLargeFileSwitch()
 })
 
+/** 退出专注模式，恢复为前一个视图模式 */
 function exitFocus() {
   viewMode.value = prevMode.value
 }
 
+/** 全局键盘监听：Esc 退出专注模式 */
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && viewMode.value === 'focus') exitFocus()
 }

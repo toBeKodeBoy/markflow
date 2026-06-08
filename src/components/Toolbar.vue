@@ -43,10 +43,12 @@ defineEmits<{ toggleSidebar: []; setViewMode: [mode: ViewMode]; toggleToc: [] }>
 const store = useNoteStore()
 const theme = useTheme()
 
+/** 在当前文件夹下创建新笔记 */
 function createNote() {
   store.createNote(store.activeFolderId ?? undefined)
 }
 
+/** 导出当前笔记为 .md 文件（uTools 环境或浏览器下载） */
 function exportNote() {
   if (!store.currentNote) return
   const filename = store.currentNote.title + '.md'
@@ -63,6 +65,7 @@ function exportNote() {
   }
 }
 
+/** 导入 .md 文件为笔记（uTools 环境或文件选择器） */
 function importNote() {
   if (typeof window.markflow !== 'undefined') {
     const content = window.markflow.openMarkdownFile()

@@ -42,6 +42,7 @@ marked.setOptions({
   gfm: true
 } as Parameters<typeof marked.setOptions>[0])
 
+/** 调度 Markdown 渲染：空内容显示占位，非空按文件大小选择防抖延迟 */
 function scheduleRender(content: string) {
   if (renderTimer) clearTimeout(renderTimer)
   if (!content) {
@@ -78,6 +79,7 @@ onBeforeUnmount(() => {
   if (renderTimer) clearTimeout(renderTimer)
 })
 
+/** 复制当前渲染 HTML 到剪贴板 */
 function copyHtml() {
   navigator.clipboard.writeText(renderedHtml.value).then(() => {
     if (typeof window.markflow !== 'undefined') {

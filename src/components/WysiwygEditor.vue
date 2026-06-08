@@ -24,6 +24,7 @@ const isDark = computed(() => document.documentElement.getAttribute('data-theme'
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let initing: Promise<void> | null = null
 
+/** 初始化 Milkdown WYSIWYG 编辑器（含 commonmark/GFM/listener/history 插件），支持销毁重建 */
 async function initEditor(content: string) {
   if (initing) await initing
   initing = (async () => {

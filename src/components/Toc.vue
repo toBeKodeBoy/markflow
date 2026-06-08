@@ -65,10 +65,12 @@ const visibleHeadings = computed(() => {
   }))
 })
 
+/** 目录列表滚动时记录 scrollTop 以计算虚拟列表可见范围 */
 function onListScroll(e: Event) {
   scrollTop.value = (e.target as HTMLElement).scrollTop
 }
 
+/** 点击标题跳转到编辑器中对应位置 */
 function jumpTo(item: TocHeading) {
   store.requestTocJump(item.line, item.index)
 }
