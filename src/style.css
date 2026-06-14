@@ -80,9 +80,9 @@ input:focus { border-color: var(--primary); }
 
 /* ===== Topbar ===== */
 .topbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
   height: 48px;
   padding: 0 12px;
   background: var(--bg-toolbar);
@@ -90,13 +90,21 @@ input:focus { border-color: var(--primary); }
   flex-shrink: 0;
   box-shadow: var(--shadow);
   z-index: 10;
-  position: relative;
 }
 
 .topbar-left, .topbar-right {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+}
+
+.topbar-left {
+  justify-self: start;
+}
+
+.topbar-right {
+  justify-self: end;
 }
 
 .app-logo {
@@ -597,9 +605,7 @@ input:focus { border-color: var(--primary); }
 
 /* ===== View Mode Switcher ===== */
 .topbar-center {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  justify-self: center;
 }
 
 .view-mode-switcher {
@@ -630,21 +636,9 @@ input:focus { border-color: var(--primary); }
   color: #fff;
 }
 
-/* ===== Source Code Mode ===== */
-.mode-source .preview-pane { display: none; }
-
 /* ===== Focus Mode ===== */
 .mode-focus .topbar { display: none; }
-.mode-focus .sidebar-pane { display: none; }
 .mode-focus .workspace { justify-content: center; background: var(--bg-editor); }
-
-.mode-focus .editor-pane {
-  max-width: 800px;
-  width: 100%;
-  padding: 40px 60px;
-}
-
-.mode-focus .editor-pane .editor-toolbar { display: none; }
 
 /* Focus exit button */
 .focus-exit-btn {

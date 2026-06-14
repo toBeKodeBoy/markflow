@@ -10,12 +10,11 @@
     <button class="focus-exit-btn btn-icon" @click="exitFocus" title="退出专注模式（Esc）">✕ 退出专注</button>
     <div class="workspace">
       <Sidebar v-if="showSidebar" />
-      <WysiwygEditor v-if="viewMode === 'live' || viewMode === 'focus'" />
-      <template v-else-if="viewMode === 'split'">
-        <Editor />
-        <Preview />
+      <WysiwygEditor v-if="viewMode === 'live' || viewMode === 'focus'" :key="'wysiwyg-' + viewMode" />
+      <template v-else>
+        <Editor :key="'editor-' + viewMode" />
+        <Preview v-if="viewMode === 'split'" key="preview" />
       </template>
-      <Editor v-else />
       <Toc v-if="tocVisible && viewMode !== 'focus'" />
     </div>
   </div>
@@ -32,8 +31,7 @@ import Toc from './components/Toc.vue'
 import { useNoteStore } from './stores/note'
 import { useTheme } from './composables/useTheme'
 import { showAppNotification } from './utils/notify'
-
-type ViewMode = 'live' | 'split' | 'source' | 'focus'
+import type { ViewMode } from './types'
 
 const store = useNoteStore()
 const theme = useTheme()
@@ -84,6 +82,9 @@ _开始你的创作之旅吧！_
 
 /** 切换视图模式：进入专注模式时保存前一个模式用于退出恢复 */
 function setViewMode(mode: ViewMode) {
+  if (store.liveContent !== (store.currentNote?.content ?? '')) {
+    store.updateCurrentContent(store.liveContent)
+  }
   if (mode === 'focus') prevMode.value = viewMode.value
   viewMode.value = mode
 }

@@ -10,10 +10,10 @@
 
     <div class="topbar-center">
       <div class="view-mode-switcher">
-        <button :class="{ active: viewMode === 'live' }" @click="$emit('setViewMode', 'live')" title="实时预览">预览</button>
-        <button :class="{ active: viewMode === 'split' }" @click="$emit('setViewMode', 'split')" title="分屏编辑">分屏</button>
-        <button :class="{ active: viewMode === 'source' }" @click="$emit('setViewMode', 'source')" title="源代码模式">源码</button>
-        <button :class="{ active: viewMode === 'focus' }" @click="$emit('setViewMode', 'focus')" title="专注模式">专注</button>
+        <button :class="{ active: viewMode === 'live' }" @click="emitSetViewMode('live')" title="实时预览">预览</button>
+        <button :class="{ active: viewMode === 'split' }" @click="emitSetViewMode('split')" title="分屏编辑">分屏</button>
+        <button :class="{ active: viewMode === 'source' }" @click="emitSetViewMode('source')" title="源代码模式">源码</button>
+        <button :class="{ active: viewMode === 'focus' }" @click="emitSetViewMode('focus')" title="专注模式">专注</button>
       </div>
     </div>
 
@@ -34,11 +34,14 @@
 <script setup lang="ts">
 import { useNoteStore } from '../stores/note'
 import { useTheme } from '../composables/useTheme'
-
-type ViewMode = 'live' | 'split' | 'source' | 'focus'
+import type { ViewMode } from '../types'
 
 defineProps<{ viewMode: ViewMode; tocVisible: boolean }>()
-defineEmits<{ toggleSidebar: []; setViewMode: [mode: ViewMode]; toggleToc: [] }>()
+const emit = defineEmits<{ toggleSidebar: []; setViewMode: [mode: ViewMode]; toggleToc: [] }>()
+
+function emitSetViewMode(mode: ViewMode) {
+  emit('setViewMode', mode)
+}
 
 const store = useNoteStore()
 const theme = useTheme()

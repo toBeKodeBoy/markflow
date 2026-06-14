@@ -81,8 +81,19 @@ onMounted(() => {
   initEditor(content)
 })
 
-onBeforeUnmount(() => {
-  if (saveTimer) clearTimeout(saveTimer)
-  editor?.destroy()
+onBeforeUnmount(async () => {
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
+  if (editor) {
+    editor.action((ctx) => {
+      const markdown = getMarkdown()(ctx)
+      store.setLiveContent(markdown)
+      store.updateCurrentContent(markdown)
+    })
+    await editor.destroy()
+    editor = null
+  }
 })
 </script>

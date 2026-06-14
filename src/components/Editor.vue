@@ -129,11 +129,20 @@ function onEditorScroll() {
 }
 
 onMounted(() => {
-  initEditor(store.currentNote?.content ?? '')
+  initEditor(store.liveContent || store.currentNote?.content || '')
   attachScrollListener()
 })
 
 onBeforeUnmount(() => {
+  if (updateTimer) {
+    clearTimeout(updateTimer)
+    updateTimer = null
+  }
+  if (view) {
+    const content = view.state.doc.toString()
+    store.setLiveContent(content)
+    store.updateCurrentContent(content)
+  }
   scrollerEl?.removeEventListener('scroll', onEditorScroll)
   view?.destroy()
 })

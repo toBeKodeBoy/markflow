@@ -1,3 +1,6 @@
+/** WYSIWYG 所见即所得（UI 标签「预览」）| split 分屏 | source 源码 | focus 专注 */
+export type ViewMode = 'live' | 'split' | 'source' | 'focus'
+
 export interface Note {
   id: string
   title: string
