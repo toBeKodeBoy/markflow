@@ -79,7 +79,7 @@ function initEditor(content: string) {
   scrollerEl?.removeEventListener('scroll', onEditorScroll)
   if (!editorEl.value) return
   const state = EditorState.create({
-    doc: content,
+    doc: content ?? '',
     extensions: buildExtensions()
   })
   view = new EditorView({ state, parent: editorEl.value })
