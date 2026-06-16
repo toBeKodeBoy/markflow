@@ -10,10 +10,10 @@
 
     <div class="topbar-center">
       <div class="view-mode-switcher">
-        <button :class="{ active: viewMode === 'live' }" @click="$emit('setViewMode', 'live')" title="实时预览">预览</button>
-        <button :class="{ active: viewMode === 'split' }" @click="$emit('setViewMode', 'split')" title="分屏编辑">分屏</button>
-        <button :class="{ active: viewMode === 'source' }" @click="$emit('setViewMode', 'source')" title="源代码模式">源码</button>
-        <button :class="{ active: viewMode === 'focus' }" @click="$emit('setViewMode', 'focus')" title="专注模式">专注</button>
+        <button :class="{ active: viewMode === 'live' }" @click="emitSetViewMode('live')" title="实时预览">预览</button>
+        <button :class="{ active: viewMode === 'split' }" @click="emitSetViewMode('split')" title="分屏编辑">分屏</button>
+        <button :class="{ active: viewMode === 'source' }" @click="emitSetViewMode('source')" title="源代码模式">源码</button>
+        <button :class="{ active: viewMode === 'focus' }" @click="emitSetViewMode('focus')" title="专注模式">专注</button>
       </div>
     </div>
 
@@ -34,19 +34,24 @@
 <script setup lang="ts">
 import { useNoteStore } from '../stores/note'
 import { useTheme } from '../composables/useTheme'
-
-type ViewMode = 'live' | 'split' | 'source' | 'focus'
+import type { ViewMode } from '../types'
 
 defineProps<{ viewMode: ViewMode; tocVisible: boolean }>()
-defineEmits<{ toggleSidebar: []; setViewMode: [mode: ViewMode]; toggleToc: [] }>()
+const emit = defineEmits<{ toggleSidebar: []; setViewMode: [mode: ViewMode]; toggleToc: [] }>()
+
+function emitSetViewMode(mode: ViewMode) {
+  emit('setViewMode', mode)
+}
 
 const store = useNoteStore()
 const theme = useTheme()
 
+/** 在当前文件夹下创建新笔记 */
 function createNote() {
   store.createNote(store.activeFolderId ?? undefined)
 }
 
+/** 导出当前笔记为 .md 文件（uTools 环境或浏览器下载） */
 function exportNote() {
   if (!store.currentNote) return
   const filename = store.currentNote.title + '.md'
@@ -63,6 +68,7 @@ function exportNote() {
   }
 }
 
+/** 导入 .md 文件为笔记（uTools 环境或文件选择器） */
 function importNote() {
   if (typeof window.markflow !== 'undefined') {
     const content = window.markflow.openMarkdownFile()

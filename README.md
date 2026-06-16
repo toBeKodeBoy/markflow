@@ -3,8 +3,8 @@
 > 随叫随到的本地 Markdown 编辑器 uTools 插件，支持所见即所得编辑、多视图模式、多文档管理和导入导出。
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue)
-![Vue](https://img.shields.io/badge/Vue-3.x-42b883)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6)
+![Vue](https://img.shields.io/badge/Vue-3.5-42b883)
+![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178c6)
 ![uTools](https://img.shields.io/badge/platform-uTools-orange)
 
 ---
@@ -15,7 +15,7 @@
 
 - **多笔记** — 创建、重命名、删除笔记，自动从首个标题提取笔记名
 - **文件夹** — 支持文件夹的创建、重命名与删除，按文件夹过滤笔记
-- **全文搜索** — 侧边栏按标题实时过滤
+- **标题搜索** — 侧边栏按标题实时过滤
 - **导入 / 导出** — 通过 uTools 文件对话框或浏览器文件选择读写 `.md` 文件
 - **持久存储** — 生产环境使用 `utools.dbStorage`，开发环境自动回退到 `localStorage`
 
@@ -28,6 +28,7 @@
 - **格式化工具栏** — 源码模式下可快捷插入加粗、斜体、删除线、标题、列表、引用、代码块、表格、链接
 - **目录导航** — 按文档标题生成 TOC，点击可跳转定位
 - **分屏预览** — 基于 `marked` + `highlight.js`，支持代码高亮与滚动同步
+- **大文件优化** — 超过 200KB 自动降级为分屏模式，渲染防抖加长
 - **复制 HTML** — 将预览内容作为 HTML 复制到剪贴板
 
 ### 界面
@@ -108,7 +109,7 @@ npm run dev
 npm run build
 ```
 
-构建产物输出至 `dist/` 目录，包含 `plugin.json`、`preload.js`、`index.html` 及静态资源。将 `dist/` 目录作为 uTools 插件目录加载即可。
+构建产物输出至 `dist/` 目录，包含 `plugin.json`、`preload.cjs`、`index.html` 及静态资源。将 `dist/` 目录作为 uTools 插件目录加载即可。
 
 ### 预览构建产物
 
@@ -124,12 +125,13 @@ npm run preview
 markflow/
 ├── public/
 │   ├── plugin.json          # uTools 插件清单
-│   ├── preload.js           # uTools API 桥接 (window.markflow)
-│   └── logo.svg
+│   ├── preload.cjs          # uTools API 桥接 (window.markflow)
+│   └── logo.png
 ├── src/
 │   ├── main.ts              # Vue 应用入口
 │   ├── App.vue              # 根布局与视图模式切换
 │   ├── style.css            # 全局样式 & CSS 变量主题
+│   ├── constants.ts         # 阈值 & 防抖常量
 │   ├── components/
 │   │   ├── Toolbar.vue      # 顶部工具栏（视图切换、导入导出、主题）
 │   │   ├── Sidebar.vue      # 侧边栏（文件夹 + 笔记列表 + 搜索）
@@ -142,9 +144,22 @@ markflow/
 │   ├── composables/
 │   │   ├── useStorage.ts    # 存储抽象（uTools / localStorage）
 │   │   ├── useTheme.ts      # 主题管理
-│   │   └── useScrollSync.ts # 分屏模式滚动同步
-│   └── types/
-│       └── index.ts         # TypeScript 类型定义
+│   │   ├── useScrollSync.ts # 分屏模式滚动同步
+│   │   ├── useTocHeadings.ts# 标题解析
+│   │   ├── useTocJumpHandler.ts # TOC 跳转
+│   │   └── useTocScroll.ts  # 滚动容器定位
+│   ├── types/
+│   │   └── index.ts         # TypeScript 类型定义
+│   └── utils/
+│       └── notify.ts        # 通知工具
+├── tests/
+│   ├── unit/                # 单元测试
+│   ├── integration/         # 集成测试
+│   └── architecture/        # 架构约束测试
+├── docs/
+│   ├── 产品设计/             # 产品设计文档
+│   ├── 架构设计/             # 架构设计文档
+│   └── 开发计划/             # 开发路线图
 ├── vite.config.ts
 ├── tsconfig.json
 └── package.json
@@ -156,14 +171,14 @@ markflow/
 
 | 层级 | 技术 |
 |------|------|
-| UI 框架 | Vue 3 (Composition API + `<script setup>`) |
-| 状态管理 | Pinia |
+| UI 框架 | Vue 3.5 (Composition API + `<script setup>`) |
+| 状态管理 | Pinia 3 |
 | 构建工具 | Vite 8 (Rolldown) |
 | WYSIWYG 编辑器 | Milkdown 7（`preset-commonmark` + `preset-gfm`） |
 | 源码编辑器 | CodeMirror 6 |
-| Markdown 预览 | marked（GFM） |
-| 语法高亮 | highlight.js |
-| 语言 | TypeScript |
+| Markdown 预览 | marked 18（GFM） |
+| 语法高亮 | highlight.js 11 |
+| 语言 | TypeScript 6 |
 | 样式 | 原生 CSS + CSS 变量（明/暗双主题） |
 | 运行平台 | uTools 插件 API |
 
@@ -174,9 +189,9 @@ markflow/
 ```
 uTools 启动器
     │
-    ├── plugin.json  →  加载 index.html + preload.js
+    ├── plugin.json  →  加载 index.html + preload.cjs
     │
-    ├── preload.js   →  window.markflow（存储、文件对话框、通知、主题）
+    ├── preload.cjs  →  window.markflow（存储、文件对话框、通知、主题）
     │
     └── Vue 3 应用
             ├── Pinia（笔记 Store：笔记列表、当前笔记、liveContent）
@@ -191,13 +206,43 @@ uTools 启动器
                   └── Toc（目录导航）
 ```
 
-`preload.js` 是 uTools 与 Vue 应用之间的桥梁，将 `utools.dbStorage`、文件系统操作等 API 安全地暴露为 `window.markflow`。Vue 应用只依赖这一抽象接口，因此在浏览器开发模式下也能正常运行。
+`preload.cjs` 是 uTools 与 Vue 应用之间的桥梁，将 `utools.dbStorage`、文件系统操作等 API 安全地暴露为 `window.markflow`。Vue 应用只依赖这一抽象接口，因此在浏览器开发模式下也能正常运行。
+
+### 编辑缓冲层
+
+- 编辑器实时写入 `liveContent`，持久化通过 300ms 防抖写入 `currentNote.content`
+- 编辑器仅监听 `note.id` 变化而非 `content`，避免防抖写回导致光标跳动
+
+### 索引 + 内容分离
+
+- `markflow_note_list` 仅存轻量元数据，正文按 `markflow_note_{id}` 独立存储
+- 加载列表时无需读取全部笔记正文
 
 ### 内容同步
 
 - 编辑内容通过 Pinia `liveContent` 在各组件间共享
 - WYSIWYG 模式：Milkdown `listener` 监听变更，防抖 300ms 后持久化
 - 导入文件或切换笔记时，通过 `getMarkdown` 比对避免重复刷新，确保外部内容正确同步到编辑器
+
+### 测试
+
+```bash
+# 运行全部测试
+npm test
+
+# 监听模式
+npm run test:watch
+```
+
+测试分为三层：单元测试（`tests/unit/`）、集成测试（`tests/integration/`）、架构约束测试（`tests/architecture/`）。
+
+---
+
+## 文档
+
+- [产品设计文档](docs/产品设计/产品设计文档.md) — 功能规格、用户画像、竞品分析
+- [架构设计文档](docs/架构设计/架构设计文档.md) — 分层架构、数据流、架构决策记录
+- [开发计划](docs/开发计划/开发计划.md) — 版本路线图与任务拆解
 
 ---
 

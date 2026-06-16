@@ -79,6 +79,7 @@
         <!-- Context Menu -->
         <div v-if="noteContextId === note.id" class="context-menu" @click.stop>
           <button @click="startRenameNote(note.id)">重命名</button>
+          <button @click="startMoveNote(note.id)">移动到</button>
           <button class="danger" @click="deleteNote(note.id)">删除</button>
         </div>
       </div>
@@ -98,12 +99,45 @@
         </div>
       </div>
     </div>
+
+    <!-- Move Note Modal -->
+    <div v-if="movingNoteId" class="modal-overlay" @click.self="closeMoveModal">
+      <div class="modal">
+        <div class="modal-title">移动到</div>
+        <div class="move-folder-list">
+          <button
+            class="move-folder-item"
+            :class="{ current: movingNoteFolderId === undefined }"
+            :disabled="movingNoteFolderId === undefined"
+            @click="commitMoveNote(undefined)"
+          >
+            无文件夹（根目录）
+            <span v-if="movingNoteFolderId === undefined" class="move-folder-tag">当前</span>
+          </button>
+          <button
+            v-for="folder in store.folderList"
+            :key="folder.id"
+            class="move-folder-item"
+            :class="{ current: movingNoteFolderId === folder.id }"
+            :disabled="movingNoteFolderId === folder.id"
+            @click="commitMoveNote(folder.id)"
+          >
+            {{ folder.name }}
+            <span v-if="movingNoteFolderId === folder.id" class="move-folder-tag">当前</span>
+          </button>
+        </div>
+        <div class="modal-actions">
+          <button @click="closeMoveModal">取消</button>
+        </div>
+      </div>
+    </div>
   </aside>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useNoteStore } from '../stores/note'
+import { showAppNotification } from '../utils/notify'
 
 const store = useNoteStore()
 
@@ -115,6 +149,8 @@ const renamingFolderName = ref('')
 const noteContextId = ref<string | null>(null)
 const renamingNoteId = ref<string | null>(null)
 const renamingNoteName = ref('')
+const movingNoteId = ref<string | null>(null)
+const movingNoteFolderId = ref<string | undefined>(undefined)
 
 watch(showNewFolder, async (val) => {
   if (val) {
@@ -123,6 +159,7 @@ watch(showNewFolder, async (val) => {
   }
 })
 
+/** 创建新文件夹（输入确认后调用 store） */
 function createFolder() {
   if (newFolderName.value.trim()) {
     store.createFolder(newFolderName.value.trim())
@@ -131,11 +168,13 @@ function createFolder() {
   showNewFolder.value = false
 }
 
+/** 开始文件夹重命名（初始化输入框） */
 function startRenameFolder(folder: { id: string; name: string }) {
   renamingFolderId.value = folder.id
   renamingFolderName.value = folder.name
 }
 
+/** 提交文件夹重命名 */
 function commitRenameFolder() {
   if (renamingFolderId.value && renamingFolderName.value.trim()) {
     store.renameFolder(renamingFolderId.value, renamingFolderName.value.trim())
@@ -143,11 +182,13 @@ function commitRenameFolder() {
   renamingFolderId.value = null
 }
 
+/** 右键菜单：确认后删除文件夹 */
 function showFolderMenu(folder: { id: string }) {
   // simple: just delete on right click for now
   if (confirm('删除文件夹？')) store.deleteFolder(folder.id)
 }
 
+/** 打开笔记重命名对话框 */
 function startRenameNote(id: string) {
   const note = store.noteList.find(n => n.id === id)
   if (note) {
@@ -157,6 +198,7 @@ function startRenameNote(id: string) {
   noteContextId.value = null
 }
 
+/** 提交笔记重命名 */
 function commitRenameNote() {
   if (renamingNoteId.value && renamingNoteName.value.trim()) {
     store.renameNote(renamingNoteId.value, renamingNoteName.value.trim())
@@ -164,11 +206,44 @@ function commitRenameNote() {
   renamingNoteId.value = null
 }
 
+/** 打开笔记移动对话框 */
+function startMoveNote(id: string) {
+  const note = store.noteList.find(n => n.id === id)
+  if (!note) return
+  movingNoteId.value = id
+  movingNoteFolderId.value = note.folderId
+  noteContextId.value = null
+}
+
+/** 获取文件夹显示名称 */
+function folderLabel(folderId: string | undefined) {
+  if (folderId === undefined) return '无文件夹（根目录）'
+  return store.folderList.find(f => f.id === folderId)?.name ?? '未知文件夹'
+}
+
+/** 执行笔记移动操作 */
+function commitMoveNote(folderId: string | undefined) {
+  if (!movingNoteId.value) return
+  if (movingNoteFolderId.value === folderId) return
+
+  store.moveNote(movingNoteId.value, folderId)
+  showAppNotification(`已移动到：${folderLabel(folderId)}`)
+  closeMoveModal()
+}
+
+/** 关闭移动对话框 */
+function closeMoveModal() {
+  movingNoteId.value = null
+  movingNoteFolderId.value = undefined
+}
+
+/** 删除笔记并关闭右键菜单 */
 function deleteNote(id: string) {
   noteContextId.value = null
   store.deleteNote(id)
 }
 
+/** 格式化时间戳为相对时间（今天=时间，<7天=N天前，其他=短日期） */
 function formatDate(ts: number) {
   const d = new Date(ts)
   const now = new Date()
@@ -179,6 +254,7 @@ function formatDate(ts: number) {
   return d.toLocaleDateString('zh', { month: 'short', day: 'numeric' })
 }
 
+/** 全局点击关闭右键菜单 */
 function onGlobalClick() {
   noteContextId.value = null
 }

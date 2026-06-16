@@ -9,11 +9,13 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { Editor, rootCtx, defaultValueCtx } from '@milkdown/core'
 import { commonmark } from '@milkdown/preset-commonmark'
 import { gfm } from '@milkdown/preset-gfm'
+import { clipboard } from '@milkdown/plugin-clipboard'
 import { listener, listenerCtx } from '@milkdown/plugin-listener'
 import { history } from '@milkdown/plugin-history'
 import { getMarkdown, replaceAll } from '@milkdown/utils'
 import { useNoteStore } from '../stores/note'
 import { useTocJumpHandler } from '../composables/useTocJumpHandler'
+import { markdownPaste } from '../plugins/markdownPaste'
 
 const store = useNoteStore()
 const containerRef = ref<HTMLDivElement>()
@@ -24,6 +26,7 @@ const isDark = computed(() => document.documentElement.getAttribute('data-theme'
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let initing: Promise<void> | null = null
 
+/** 初始化 Milkdown WYSIWYG 编辑器（含 commonmark/GFM/clipboard/listener/history 插件），支持销毁重建 */
 async function initEditor(content: string) {
   if (initing) await initing
   initing = (async () => {
@@ -48,6 +51,8 @@ async function initEditor(content: string) {
       })
       .use(commonmark)
       .use(gfm)
+      .use(clipboard)
+      .use(markdownPaste)
       .use(listener)
       .use(history)
       .create()
@@ -57,12 +62,13 @@ async function initEditor(content: string) {
 }
 
 watch(
-  [() => store.currentNote?.id, () => store.currentNote?.content],
-  ([, content]) => {
-    if (!editor || content === undefined) return
+  () => store.currentNote?.id,
+  () => {
+    if (!editor) return
+    const content = store.currentNote?.content ?? ''
+    store.setLiveContent(content)
     editor.action((ctx) => {
       if (getMarkdown()(ctx) === content) return
-      store.setLiveContent(content)
       replaceAll(content)(ctx)
     })
   }
@@ -79,8 +85,19 @@ onMounted(() => {
   initEditor(content)
 })
 
-onBeforeUnmount(() => {
-  if (saveTimer) clearTimeout(saveTimer)
-  editor?.destroy()
+onBeforeUnmount(async () => {
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
+  if (editor) {
+    editor.action((ctx) => {
+      const markdown = getMarkdown()(ctx)
+      store.setLiveContent(markdown)
+      store.updateCurrentContent(markdown)
+    })
+    await editor.destroy()
+    editor = null
+  }
 })
 </script>

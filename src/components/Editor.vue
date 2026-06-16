@@ -44,6 +44,7 @@ const charCount = computed(() => store.liveContent.length || store.currentNote?.
 
 let updateTimer: ReturnType<typeof setTimeout> | null = null
 
+/** 构建 CodeMirror 扩展集合（历史/行号/高亮/Markdown/快捷键/主题） */
 function buildExtensions() {
   const exts = [
     history(),
@@ -72,12 +73,13 @@ function buildExtensions() {
   return exts
 }
 
+/** 初始化 CodeMirror 编辑器实例，销毁旧实例并绑定滚动监听 */
 function initEditor(content: string) {
   if (view) { view.destroy(); view = null }
   scrollerEl?.removeEventListener('scroll', onEditorScroll)
   if (!editorEl.value) return
   const state = EditorState.create({
-    doc: content,
+    doc: content ?? '',
     extensions: buildExtensions()
   })
   view = new EditorView({ state, parent: editorEl.value })
@@ -85,9 +87,9 @@ function initEditor(content: string) {
 }
 
 watch(
-  [() => store.currentNote?.id, () => store.currentNote?.content],
-  ([, content]) => {
-    if (content === undefined) return
+  () => store.currentNote?.id,
+  () => {
+    const content = store.currentNote?.content ?? ''
     if (view?.state.doc.toString() === content) return
     initEditor(content)
   }
@@ -111,12 +113,14 @@ watch(isDark, () => {
 
 let scrollerEl: HTMLElement | null = null
 
+/** 为 .cm-scroller 绑定滚动同步事件 */
 function attachScrollListener() {
   scrollerEl = editorEl.value?.querySelector('.cm-scroller') ?? null
   if (!scrollerEl) return
   scrollerEl.addEventListener('scroll', onEditorScroll)
 }
 
+/** 编辑器滚动回调：计算滚动比例并同步到 useScrollSync */
 function onEditorScroll() {
   if (!scrollerEl) return
   const { scrollTop, scrollHeight, clientHeight } = scrollerEl
@@ -125,16 +129,26 @@ function onEditorScroll() {
 }
 
 onMounted(() => {
-  initEditor(store.currentNote?.content ?? '')
+  initEditor(store.liveContent || store.currentNote?.content || '')
   attachScrollListener()
 })
 
 onBeforeUnmount(() => {
+  if (updateTimer) {
+    clearTimeout(updateTimer)
+    updateTimer = null
+  }
+  if (view) {
+    const content = view.state.doc.toString()
+    store.setLiveContent(content)
+    store.updateCurrentContent(content)
+  }
   scrollerEl?.removeEventListener('scroll', onEditorScroll)
   view?.destroy()
 })
 
 // Toolbar helpers
+/** 工具栏：在选中文本前后插入 Markdown 标记（加粗/斜体/链接等） */
 function insertMarkdown(before: string, after: string, placeholder: string) {
   if (!view) return
   const sel = view.state.selection.main
@@ -146,6 +160,7 @@ function insertMarkdown(before: string, after: string, placeholder: string) {
   view.focus()
 }
 
+/** 工具栏：在当前行首插入前缀（标题/列表/引用等） */
 function insertLine(prefix: string) {
   if (!view) return
   const sel = view.state.selection.main
@@ -157,6 +172,7 @@ function insertLine(prefix: string) {
   view.focus()
 }
 
+/** 工具栏：插入代码块包裹选中文本 */
 function insertCodeBlock() {
   if (!view) return
   const sel = view.state.selection.main
@@ -169,6 +185,7 @@ function insertCodeBlock() {
   view.focus()
 }
 
+/** 工具栏：插入 Markdown 表格模板 */
 function insertTable() {
   if (!view) return
   const table = '\n| 标题1 | 标题2 | 标题3 |\n| --- | --- | --- |\n| 内容 | 内容 | 内容 |\n'
