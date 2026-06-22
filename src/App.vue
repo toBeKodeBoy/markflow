@@ -115,7 +115,6 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 onMounted(() => {
-  theme.init?.()
   window.addEventListener('keydown', onKeydown)
 })
 
