@@ -25,6 +25,8 @@ const isDark = computed(() => document.documentElement.getAttribute('data-theme'
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let initing: Promise<void> | null = null
+/** 编辑器未就绪时暂存待切换的内容，初始化后自动应用 */
+let pendingContent: string | null = null
 
 /** 初始化 Milkdown WYSIWYG 编辑器（含 commonmark/GFM/clipboard/listener/history 插件），支持销毁重建 */
 async function initEditor(content: string) {
@@ -56,6 +58,16 @@ async function initEditor(content: string) {
       .use(listener)
       .use(history)
       .create()
+
+    // 初始化完成后，应用初始化期间暂存的待切换内容
+    if (pendingContent !== null) {
+      const pc = pendingContent
+      pendingContent = null
+      editor.action((ctx) => {
+        if (getMarkdown()(ctx) === pc) return
+        replaceAll(pc)(ctx)
+      })
+    }
   })()
   await initing
   initing = null
@@ -64,9 +76,12 @@ async function initEditor(content: string) {
 watch(
   () => store.currentNote?.id,
   () => {
-    if (!editor) return
     const content = store.currentNote?.content ?? ''
     store.setLiveContent(content)
+    if (!editor) {
+      pendingContent = content
+      return
+    }
     editor.action((ctx) => {
       if (getMarkdown()(ctx) === content) return
       replaceAll(content)(ctx)

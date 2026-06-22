@@ -26,7 +26,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
+import { EditorState, Compartment } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { oneDark } from '@codemirror/theme-one-dark'
@@ -43,6 +43,8 @@ const isDark = computed(() => document.documentElement.getAttribute('data-theme'
 const charCount = computed(() => store.liveContent.length || store.currentNote?.content.length || 0)
 
 let updateTimer: ReturnType<typeof setTimeout> | null = null
+/** 主题切换 Compartment：动态更新 oneDark 扩展，无需重建编辑器实例 */
+const themeCompartment = new Compartment()
 
 /** 构建 CodeMirror 扩展集合（历史/行号/高亮/Markdown/快捷键/主题） */
 function buildExtensions() {
@@ -69,7 +71,8 @@ function buildExtensions() {
       '.cm-content': { padding: '16px' },
     })
   ]
-  if (isDark.value) exts.push(oneDark)
+  // 使用 Compartment 动态切换主题，避免销毁重建编辑器
+  exts.push(themeCompartment.of(isDark.value ? oneDark : []))
   return exts
 }
 
@@ -107,8 +110,10 @@ watch(() => store.tocJumpTarget?.id, () => {
 })
 
 watch(isDark, () => {
-  const content = view?.state.doc.toString() ?? store.currentNote?.content ?? ''
-  initEditor(content)
+  if (!view) return
+  view.dispatch({
+    effects: themeCompartment.reconfigure(isDark.value ? oneDark : [])
+  })
 })
 
 let scrollerEl: HTMLElement | null = null
