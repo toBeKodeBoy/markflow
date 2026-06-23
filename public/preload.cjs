@@ -74,6 +74,34 @@ window.markflow = {
     return null;
   },
 
+  // 导出 PDF（使用 @mdpdf/mdpdf Rust 原生引擎）
+  savePdfFile: function (filename, markdownContent) {
+    var path = utools.showSaveDialog({
+      title: '导出 PDF',
+      defaultPath: filename.replace(/\.md$/, '.pdf'),
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    });
+    if (!path) return false;
+
+    try {
+      var mdpdf = require('@mdpdf/mdpdf');
+      // markdownToPdf 返回 Promise<Uint8Array>
+      var pdfBuf = mdpdf.markdownToPdf(markdownContent);
+      // 处理同步化（@mdpdf/mdpdf 是 async，但 preload 可以用 .then）
+      // 注意：这里用同步风格等待，uTools preload 中实际是异步执行
+      return pdfBuf.then(function (buf) {
+        require('fs').writeFileSync(path, Buffer.from(buf));
+        return true;
+      }).catch(function (err) {
+        console.error('[MarkFlow] PDF 导出失败:', err);
+        return false;
+      });
+    } catch (err) {
+      console.error('[MarkFlow] PDF 导出初始化失败:', err);
+      return false;
+    }
+  },
+
   // 获取 uTools 主题（dark/light）
   isDarkTheme: function () {
     return utools.isDarkColors();

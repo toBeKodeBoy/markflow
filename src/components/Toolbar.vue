@@ -22,6 +22,7 @@
         <span>+ 新建</span>
       </button>
       <button class="btn-icon" @click="exportNote" title="导出 .md 文件" :disabled="!store.currentNote">⬇</button>
+      <button class="btn-icon" @click="exportPdf" title="导出 PDF" :disabled="!store.currentNote">PDF</button>
       <button class="btn-icon" @click="importNote" title="导入 .md 文件">⬆</button>
       <button class="btn-icon" :class="{ active: tocVisible }" @click="$emit('toggleToc')" title="目录">目录</button>
       <button class="btn-icon" @click="theme.toggle()" :title="theme.isDark.value ? '切换亮色' : '切换暗色'">
@@ -34,6 +35,7 @@
 <script setup lang="ts">
 import { useNoteStore } from '../stores/note'
 import { useTheme } from '../composables/useTheme'
+import { exportPdf } from '../utils/exportPdf'
 import type { ViewMode } from '../types'
 
 defineProps<{ viewMode: ViewMode; tocVisible: boolean }>()
