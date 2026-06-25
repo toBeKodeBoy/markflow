@@ -20,7 +20,8 @@ export function looksLikeMarkdown(text: string): boolean {
     /```/.test(t) ||
     /^\|.+\|/m.test(t) ||
     /!\[[^\]]*\]\([^)]+\)/.test(t) ||
-    /\[[^\]]+\]\([^)]+\)/.test(t)
+    /\[[^\]]+\]\([^)]+\)/.test(t) ||
+    /<u>[^<\n]+<\/u>/i.test(t)
   )
 }
 

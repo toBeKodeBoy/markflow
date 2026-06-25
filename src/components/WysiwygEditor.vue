@@ -12,10 +12,14 @@ import { gfm } from '@milkdown/preset-gfm'
 import { clipboard } from '@milkdown/plugin-clipboard'
 import { listener, listenerCtx } from '@milkdown/plugin-listener'
 import { history } from '@milkdown/plugin-history'
+import { listItemBlockComponent } from '@milkdown/components/list-item-block'
 import { getMarkdown, replaceAll } from '@milkdown/utils'
 import { useNoteStore } from '../stores/note'
 import { useTocJumpHandler } from '../composables/useTocJumpHandler'
 import { markdownPaste } from '../plugins/markdownPaste'
+import { highlightMarkPlugins } from '../plugins/highlightMark'
+import { underlineMarkPlugins } from '../plugins/underlineMark'
+import { normalizeUnderlineMarkdown } from '../utils/markedSetup'
 
 const store = useNoteStore()
 const containerRef = ref<HTMLDivElement>()
@@ -42,7 +46,7 @@ async function initEditor(content: string) {
     editor = await Editor.make()
       .config((ctx) => {
         ctx.set(rootCtx, containerRef.value!)
-        ctx.set(defaultValueCtx, content)
+        ctx.set(defaultValueCtx, normalizeUnderlineMarkdown(content))
         ctx.get(listenerCtx).markdownUpdated((_, markdown) => {
           store.setLiveContent(markdown)
           if (saveTimer) clearTimeout(saveTimer)
@@ -53,6 +57,9 @@ async function initEditor(content: string) {
       })
       .use(commonmark)
       .use(gfm)
+      .use(listItemBlockComponent)
+      .use(highlightMarkPlugins)
+      .use(underlineMarkPlugins)
       .use(clipboard)
       .use(markdownPaste)
       .use(listener)
@@ -65,7 +72,7 @@ async function initEditor(content: string) {
       pendingContent = null
       editor.action((ctx) => {
         if (getMarkdown()(ctx) === pc) return
-        replaceAll(pc)(ctx)
+        replaceAll(normalizeUnderlineMarkdown(pc))(ctx)
       })
     }
   })()
@@ -84,7 +91,7 @@ watch(
     }
     editor.action((ctx) => {
       if (getMarkdown()(ctx) === content) return
-      replaceAll(content)(ctx)
+      replaceAll(normalizeUnderlineMarkdown(content))(ctx)
     })
   }
 )

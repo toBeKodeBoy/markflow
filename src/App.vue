@@ -34,7 +34,7 @@ import { showAppNotification } from './utils/notify'
 import type { ViewMode } from './types'
 
 const store = useNoteStore()
-const theme = useTheme()
+useTheme()
 
 const viewMode = ref<ViewMode>('live')
 const prevMode = ref<ViewMode>('live')

@@ -51,6 +51,7 @@ export interface MarkFlowBridge {
   saveSettings: (settings: AppSettings) => void
   showNotification: (msg: string) => void
   saveMarkdownFile: (filename: string, content: string) => boolean
+  savePdfFile: (filename: string, markdownContent: string) => boolean | Promise<boolean>
   openMarkdownFile: () => string | null
   isDarkTheme: () => boolean
   hideMainWindow: () => void
