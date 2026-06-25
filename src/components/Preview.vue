@@ -11,8 +11,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onBeforeUnmount } from 'vue'
-import { marked } from 'marked'
-import hljs from 'highlight.js'
+import { parseMarkdown } from '../utils/markedSetup'
 import { useNoteStore } from '../stores/note'
 import { useScrollSync } from '../composables/useScrollSync'
 import { useTocJumpHandler } from '../composables/useTocJumpHandler'
@@ -30,18 +29,6 @@ const renderedHtml = ref('<p class="empty-preview">开始输入 Markdown...</p>'
 const previewLoading = ref(false)
 let renderTimer: ReturnType<typeof setTimeout> | null = null
 
-marked.setOptions({
-  // @ts-ignore
-  highlight: (code: string, lang: string) => {
-    if (lang && hljs.getLanguage(lang)) {
-      return hljs.highlight(code, { language: lang }).value
-    }
-    return hljs.highlightAuto(code).value
-  },
-  breaks: true,
-  gfm: true
-} as Parameters<typeof marked.setOptions>[0])
-
 /** 调度 Markdown 渲染：空内容显示占位，非空按文件大小选择防抖延迟 */
 function scheduleRender(content: string) {
   if (renderTimer) clearTimeout(renderTimer)
@@ -56,8 +43,7 @@ function scheduleRender(content: string) {
     : PREVIEW_RENDER_DEBOUNCE_MS
   renderTimer = setTimeout(() => {
     try {
-      const html = marked.parse(content, { async: false })
-      renderedHtml.value = typeof html === 'string' ? html : '<p class="empty-preview">预览渲染失败</p>'
+      renderedHtml.value = parseMarkdown(content) || '<p class="empty-preview">预览渲染失败</p>'
     } catch {
       renderedHtml.value = '<p class="empty-preview">预览渲染失败</p>'
     } finally {

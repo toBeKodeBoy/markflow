@@ -1,18 +1,6 @@
 import { useNoteStore } from '../stores/note'
 import { showAppNotification } from './notify'
-import { marked } from 'marked'
-import hljs from 'highlight.js'
-
-/** marked 配置：与 Preview.vue 保持一致 */
-marked.setOptions({
-  // @ts-ignore
-  highlight: (code: string, lang: string) => {
-    if (lang && hljs.getLanguage(lang)) return hljs.highlight(code, { language: lang }).value
-    return hljs.highlightAuto(code).value
-  },
-  breaks: true,
-  gfm: true,
-} as Parameters<typeof marked.setOptions>[0])
+import { parseMarkdown } from './markedSetup'
 
 /**
  * 导出当前笔记为 PDF。
@@ -58,7 +46,7 @@ function openPrintWindow(markdown: string, title: string): void {
 function buildPdfHtml(markdown: string, title: string): string {
   let bodyHtml = ''
   try {
-    bodyHtml = marked.parse(markdown, { async: false }) as string
+    bodyHtml = parseMarkdown(markdown)
   } catch {
     bodyHtml = escapeHtml(markdown)
   }
@@ -116,6 +104,8 @@ function buildPdfHtml(markdown: string, title: string): string {
   ul, ol { padding-left: 24px; }
   hr { border: none; border-top: 1px solid #ddd; margin: 16px 0; }
   a { color: #0366d6; text-decoration: none; }
+  u { text-decoration: underline; text-underline-offset: 2px; text-decoration-color: #888; }
+  mark.highlight-mark { background: #fff3a3; padding: 0 2px; border-radius: 2px; }
   .markdown-body { padding: 0; max-width: 100%; }
 </style>
 </head>
