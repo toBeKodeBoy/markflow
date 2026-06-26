@@ -28,9 +28,10 @@
 import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } from '@codemirror/view'
 import { EditorState, Compartment } from '@codemirror/state'
-import { markdown } from '@codemirror/lang-markdown'
+import { closeBracketsKeymap } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { oneDark } from '@codemirror/theme-one-dark'
+import { autoCloseBracketsExtensions } from '../extensions/autoCloseBrackets'
 import { useNoteStore } from '../stores/note'
 import { useScrollSync } from '../composables/useScrollSync'
 
@@ -54,8 +55,14 @@ function buildExtensions() {
     lineNumbers(),
     highlightActiveLine(),
     drawSelection(),
-    markdown(),
-    keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab, { key: 'Ctrl-u', run: insertUnderline, preventDefault: true }]),
+    ...autoCloseBracketsExtensions,
+    keymap.of([
+      ...closeBracketsKeymap,
+      ...defaultKeymap,
+      ...historyKeymap,
+      indentWithTab,
+      { key: 'Ctrl-u', run: insertUnderline, preventDefault: true },
+    ]),
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         const content = update.state.doc.toString()

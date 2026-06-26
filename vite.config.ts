@@ -11,6 +11,7 @@ const codemirrorDedupe = [
   '@codemirror/view',
   '@codemirror/language',
   '@codemirror/lang-markdown',
+  '@codemirror/autocomplete',
 ]
 
 export default defineConfig({
@@ -33,6 +34,7 @@ export default defineConfig({
       '@codemirror/commands',
       '@codemirror/lang-markdown',
       '@codemirror/language',
+      '@codemirror/autocomplete',
     ],
   },
   build: {
