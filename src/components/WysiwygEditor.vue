@@ -20,6 +20,7 @@ import { markdownPaste } from '../plugins/markdownPaste'
 import { highlightMarkPlugins } from '../plugins/highlightMark'
 import { underlineMarkPlugins } from '../plugins/underlineMark'
 import { codeBlockLabelPlugin } from '../plugins/codeBlockLabel'
+import { autoCloseBracketsPlugin } from '../plugins/autoCloseBrackets'
 import { normalizeUnderlineMarkdown } from '../utils/markedSetup'
 
 const store = useNoteStore()
@@ -64,6 +65,7 @@ async function initEditor(content: string) {
       .use(clipboard)
       .use(markdownPaste)
       .use(codeBlockLabelPlugin)
+      .use(autoCloseBracketsPlugin)
       .use(listener)
       .use(history)
       .create()
