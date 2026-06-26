@@ -96,8 +96,10 @@ watch(
   }
 )
 
-watch(isDark, async () => {
-  await initEditor(store.liveContent || (store.currentNote?.content ?? ''))
+watch(isDark, (dark) => {
+  if (containerRef.value) {
+    containerRef.value.classList.toggle('milkdown-dark', dark)
+  }
 })
 
 useTocJumpHandler(containerRef, store)

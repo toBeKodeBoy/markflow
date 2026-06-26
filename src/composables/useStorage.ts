@@ -113,13 +113,13 @@ export function useStorage() {
 
   /** 保存笔记及同步更新笔记列表 */
   function saveNote(note: Note) {
+    bridge.saveNote(note.id, note)
     const list = getNoteList()
     const idx = list.findIndex(n => n.id === note.id)
     const item: NoteListItem = { id: note.id, title: note.title, folderId: note.folderId, updatedAt: note.updatedAt }
     if (idx >= 0) list[idx] = item
     else list.unshift(item)
     saveNoteList(list)
-    bridge.saveNote(note.id, note)
   }
 
   /** 删除笔记并从列表移除 */
