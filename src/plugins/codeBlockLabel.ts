@@ -67,7 +67,9 @@ function showDropdown(anchor: HTMLElement, view: EditorView, getPos: () => numbe
   dropdown.style.position = 'fixed'
   dropdown.style.top = `${rect.bottom + 4}px`
   dropdown.style.right = `${window.innerWidth - rect.right}px`
-  dropdown.style.left = 'auto'
+  dropdown.style.minWidth = `${rect.width}px`
+  dropdown.style.left = ''
+  dropdown.style.width = ''
   dropdown.style.display = 'block'
 }
 

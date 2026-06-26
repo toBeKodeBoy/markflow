@@ -575,9 +575,6 @@ input:focus { border-color: var(--primary); }
 }
 
 .code-lang-label {
-  position: absolute;
-  top: 0;
-  right: 0;
   padding: 4px 10px;
   font-size: 11px;
   font-family: var(--font-mono);
@@ -591,6 +588,13 @@ input:focus { border-color: var(--primary); }
   line-height: 1.4;
   min-width: 72px;
   white-space: nowrap;
+}
+
+/* Preview pane: label floats at top-right of wrapper (direct child, no .code-lang-badge) */
+.code-block-wrapper > .code-lang-label {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 [data-theme="dark"] .code-lang-label {
@@ -832,7 +836,7 @@ input:focus { border-color: var(--primary); }
   user-select: none;
   z-index: 1;
   line-height: 1.6;
-  min-width: 72px;
+  min-width: 160px;
   white-space: nowrap;
 }
 
@@ -845,14 +849,11 @@ input:focus { border-color: var(--primary); }
 }
 
 .code-lang-chevron {
+  display: none;
   font-size: 8px;
   line-height: 1;
   margin-left: 2px;
   opacity: 0.6;
-}
-
-.code-lang-badge:hover .code-lang-chevron {
-  opacity: 1;
 }
 
 /* Language dropdown */
