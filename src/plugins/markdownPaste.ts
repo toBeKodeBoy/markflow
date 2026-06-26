@@ -17,7 +17,8 @@ export function looksLikeMarkdown(text: string): boolean {
     /^\s*[-*+]\s/m.test(t) ||
     /^\s*\d+\.\s/m.test(t) ||
     /^>\s/m.test(t) ||
-    /```/.test(t) ||
+    /^[ \t]*`{3,}/m.test(t) ||
+    /^[ \t]*~{3,}/m.test(t) ||
     /^\|.+\|/m.test(t) ||
     /!\[[^\]]*\]\([^)]+\)/.test(t) ||
     /\[[^\]]+\]\([^)]+\)/.test(t) ||

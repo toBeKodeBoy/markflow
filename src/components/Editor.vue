@@ -185,15 +185,16 @@ function insertLine(prefix: string) {
   view.focus()
 }
 
-/** 工具栏：插入代码块包裹选中文本 */
+/** 工具栏：插入代码块，默认带 language 占位符便于用户替换 */
 function insertCodeBlock() {
   if (!view) return
   const sel = view.state.selection.main
   const selected = view.state.sliceDoc(sel.from, sel.to)
-  const block = '```\n' + (selected || '// 代码') + '\n```'
+  const lang = selected ? '' : 'language'
+  const block = `\`\`\`${lang}\n${selected || '// 代码'}\n\`\`\``
   view.dispatch({
     changes: { from: sel.from, to: sel.to, insert: block },
-    selection: { anchor: sel.from + 4 }
+    selection: { anchor: sel.from + 4, head: sel.from + 4 + lang.length }
   })
   view.focus()
 }
