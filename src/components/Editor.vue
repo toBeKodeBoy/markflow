@@ -4,6 +4,7 @@
       <button @click="insertMarkdown('**', '**', '粗体')" title="粗体 (Ctrl+B)"><b>B</b></button>
       <button @click="insertMarkdown('*', '*', '斜体')" title="斜体 (Ctrl+I)"><i>I</i></button>
       <button @click="insertMarkdown('~~', '~~', '删除线')" title="删除线"><s>S</s></button>
+      <button @click="insertMarkdown('<u>', '</u>', '下划线')" title="下划线 (Ctrl+U)"><u>U</u></button>
       <span class="sep">|</span>
       <button @click="insertLine('# ')" title="标题 1">H1</button>
       <button @click="insertLine('## ')" title="标题 2">H2</button>
@@ -54,7 +55,7 @@ function buildExtensions() {
     highlightActiveLine(),
     drawSelection(),
     markdown(),
-    keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+    keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab, { key: 'Ctrl-u', run: insertUnderline, preventDefault: true }]),
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         const content = update.state.doc.toString()
@@ -163,6 +164,13 @@ function insertMarkdown(before: string, after: string, placeholder: string) {
     selection: { anchor: sel.from + before.length, head: sel.from + before.length + selected.length }
   })
   view.focus()
+}
+
+/** 快捷键：Ctrl+U 插入下划线标签，作为 CodeMirror Command 返回 boolean */
+function insertUnderline(): boolean {
+  if (!view) return false
+  insertMarkdown('<u>', '</u>', '下划线')
+  return true
 }
 
 /** 工具栏：在当前行首插入前缀（标题/列表/引用等） */

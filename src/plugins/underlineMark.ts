@@ -2,9 +2,10 @@ import type { MilkdownPlugin } from '@milkdown/ctx'
 import { schemaCtx } from '@milkdown/core'
 import type { RemarkPluginRaw } from '@milkdown/transformer'
 import { markRule } from '@milkdown/prose'
+import { toggleMark } from '@milkdown/prose/commands'
 import type { Node as ProseNode } from '@milkdown/prose/model'
 import { Plugin, PluginKey } from '@milkdown/prose/state'
-import { $inputRule, $markAttr, $markSchema, $prose, $remark } from '@milkdown/utils'
+import { $inputRule, $markAttr, $markSchema, $prose, $remark, $shortcut } from '@milkdown/utils'
 
 interface MdastNode {
   type: string
@@ -204,10 +205,15 @@ export const underlineAutoConvertPlugin = $prose((ctx) => {
   })
 })
 
+export const underlineShortcut = $shortcut((ctx) => ({
+  'Ctrl-u': toggleMark(underlineSchema.type(ctx))
+}))
+
 export const underlineMarkPlugins: MilkdownPlugin[] = [
   underlineRemark,
   underlineAttr,
   underlineSchema,
   underlineInputRule,
   underlineAutoConvertPlugin,
+  underlineShortcut,
 ].flat()
