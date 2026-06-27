@@ -4,6 +4,7 @@ import { Plugin, PluginKey } from '@milkdown/prose/state'
 import type { EditorView, NodeView, NodeViewConstructor, ViewMutationRecord } from '@milkdown/prose/view'
 import type { Node as ProseNode } from '@milkdown/prose/model'
 import hljs from 'highlight.js'
+import { handleCodeCopy } from '../utils/codeCopy'
 
 const POPULAR_LANGUAGES = [
   'javascript', 'typescript', 'python', 'java', 'c', 'cpp', 'csharp',
@@ -280,10 +281,19 @@ function buildCodeBlockDOM(lang: string): {
   badge.appendChild(label)
   badge.appendChild(chevron)
 
-  wrapper.appendChild(pre)
-  wrapper.appendChild(badge)
+  const copyBtn = document.createElement('button')
+  copyBtn.className = 'code-copy-btn'
+  copyBtn.textContent = '复制'
 
-  return { wrapper, badge, label, chevron, pre, code, highlightCode }
+  const actions = document.createElement('div')
+  actions.className = 'code-block-actions'
+  actions.appendChild(badge)
+  actions.appendChild(copyBtn)
+
+  wrapper.appendChild(pre)
+  wrapper.appendChild(actions)
+
+  return { wrapper, badge, label, chevron, pre, code, highlightCode, copyBtn }
 }
 
 function attachClickHandlers(
@@ -306,6 +316,7 @@ class CodeBlockNodeView implements NodeView {
   private highlightCode: HTMLElement
   private badge: HTMLSpanElement
   private label: HTMLSpanElement
+  private copyBtn: HTMLButtonElement
   private view: EditorView
   private getPos: () => number | undefined
   private trailingObserver: MutationObserver
@@ -316,7 +327,7 @@ class CodeBlockNodeView implements NodeView {
     this.getPos = getPos
 
     const lang = node.attrs.language || ''
-    const { wrapper, badge, label, pre, code, highlightCode } = buildCodeBlockDOM(lang)
+    const { wrapper, badge, label, pre, code, highlightCode, copyBtn } = buildCodeBlockDOM(lang)
 
     if (lang) {
       attachClickHandlers(badge, view, getPos)
@@ -329,7 +340,14 @@ class CodeBlockNodeView implements NodeView {
     this.highlightCode = highlightCode
     this.badge = badge
     this.label = label
+    this.copyBtn = copyBtn
     this.contentDOM = code
+
+    copyBtn.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      handleCodeCopy(copyBtn)
+    })
 
     // 首次高亮
     this.highlightContent(node.textContent, lang)

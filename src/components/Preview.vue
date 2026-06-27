@@ -10,8 +10,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { parseMarkdown } from '../utils/markedSetup'
+import { handleCodeCopy } from '../utils/codeCopy'
 import { useNoteStore } from '../stores/note'
 import { useScrollSync } from '../composables/useScrollSync'
 import { useTocJumpHandler } from '../composables/useTocJumpHandler'
@@ -67,8 +68,22 @@ watch(scrollRatio, (ratio) => {
 
 useTocJumpHandler(previewContentEl, store)
 
+function onPreviewClick(e: MouseEvent) {
+  const target = e.target as HTMLElement
+  const btn = target.closest('.code-copy-btn') as HTMLButtonElement | null
+  if (btn) {
+    e.preventDefault()
+    handleCodeCopy(btn)
+  }
+}
+
+onMounted(() => {
+  previewContentEl.value?.addEventListener('click', onPreviewClick)
+})
+
 onBeforeUnmount(() => {
   if (renderTimer) clearTimeout(renderTimer)
+  previewContentEl.value?.removeEventListener('click', onPreviewClick)
 })
 
 /** 复制当前渲染 HTML 到剪贴板 */

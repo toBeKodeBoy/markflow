@@ -590,14 +590,56 @@ input:focus { border-color: var(--primary); }
   white-space: nowrap;
 }
 
-/* Preview pane: label floats at top-right of wrapper (direct child, no .code-lang-badge) */
-.code-block-wrapper > .code-lang-label {
+/* Preview pane: label floats at top-right of wrapper */
+.code-block-actions {
   position: absolute;
   top: 0;
   right: 0;
+  display: flex;
+  z-index: 1;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, visibility 0.15s ease;
+}
+
+.code-block-wrapper:hover .code-block-actions {
+  opacity: 1;
+  visibility: visible;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .code-block-actions {
+    opacity: 1;
+    visibility: visible;
+  }
 }
 
 [data-theme="dark"] .code-lang-label {
+  background: #2a2a3e;
+}
+
+/* 代码块复制按钮 */
+.code-copy-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: var(--bg-sidebar);
+  border-bottom-left-radius: 6px;
+  border-top-right-radius: 7px;
+  border-left: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.code-copy-btn:hover {
+  color: var(--primary);
+}
+
+[data-theme="dark"] .code-copy-btn {
   background: #2a2a3e;
 }
 
@@ -815,11 +857,8 @@ input:focus { border-color: var(--primary); }
   position: relative;
 }
 
-/* Code block language badge (WYSIWYG Milkdown - floating top-right) */
+/* Code block language badge (WYSIWYG Milkdown) */
 .code-lang-badge {
-  position: absolute;
-  top: 0;
-  right: 0;
   display: none;
   align-items: center;
   gap: 2px;
@@ -842,33 +881,6 @@ input:focus { border-color: var(--primary); }
 
 .has-language .code-lang-badge {
   display: flex;
-}
-
-/* 默认隐藏语言标签，hover 时淡入 */
-.code-block-wrapper .code-lang-badge,
-.code-block-wrapper > .code-lang-label {
-  opacity: 0;
-  pointer-events: none;
-  visibility: hidden;
-  transition: opacity 0.15s ease, visibility 0.15s ease;
-}
-
-.code-block-wrapper:hover .code-lang-badge,
-.code-block-wrapper:hover > .code-lang-label,
-.code-block-wrapper .code-lang-badge:hover {
-  opacity: 1;
-  pointer-events: auto;
-  visibility: visible;
-}
-
-/* 触摸设备：始终显示 */
-@media (hover: none) and (pointer: coarse) {
-  .code-block-wrapper .code-lang-badge,
-  .code-block-wrapper > .code-lang-label {
-    opacity: 1;
-    pointer-events: auto;
-    visibility: visible;
-  }
 }
 
 .code-lang-badge:hover {

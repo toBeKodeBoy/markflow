@@ -58,7 +58,7 @@ const underlineHtmlExtension: TokenizerAndRendererExtension = {
 
 /** 代码块渲染扩展：语法高亮 + 右上角语言标签 */
 const codeBlockRenderer: RendererExtension = {
-  name: 'codeBlockRenderer',
+  name: 'code',
   renderer(token) {
     const code = token.text
     const lang = token.lang || ''
@@ -74,7 +74,10 @@ const codeBlockRenderer: RendererExtension = {
     }
 
     return `<div class="code-block-wrapper">
-      ${langLabel}
+      <div class="code-block-actions">
+        ${langLabel}
+        <button class="code-copy-btn">复制</button>
+      </div>
       <pre><code class="hljs${lang ? ` language-${lang}` : ''}">${highlighted}</code></pre>
     </div>`
   },
