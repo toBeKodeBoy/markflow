@@ -17,6 +17,36 @@ function getCodeText(btn: HTMLButtonElement): string | null {
   return code.textContent ?? null
 }
 
+/** execCommand('copy') 回退方案，适用于 Clipboard API 不可用的环境 */
+function fallbackCopy(text: string): boolean {
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+  try {
+    return document.execCommand('copy')
+  } catch {
+    return false
+  } finally {
+    document.body.removeChild(textarea)
+  }
+}
+
+/** 写入剪贴板：优先 Clipboard API，失败时回退到 execCommand */
+async function writeClipboard(text: string): Promise<boolean> {
+  if (navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      // Clipboard API failed, fall through to execCommand
+    }
+  }
+  return fallbackCopy(text)
+}
+
 export function handleCodeCopy(btn: HTMLButtonElement): void {
   const text = getCodeText(btn)
   if (text === null || text === undefined) return
@@ -24,15 +54,8 @@ export function handleCodeCopy(btn: HTMLButtonElement): void {
   const trimmed = text.trim()
   if (!trimmed) return
 
-  if (!navigator.clipboard) {
-    if (typeof window.markflow !== 'undefined') {
-      window.markflow.showNotification('复制失败')
-    }
-    return
-  }
-
-  navigator.clipboard.writeText(text)
-    .then(() => {
+  writeClipboard(trimmed).then((success) => {
+    if (success) {
       btn.textContent = COPIED_TEXT
       const existing = timers.get(btn)
       if (existing) clearTimeout(existing)
@@ -41,10 +64,10 @@ export function handleCodeCopy(btn: HTMLButtonElement): void {
         timers.delete(btn)
       }, COPY_DURATION)
       timers.set(btn, timer)
-    })
-    .catch(() => {
+    } else {
       if (typeof window.markflow !== 'undefined') {
         window.markflow.showNotification('复制失败')
       }
-    })
+    }
+  })
 }
