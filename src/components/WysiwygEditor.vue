@@ -14,14 +14,42 @@ import { listener, listenerCtx } from '@milkdown/plugin-listener'
 import { history } from '@milkdown/plugin-history'
 import { listItemBlockComponent } from '@milkdown/components/list-item-block'
 import { getMarkdown, replaceAll } from '@milkdown/utils'
+import { editorViewOptionsCtx } from '@milkdown/core'
 import { useNoteStore } from '../stores/note'
 import { useTocJumpHandler } from '../composables/useTocJumpHandler'
 import { markdownPaste } from '../plugins/markdownPaste'
+import { plainTextFallback } from '../plugins/plainTextFallback'
 import { highlightMarkPlugins } from '../plugins/highlightMark'
 import { underlineMarkPlugins } from '../plugins/underlineMark'
-import { codeBlockLabelPlugin } from '../plugins/codeBlockLabel'
+import { codeBlockLabelPlugin, codeBlockExitPlugin } from '../plugins/codeBlockLabel'
 import { autoCloseBracketsPlugin } from '../plugins/autoCloseBrackets'
 import { normalizeUnderlineMarkdown } from '../utils/markedSetup'
+
+/** 粘贴 HTML 清洗：剥离 ProseMirror schema 不兼容的元素，防止 replaceSelection 异常触发静默粘贴失败 */
+function sanitizePastedHTML(html: string): string {
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(html, 'text/html')
+  const body = doc.body
+
+  const removeTags = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'CANVAS', 'VIDEO', 'AUDIO', 'OBJECT', 'EMBED', 'APPLET'])
+  const unwrapTags = new Set(['DIV', 'SPAN', 'SECTION', 'ARTICLE', 'ASIDE', 'NAV', 'HEADER', 'FOOTER', 'MAIN', 'FIGURE', 'FIGCAPTION', 'DETAILS', 'SUMMARY', 'ADDRESS', 'DATA', 'TIME', 'ABBR', 'BDO', 'BDI', 'RUBY', 'RT', 'RP', 'WBR'])
+
+  const toProcess: Element[] = []
+  const walker = document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT)
+  while (walker.nextNode()) {
+    toProcess.push(walker.currentNode as Element)
+  }
+
+  for (const el of toProcess.reverse()) {
+    if (removeTags.has(el.tagName)) {
+      el.remove()
+    } else if (unwrapTags.has(el.tagName)) {
+      el.replaceWith(...Array.from(el.childNodes))
+    }
+  }
+
+  return body.innerHTML
+}
 
 const store = useNoteStore()
 const containerRef = ref<HTMLDivElement>()
@@ -56,14 +84,23 @@ async function initEditor(content: string) {
             store.updateCurrentContent(markdown)
           }, 300)
         })
+        ctx.update(editorViewOptionsCtx, (prev) => ({
+          ...prev,
+          transformPastedHTML: (html: string) => {
+            if (prev.transformPastedHTML) html = (prev.transformPastedHTML as (html: string) => string)(html)
+            return sanitizePastedHTML(html)
+          },
+        }))
       })
+      .use(codeBlockExitPlugin)
       .use(commonmark)
       .use(gfm)
       .use(listItemBlockComponent)
       .use(highlightMarkPlugins)
       .use(underlineMarkPlugins)
-      .use(clipboard)
       .use(markdownPaste)
+      .use(clipboard)
+      .use(plainTextFallback)
       .use(codeBlockLabelPlugin)
       .use(autoCloseBracketsPlugin)
       .use(listener)

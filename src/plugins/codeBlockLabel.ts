@@ -1,6 +1,6 @@
 import type { Ctx } from '@milkdown/ctx'
 import { $prose } from '@milkdown/utils'
-import { Plugin, PluginKey } from '@milkdown/prose/state'
+import { Plugin, PluginKey, TextSelection, type Command } from '@milkdown/prose/state'
 import type { EditorView, NodeView, NodeViewConstructor, ViewMutationRecord } from '@milkdown/prose/view'
 import type { Node as ProseNode } from '@milkdown/prose/model'
 import hljs from 'highlight.js'
@@ -228,6 +228,38 @@ function hideDropdown() {
   activeIndex = -1
 }
 
+/** 当光标在代码块末尾时，ArrowDown 退出至代码块下方 */
+const exitCodeBlockCommand: Command = (state, dispatch) => {
+  const { $from } = state.selection
+  let codeBlockDepth = -1
+  for (let d = $from.depth; d >= 0; d--) {
+    if ($from.node(d).type.name === 'code_block') {
+      codeBlockDepth = d
+      break
+    }
+  }
+  if (codeBlockDepth < 0) return false
+
+  const endPos = $from.end(codeBlockDepth)
+  if ($from.pos < endPos) return false
+
+  if (!dispatch) return true
+
+  const afterPos = $from.after(codeBlockDepth)
+  const $after = state.doc.resolve(afterPos)
+  const atParentEnd = $after.parentOffset >= $after.parent.content.size
+
+  if (atParentEnd) {
+    const tr = state.tr
+    tr.insert(afterPos, state.schema.nodes.paragraph.create())
+    tr.setSelection(TextSelection.create(tr.doc, afterPos + 1))
+    dispatch(tr.scrollIntoView())
+  } else {
+    dispatch(state.tr.setSelection(TextSelection.near($after)).scrollIntoView())
+  }
+  return true
+}
+
 function buildCodeBlockDOM(lang: string): {
   wrapper: HTMLDivElement
   badge: HTMLSpanElement
@@ -236,6 +268,7 @@ function buildCodeBlockDOM(lang: string): {
   pre: HTMLPreElement
   code: HTMLElement
   highlightCode: HTMLElement
+  copyBtn: HTMLButtonElement
 } {
   const wrapper = document.createElement('div')
   wrapper.className = 'code-block-wrapper milkdown-code-block'
@@ -316,7 +349,6 @@ class CodeBlockNodeView implements NodeView {
   private highlightCode: HTMLElement
   private badge: HTMLSpanElement
   private label: HTMLSpanElement
-  private copyBtn: HTMLButtonElement
   private view: EditorView
   private getPos: () => number | undefined
   private trailingObserver: MutationObserver
@@ -340,10 +372,9 @@ class CodeBlockNodeView implements NodeView {
     this.highlightCode = highlightCode
     this.badge = badge
     this.label = label
-    this.copyBtn = copyBtn
     this.contentDOM = code
 
-    copyBtn.addEventListener('click', (e) => {
+    copyBtn.addEventListener('click', (e: MouseEvent) => {
       e.preventDefault()
       e.stopPropagation()
       handleCodeCopy(copyBtn)
@@ -370,6 +401,34 @@ class CodeBlockNodeView implements NodeView {
     } else if (mirror) {
       mirror.remove()
     }
+    this.syncLayerLineCount()
+  }
+
+  private layerSyncTimer: ReturnType<typeof requestAnimationFrame> | null = null
+
+  /** 测量高亮层与编辑层的视觉行数，若不一致则在编辑层补 padding，保证光标可达 */
+  private syncLayerLineCount() {
+    if (this.layerSyncTimer) return
+    this.layerSyncTimer = requestAnimationFrame(() => {
+      this.layerSyncTimer = null
+      const highlightRects = this.highlightCode.getClientRects()
+      const editRects = this.code.getClientRects()
+      const highlightLines = new Set<number>()
+      for (let i = 0; i < highlightRects.length; i++) {
+        highlightLines.add(Math.round(highlightRects[i].top))
+      }
+      const editLines = new Set<number>()
+      for (let i = 0; i < editRects.length; i++) {
+        editLines.add(Math.round(editRects[i].top))
+      }
+      if (highlightLines.size > editLines.size) {
+        const diff = highlightLines.size - editLines.size
+        const lineHeight = parseFloat(getComputedStyle(this.code).lineHeight) || 24
+        this.code.style.paddingBottom = `${diff * lineHeight}px`
+      } else {
+        this.code.style.paddingBottom = '0px'
+      }
+    })
   }
 
   /** 防抖调度高亮，避免大代码块逐字输入时卡顿 */
@@ -454,6 +513,7 @@ class CodeBlockNodeView implements NodeView {
 
   destroy() {
     if (this.highlightTimer) clearTimeout(this.highlightTimer)
+    if (this.layerSyncTimer) cancelAnimationFrame(this.layerSyncTimer)
     this.trailingObserver.disconnect()
     hideDropdown()
   }
@@ -476,6 +536,20 @@ export const codeBlockLabelPlugin = $prose((_ctx: Ctx) => {
           return new CodeBlockNodeView(node, view, getPos)
         },
       } as Record<string, NodeViewConstructor>,
+    },
+  })
+})
+
+export const codeBlockExitPlugin = $prose((_ctx: Ctx) => {
+  return new Plugin({
+    key: new PluginKey('MARKFLOW_CODE_BLOCK_EXIT'),
+    props: {
+      handleKeyDown: (view, event) => {
+        if (event.key === 'ArrowDown') {
+          return exitCodeBlockCommand(view.state, view.dispatch, view)
+        }
+        return false
+      },
     },
   })
 })
