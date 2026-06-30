@@ -2,7 +2,7 @@
 
 随叫随到的本地 Markdown 编辑器 uTools 插件，支持所见即所得编辑、多视图模式、多文档管理和导入导出。
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.0.1-blue)
 ![Vue](https://img.shields.io/badge/Vue-3.5-42b883)
 ![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178c6)
 ![uTools](https://img.shields.io/badge/platform-uTools-orange)
@@ -99,7 +99,7 @@ npm run build
 npm run preview
 ```
 
-构建产物输出至 `dist/` 目录，包含 `plugin.json`、`preload.cjs`、`index.html` 及静态资源。将 `dist/` 目录作为 uTools 插件目录加载即可。
+构建产物输出至 `dist/` 目录，包含 `plugin.json`、`preload.js`、`index.html` 及静态资源。将 `dist/` 目录作为 uTools 插件目录加载即可。
 
 ### 使用方式
 
@@ -148,7 +148,7 @@ npm run test:watch
 markflow/
 ├── public/
 │   ├── plugin.json        # uTools 插件清单
-│   └── preload.cjs        # uTools API 桥接 (window.markflow)
+│   └── preload.js         # uTools API 桥接 (window.markflow)
 ├── src/
 │   ├── main.ts            # Vue 应用入口
 │   ├── App.vue            # 根布局与视图模式切换
@@ -181,7 +181,7 @@ markflow/
 {
   "pluginName": "MarkFlow - Markdown笔记",
   "main": "index.html",
-  "preload": "preload.cjs",
+  "preload": "preload.js",
   "features": [{
     "code": "open-editor",
     "cmds": ["md", "markdown", "笔记", "MarkFlow", "markflow"]
