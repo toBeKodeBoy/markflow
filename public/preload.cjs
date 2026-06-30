@@ -110,5 +110,16 @@ window.markflow = {
   // 隐藏 uTools 主窗口
   hideMainWindow: function () {
     utools.hideMainWindow();
+  },
+
+  // 复制文本到剪贴板（uTools 原生 API，比 Clipboard API 更可靠）
+  copyText: function (text) {
+    try {
+      utools.copyText(text);
+      return true;
+    } catch (e) {
+      console.error('[MarkFlow] utools.copyText 失败:', e);
+      return false;
+    }
   }
 };

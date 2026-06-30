@@ -597,12 +597,22 @@ input:focus { border-color: var(--primary); }
   right: 0;
   display: flex;
   z-index: 1;
+}
+
+/* 在预览视图中始终显示操作按钮（复制、语言标签），无需悬停 */
+.preview-content .code-block-actions {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* WYSIWYG 编辑器中默认隐藏，悬停时显示 */
+.ProseMirror .code-block-actions {
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.15s ease, visibility 0.15s ease;
 }
 
-.code-block-wrapper:hover .code-block-actions {
+.ProseMirror .code-block-wrapper:hover .code-block-actions {
   opacity: 1;
   visibility: visible;
 }

@@ -32,6 +32,7 @@ describe('preload 桥接契约', () => {
     expect(typeof api.showNotification).toBe('function')
     expect(typeof api.isDarkTheme).toBe('function')
     expect(typeof api.hideMainWindow).toBe('function')
+    expect(typeof api.copyText).toBe('function')
   })
 
   it('getNoteList 应返回 NoteListItem[]', () => {
@@ -133,9 +134,17 @@ describe('Pinia Store 架构设计', () => {
     expect(Array.isArray(store.filteredNoteList)).toBe(true)
   })
 
-  it('liveContent 是编辑器的唯一内容源', () => {
-    // 这个模式确保了 WYSIWYG 和源码编辑器共用同一数据源
-    // 通过 setLiveContent / updateCurrentContent 双向同步
+  it('liveContent 是编辑器的唯一内容源', async () => {
+    const { setActivePinia, createPinia } = await import('pinia')
+    setActivePinia(createPinia())
+    const { useNoteStore } = await import('../../src/stores/note')
+    const store = useNoteStore()
+    store.createNoteWithContent('# 源')
+    store.setLiveContent('draft')
+    expect(store.liveContent).toBe('draft')
+    expect(store.currentNote?.content).toBe('# 源')
+    store.updateCurrentContent(store.liveContent)
+    expect(store.currentNote?.content).toBe('draft')
   })
 })
 
@@ -155,8 +164,13 @@ describe('视图模式架构设计', () => {
     // 按 Esc 恢复
   })
 
-  it('大文件应自动切换到分屏模式', () => {
-    // 当内容 > 200KB 且处于 live/focus 模式时
-    // App.vue 监听 pendingLargeFileSwitch 自动切换
+  it('大文件应自动切换到分屏模式', async () => {
+    const { setActivePinia, createPinia } = await import('pinia')
+    setActivePinia(createPinia())
+    const { useNoteStore } = await import('../../src/stores/note')
+    const { LARGE_FILE_THRESHOLD } = await import('../../src/constants')
+    const store = useNoteStore()
+    store.createNoteWithContent('x'.repeat(LARGE_FILE_THRESHOLD + 1))
+    expect(store.pendingLargeFileSwitch).toBe(true)
   })
 })

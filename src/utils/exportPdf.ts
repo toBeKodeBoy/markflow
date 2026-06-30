@@ -1,6 +1,7 @@
 import { useNoteStore } from '../stores/note'
 import { showAppNotification } from './notify'
 import { parseMarkdown } from './markedSetup'
+import { escapeHtml } from './escapeHtml'
 
 /**
  * 导出当前笔记为 PDF。
@@ -113,12 +114,4 @@ function buildPdfHtml(markdown: string, title: string): string {
 ${bodyHtml}
 </body>
 </html>`
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
 }

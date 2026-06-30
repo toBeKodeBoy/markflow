@@ -215,6 +215,17 @@ describe('useNoteStore', () => {
       expect(store.activeFolderId).toBeNull()
     })
 
+    it('deleteFolder 应将文件夹内笔记移回根目录', () => {
+      const store = useNoteStore()
+      const f = store.createFolder('工作')
+      const note = store.createNote(f.id)
+      store.deleteFolder(f.id)
+      expect(store.folderList).toHaveLength(0)
+      const saved = store.noteList.find(n => n.id === note.id)
+      expect(saved?.folderId).toBeUndefined()
+      expect(store.currentNote?.folderId).toBeUndefined()
+    })
+
     it('renameFolder 应更新名称', () => {
       const store = useNoteStore()
       const f = store.createFolder('旧名')
