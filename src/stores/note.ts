@@ -199,8 +199,21 @@ export const useNoteStore = defineStore('note', () => {
     return folder
   }
 
-  /** 删除文件夹，若为当前筛选则清除筛选 */
+  /** 删除文件夹：笔记移回根目录，清除当前文件夹筛选 */
   function deleteFolder(id: string) {
+    for (const item of noteList.value) {
+      if (item.folderId !== id) continue
+      const note = storage.getNote(item.id)
+      if (!note) continue
+      note.folderId = undefined
+      note.updatedAt = Date.now()
+      storage.saveNote(note)
+      item.folderId = undefined
+      item.updatedAt = note.updatedAt
+    }
+    if (currentNote.value?.folderId === id) {
+      currentNote.value.folderId = undefined
+    }
     folderList.value = folderList.value.filter(f => f.id !== id)
     storage.saveFolderList(folderList.value)
     if (activeFolderId.value === id) activeFolderId.value = null

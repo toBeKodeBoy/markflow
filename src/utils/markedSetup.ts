@@ -1,5 +1,7 @@
 import { marked, type TokenizerAndRendererExtension, type RendererExtension } from 'marked'
 import hljs from 'highlight.js'
+import DOMPurify from 'dompurify'
+import { escapeHtml } from './escapeHtml'
 
 /** 去掉 \<u> / \</u> 等转义，避免 marked 输出字面量标签 */
 export function normalizeUnderlineMarkdown(md: string): string {
@@ -62,7 +64,7 @@ const codeBlockRenderer: RendererExtension = {
   renderer(token) {
     const code = token.text
     const lang = token.lang || ''
-    const langLabel = lang ? `<span class="code-lang-label">${lang}</span>` : ''
+    const langLabel = lang ? `<span class="code-lang-label">${escapeHtml(lang)}</span>` : ''
 
     let highlighted: string
     if (lang && hljs.getLanguage(lang)) {
@@ -93,7 +95,8 @@ marked.setOptions({
 export function parseMarkdown(content: string): string {
   const normalized = normalizeUnderlineMarkdown(content)
   const html = marked.parse(normalized, { async: false })
-  return typeof html === 'string' ? html : ''
+  const raw = typeof html === 'string' ? html : ''
+  return DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } })
 }
 
 export { marked }

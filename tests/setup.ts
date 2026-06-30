@@ -55,6 +55,7 @@ window.markflow = {
   openMarkdownFile: vi.fn(() => '# Test content\n'),
   isDarkTheme: vi.fn(() => false),
   hideMainWindow: vi.fn(),
+  copyText: vi.fn(() => true),
 }
 
 // ---- mock localStorage fallback ----

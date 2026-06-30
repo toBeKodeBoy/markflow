@@ -55,6 +55,7 @@ export interface MarkFlowBridge {
   openMarkdownFile: () => string | null
   isDarkTheme: () => boolean
   hideMainWindow: () => void
+  copyText: (text: string) => boolean
 }
 
 declare global {
