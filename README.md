@@ -168,7 +168,6 @@ markflow/
 │   ├── unit/              # 单元测试
 │   ├── integration/       # 集成测试
 │   └── architecture/      # 架构约束测试
-├── docs/                  # 产品设计/架构设计/开发计划文档
 ├── vite.config.ts
 ├── tsconfig.json
 └── package.json

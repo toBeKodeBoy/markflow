@@ -374,6 +374,12 @@ class CodeBlockNodeView implements NodeView {
     this.label = label
     this.contentDOM = code
 
+    copyBtn.addEventListener('mousedown', (e: MouseEvent) => {
+      // 在 ProseMirror 中，交互控件需在 mousedown 阶段阻止默认行为，
+      // 否则编辑器会抢焦点 / 触发选区变更，导致随后的 click 不到达按钮。
+      e.preventDefault()
+      e.stopPropagation()
+    })
     copyBtn.addEventListener('click', (e: MouseEvent) => {
       e.preventDefault()
       e.stopPropagation()

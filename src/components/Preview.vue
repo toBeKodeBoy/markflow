@@ -13,6 +13,7 @@
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { parseMarkdown } from '../utils/markedSetup'
 import { handleCodeCopy } from '../utils/codeCopy'
+import { writeClipboard } from '../utils/clipboard'
 import { useNoteStore } from '../stores/note'
 import { useScrollSync } from '../composables/useScrollSync'
 import { useTocJumpHandler } from '../composables/useTocJumpHandler'
@@ -87,11 +88,10 @@ onBeforeUnmount(() => {
 })
 
 /** 复制当前渲染 HTML 到剪贴板 */
-function copyHtml() {
-  navigator.clipboard.writeText(renderedHtml.value).then(() => {
-    if (typeof window.markflow !== 'undefined') {
-      window.markflow.showNotification('HTML 已复制到剪贴板')
-    }
-  })
+async function copyHtml() {
+  const ok = await writeClipboard(renderedHtml.value)
+  if (ok && typeof window.markflow !== 'undefined') {
+    window.markflow.showNotification('HTML 已复制到剪贴板')
+  }
 }
 </script>
