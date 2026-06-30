@@ -2,7 +2,7 @@
 
 > 随叫随到的本地 Markdown 编辑器 uTools 插件，支持所见即所得编辑、多视图模式、多文档管理和导入导出。
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.0.1-blue)
 ![Vue](https://img.shields.io/badge/Vue-3.5-42b883)
 ![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178c6)
 ![uTools](https://img.shields.io/badge/platform-uTools-orange)
@@ -109,7 +109,7 @@ npm run dev
 npm run build
 ```
 
-构建产物输出至 `dist/` 目录，包含 `plugin.json`、`preload.cjs`、`index.html` 及静态资源。将 `dist/` 目录作为 uTools 插件目录加载即可。
+构建产物输出至 `dist/` 目录，包含 `plugin.json`、`preload.js`、`index.html` 及静态资源。将 `dist/` 目录作为 uTools 插件目录加载即可。
 
 ### 预览构建产物
 
@@ -125,7 +125,7 @@ npm run preview
 markflow/
 ├── public/
 │   ├── plugin.json          # uTools 插件清单
-│   ├── preload.cjs          # uTools API 桥接 (window.markflow)
+│   ├── preload.js           # uTools API 桥接 (window.markflow)
 │   └── logo.png
 ├── src/
 │   ├── main.ts              # Vue 应用入口
@@ -189,9 +189,9 @@ markflow/
 ```
 uTools 启动器
     │
-    ├── plugin.json  →  加载 index.html + preload.cjs
+    ├── plugin.json  →  加载 index.html + preload.js
     │
-    ├── preload.cjs  →  window.markflow（存储、文件对话框、通知、主题）
+    ├── preload.js   →  window.markflow（存储、文件对话框、通知、主题）
     │
     └── Vue 3 应用
             ├── Pinia（笔记 Store：笔记列表、当前笔记、liveContent）
@@ -206,7 +206,7 @@ uTools 启动器
                   └── Toc（目录导航）
 ```
 
-`preload.cjs` 是 uTools 与 Vue 应用之间的桥梁，将 `utools.dbStorage`、文件系统操作等 API 安全地暴露为 `window.markflow`。Vue 应用只依赖这一抽象接口，因此在浏览器开发模式下也能正常运行。
+`preload.js` 是 uTools 与 Vue 应用之间的桥梁，将 `utools.dbStorage`、文件系统操作等 API 安全地暴露为 `window.markflow`。Vue 应用只依赖这一抽象接口，因此在浏览器开发模式下也能正常运行。
 
 ### 编辑缓冲层
 
