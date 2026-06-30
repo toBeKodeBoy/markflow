@@ -4,7 +4,6 @@ import { Plugin, PluginKey, TextSelection, type Command } from '@milkdown/prose/
 import type { EditorView, NodeView, NodeViewConstructor, ViewMutationRecord } from '@milkdown/prose/view'
 import type { Node as ProseNode } from '@milkdown/prose/model'
 import hljs from 'highlight.js'
-import { handleCodeCopy } from '../utils/codeCopy'
 
 const POPULAR_LANGUAGES = [
   'javascript', 'typescript', 'python', 'java', 'c', 'cpp', 'csharp',
@@ -315,6 +314,7 @@ function buildCodeBlockDOM(lang: string): {
   badge.appendChild(chevron)
 
   const copyBtn = document.createElement('button')
+  copyBtn.type = 'button'
   copyBtn.className = 'code-copy-btn'
   copyBtn.textContent = '复制'
 
@@ -359,7 +359,7 @@ class CodeBlockNodeView implements NodeView {
     this.getPos = getPos
 
     const lang = node.attrs.language || ''
-    const { wrapper, badge, label, pre, code, highlightCode, copyBtn } = buildCodeBlockDOM(lang)
+    const { wrapper, badge, label, pre, code, highlightCode } = buildCodeBlockDOM(lang)
 
     if (lang) {
       attachClickHandlers(badge, view, getPos)
@@ -374,17 +374,7 @@ class CodeBlockNodeView implements NodeView {
     this.label = label
     this.contentDOM = code
 
-    copyBtn.addEventListener('mousedown', (e: MouseEvent) => {
-      // 在 ProseMirror 中，交互控件需在 mousedown 阶段阻止默认行为，
-      // 否则编辑器会抢焦点 / 触发选区变更，导致随后的 click 不到达按钮。
-      e.preventDefault()
-      e.stopPropagation()
-    })
-    copyBtn.addEventListener('click', (e: MouseEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      handleCodeCopy(copyBtn)
-    })
+    // 复制交互由 WysiwygEditor 容器捕获阶段委托处理（见 handleCodeCopyCapture*）
 
     // 首次高亮
     this.highlightContent(node.textContent, lang)
@@ -522,6 +512,12 @@ class CodeBlockNodeView implements NodeView {
     if (this.layerSyncTimer) cancelAnimationFrame(this.layerSyncTimer)
     this.trailingObserver.disconnect()
     hideDropdown()
+  }
+
+  stopEvent(event: Event): boolean {
+    const target = event.target
+    if (!(target instanceof Node)) return false
+    return this.dom.contains(target) && !this.contentDOM.contains(target)
   }
 
   ignoreMutation(mutation: ViewMutationRecord) {

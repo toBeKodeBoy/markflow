@@ -24,6 +24,10 @@ import { underlineMarkPlugins } from '../plugins/underlineMark'
 import { codeBlockLabelPlugin, codeBlockExitPlugin } from '../plugins/codeBlockLabel'
 import { autoCloseBracketsPlugin } from '../plugins/autoCloseBrackets'
 import { normalizeUnderlineMarkdown } from '../utils/markedSetup'
+import {
+  handleCodeCopyCaptureClick,
+  handleCodeCopyCaptureMouseDown,
+} from '../utils/codeCopy'
 
 /** 粘贴 HTML 清洗：剥离 ProseMirror schema 不兼容的元素，防止 replaceSelection 异常触发静默粘贴失败 */
 function sanitizePastedHTML(html: string): string {
@@ -148,9 +152,19 @@ useTocJumpHandler(containerRef, store)
 onMounted(() => {
   const content = store.currentNote?.content ?? store.liveContent ?? ''
   initEditor(content)
+  const host = containerRef.value
+  if (host) {
+    host.addEventListener('mousedown', handleCodeCopyCaptureMouseDown, true)
+    host.addEventListener('click', handleCodeCopyCaptureClick, true)
+  }
 })
 
 onBeforeUnmount(async () => {
+  const host = containerRef.value
+  if (host) {
+    host.removeEventListener('mousedown', handleCodeCopyCaptureMouseDown, true)
+    host.removeEventListener('click', handleCodeCopyCaptureClick, true)
+  }
   if (saveTimer) {
     clearTimeout(saveTimer)
     saveTimer = null
