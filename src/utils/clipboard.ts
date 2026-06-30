@@ -15,8 +15,8 @@ function fallbackCopy(text: string): boolean {
   }
 }
 
-/** 写入剪贴板：优先 uTools 原生 API，其次 Clipboard API，最后回退到 execCommand */
-export async function writeClipboard(text: string): Promise<boolean> {
+/** 同步写入剪贴板：uTools 原生 API 或 execCommand 回退（须在用户手势同步栈内调用） */
+export function writeClipboardSync(text: string): boolean {
   if (typeof window !== 'undefined' && typeof window.markflow?.copyText === 'function') {
     try {
       if (window.markflow.copyText(text)) return true
@@ -24,6 +24,12 @@ export async function writeClipboard(text: string): Promise<boolean> {
       // fall through
     }
   }
+  return fallbackCopy(text)
+}
+
+/** 写入剪贴板：优先同步路径，其次 Clipboard API */
+export async function writeClipboard(text: string): Promise<boolean> {
+  if (writeClipboardSync(text)) return true
   if (navigator.clipboard) {
     try {
       await navigator.clipboard.writeText(text)
@@ -32,5 +38,5 @@ export async function writeClipboard(text: string): Promise<boolean> {
       // fall through
     }
   }
-  return fallbackCopy(text)
+  return false
 }

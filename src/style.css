@@ -596,16 +596,19 @@ input:focus { border-color: var(--primary); }
   top: 0;
   right: 0;
   display: flex;
-  z-index: 1;
+  z-index: 10;
+  pointer-events: auto;
 }
 
-/* 在预览视图中始终显示操作按钮（复制、语言标签），无需悬停 */
+/* 预览/专注/分屏右侧：始终显示操作按钮（复制、语言标签），无需悬停 */
+.mode-live .ProseMirror .code-block-actions,
+.mode-focus .ProseMirror .code-block-actions,
 .preview-content .code-block-actions {
   opacity: 1;
   visibility: visible;
 }
 
-/* WYSIWYG 编辑器中默认隐藏，悬停时显示 */
+/* WYSIWYG 编辑器中默认隐藏，悬停时显示（预览/专注模式由上方规则覆盖） */
 .ProseMirror .code-block-actions {
   opacity: 0;
   visibility: hidden;
@@ -647,6 +650,11 @@ input:focus { border-color: var(--primary); }
 
 .code-copy-btn:hover {
   color: var(--primary);
+}
+
+.code-copy-btn.copied {
+  color: var(--primary);
+  font-weight: 600;
 }
 
 [data-theme="dark"] .code-copy-btn {
