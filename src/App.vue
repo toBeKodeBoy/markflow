@@ -17,6 +17,11 @@
       </template>
       <Toc v-if="tocVisible && viewMode !== 'focus'" />
     </div>
+    <Transition name="app-toast">
+      <div v-if="toastMessage" class="app-toast" role="status" aria-live="polite">
+        {{ toastMessage }}
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -30,7 +35,7 @@ import Preview from './components/Preview.vue'
 import Toc from './components/Toc.vue'
 import { useNoteStore } from './stores/note'
 import { useTheme } from './composables/useTheme'
-import { showAppNotification } from './utils/notify'
+import { onAppNotification, showAppNotification } from './utils/notify'
 import type { ViewMode } from './types'
 
 const store = useNoteStore()
@@ -40,6 +45,9 @@ const viewMode = ref<ViewMode>('live')
 const prevMode = ref<ViewMode>('live')
 const sidebarVisible = ref(true)
 const tocVisible = ref(false)
+const toastMessage = ref('')
+let toastTimer: ReturnType<typeof setTimeout> | null = null
+let removeNotificationListener: (() => void) | null = null
 
 const showSidebar = computed(() => viewMode.value !== 'focus' && sidebarVisible.value)
 
@@ -116,9 +124,19 @@ function onKeydown(e: KeyboardEvent) {
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
+  removeNotificationListener = onAppNotification((message) => {
+    toastMessage.value = message
+    if (toastTimer) clearTimeout(toastTimer)
+    toastTimer = setTimeout(() => {
+      toastMessage.value = ''
+      toastTimer = null
+    }, 1800)
+  })
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
+  removeNotificationListener?.()
+  if (toastTimer) clearTimeout(toastTimer)
 })
 </script>

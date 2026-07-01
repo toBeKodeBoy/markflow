@@ -10,8 +10,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { parseMarkdown } from '../utils/markedSetup'
+import { handleCodeCopyCaptureClick } from '../utils/codeCopy'
+import { writeClipboard } from '../utils/clipboard'
+import { showCodeLanguageDropdown, hideCodeLanguageDropdown } from '../utils/codeLanguageDropdown'
+import { updateFenceLanguage } from '../utils/updateFenceLanguage'
 import { useNoteStore } from '../stores/note'
 import { useScrollSync } from '../composables/useScrollSync'
 import { useTocJumpHandler } from '../composables/useTocJumpHandler'
@@ -67,16 +71,44 @@ watch(scrollRatio, (ratio) => {
 
 useTocJumpHandler(previewContentEl, store)
 
+function handleCodeLanguageMouseDown(e: MouseEvent) {
+  const badge = (e.target as HTMLElement).closest?.('.preview-code-lang-badge') as HTMLElement | null
+  if (!badge) return
+
+  const index = Number(badge.dataset.codeBlockIndex)
+  if (!Number.isInteger(index)) return
+
+  e.preventDefault()
+  e.stopPropagation()
+
+  showCodeLanguageDropdown(badge, {
+    onSelect: (lang) => {
+      const content = store.liveContent || (store.currentNote?.content ?? '')
+      const nextContent = updateFenceLanguage(content, index, lang)
+      if (nextContent !== content) {
+        store.updateCurrentContent(nextContent)
+      }
+    },
+  })
+}
+
+onMounted(() => {
+  previewContentEl.value?.addEventListener('mousedown', handleCodeLanguageMouseDown, true)
+  previewContentEl.value?.addEventListener('click', handleCodeCopyCaptureClick, true)
+})
+
 onBeforeUnmount(() => {
   if (renderTimer) clearTimeout(renderTimer)
+  hideCodeLanguageDropdown()
+  previewContentEl.value?.removeEventListener('mousedown', handleCodeLanguageMouseDown, true)
+  previewContentEl.value?.removeEventListener('click', handleCodeCopyCaptureClick, true)
 })
 
 /** 复制当前渲染 HTML 到剪贴板 */
-function copyHtml() {
-  navigator.clipboard.writeText(renderedHtml.value).then(() => {
-    if (typeof window.markflow !== 'undefined') {
-      window.markflow.showNotification('HTML 已复制到剪贴板')
-    }
-  })
+async function copyHtml() {
+  const ok = await writeClipboard(renderedHtml.value)
+  if (ok && typeof window.markflow !== 'undefined') {
+    window.markflow.showNotification('HTML 已复制到剪贴板')
+  }
 }
 </script>
