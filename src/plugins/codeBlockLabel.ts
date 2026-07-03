@@ -5,6 +5,7 @@ import type { EditorView, NodeView, NodeViewConstructor, ViewMutationRecord } fr
 import type { Node as ProseNode } from '@milkdown/prose/model'
 import hljs from 'highlight.js'
 import { hideCodeLanguageDropdown, showCodeLanguageDropdown } from '../utils/codeLanguageDropdown'
+import { COPY_TEXT } from '../utils/codeCopy'
 
 type CodeBlockHandle = {
   view: EditorView
@@ -93,14 +94,16 @@ function buildCodeBlockDOM(lang: string): {
   const layers = document.createElement('div')
   layers.className = 'code-block-layers'
 
-  // 鍙鐨勯珮浜唬鐮佸眰锛堜笌 contentDOM 鍚屾牸鍙犳斁锛?  const highlightCode = document.createElement('code')
+  // 可见的高亮代码层（与 contentDOM 同格叠放）
+  const highlightCode = document.createElement('code')
   highlightCode.className = 'hljs code-block-highlight'
   if (lang) {
     highlightCode.classList.add(`language-${lang}`)
   }
   layers.appendChild(highlightCode)
 
-  // contentDOM锛歅roseMirror 绠＄悊姝ゅ厓绱?  const code = document.createElement('code')
+  // contentDOM：ProseMirror 管理此元素
+  const code = document.createElement('code')
   code.className = 'code-block-editable'
   if (lang) {
     code.classList.add(`language-${lang}`)
@@ -131,7 +134,7 @@ function buildCodeBlockDOM(lang: string): {
   const copyBtn = document.createElement('button')
   copyBtn.type = 'button'
   copyBtn.className = 'code-copy-btn'
-  copyBtn.textContent = '澶嶅埗'
+  copyBtn.textContent = COPY_TEXT
 
   const actions = document.createElement('div')
   actions.className = 'code-block-actions'
@@ -219,7 +222,7 @@ class CodeBlockNodeView implements NodeView {
     this.label = label
     this.contentDOM = code
 
-    // 澶嶅埗浜や簰鐢?WysiwygEditor 瀹瑰櫒鎹曡幏闃舵濮旀墭澶勭悊锛堣 handleCodeCopyCapture*锛?
+    // 复制交互由 WysiwygEditor 容器捕获阶段委托处理（见 handleCodeCopyCapture*）
     // 棣栨楂樹寒
     this.highlightContent(node.textContent, lang)
     requestAnimationFrame(() => this.syncTrailingBreak())

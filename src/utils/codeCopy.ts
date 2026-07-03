@@ -6,8 +6,8 @@
 import { writeClipboard, writeClipboardSync } from './clipboard'
 import { showAppNotification } from './notify'
 
-const COPY_TEXT = '复制'
-const COPIED_TEXT = '已复制!'
+export const COPY_TEXT = '复制'
+export const COPIED_TEXT = '已复制!'
 const COPY_SUCCESS_MSG = '代码已复制到剪贴板'
 const COPY_DURATION = 2000
 

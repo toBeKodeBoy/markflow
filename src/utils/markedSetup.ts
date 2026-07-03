@@ -2,6 +2,7 @@ import { marked, type TokenizerAndRendererExtension, type RendererExtension } fr
 import hljs from 'highlight.js'
 import DOMPurify from 'dompurify'
 import { escapeHtml } from './escapeHtml'
+import { COPY_TEXT } from './codeCopy'
 
 /** 去掉 \<u> / \</u> 等转义，避免 marked 输出字面量标签 */
 export function normalizeUnderlineMarkdown(md: string): string {
@@ -78,7 +79,7 @@ const codeBlockRenderer: RendererExtension = {
     return `<div class="code-block-wrapper">
       <div class="code-block-actions">
         ${langLabel}
-        <button class="code-copy-btn">复制</button>
+        <button class="code-copy-btn">${COPY_TEXT}</button>
       </div>
       <pre><code class="hljs${lang ? ` language-${lang}` : ''}">${highlighted}</code></pre>
     </div>`
