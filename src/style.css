@@ -561,6 +561,7 @@ input:focus { border-color: var(--primary); }
   border-radius: var(--radius);
   background: var(--code-bg);
   overflow: visible;
+  isolation: isolate;
 }
 
 .ProseMirror .code-block-wrapper pre {
@@ -572,6 +573,11 @@ input:focus { border-color: var(--primary); }
 
 .ProseMirror .code-block-wrapper.has-language pre {
   padding-top: 24px;
+  pointer-events: none;
+}
+
+.ProseMirror .code-block-wrapper.has-language pre .code-block-editable {
+  pointer-events: auto;
 }
 
 .code-lang-label {
@@ -596,7 +602,7 @@ input:focus { border-color: var(--primary); }
   top: 0;
   right: 0;
   display: flex;
-  z-index: 10;
+  z-index: 20;
   pointer-events: auto;
 }
 
@@ -604,8 +610,9 @@ input:focus { border-color: var(--primary); }
 .mode-live .ProseMirror .code-block-actions,
 .mode-focus .ProseMirror .code-block-actions,
 .preview-content .code-block-actions {
-  opacity: 1;
-  visibility: visible;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
 }
 
 /* WYSIWYG 编辑器中默认隐藏，悬停时显示（预览/专注模式由上方规则覆盖） */
@@ -1013,6 +1020,16 @@ input:focus { border-color: var(--primary); }
 /* WYSIWYG 代码块：grid 叠层，高亮层与可编辑层共享同一排版 */
 .ProseMirror .code-block-wrapper .code-block-layers {
   display: grid;
+}
+
+.ProseMirror .code-block-wrapper .code-block-edit-spacer {
+  grid-area: 1 / 1;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.ProseMirror .code-block-wrapper .code-block-actions {
+  z-index: 30;
 }
 
 .ProseMirror .code-block-wrapper .code-block-layers > code {

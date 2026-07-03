@@ -1,233 +1,43 @@
-import type { Ctx } from '@milkdown/ctx'
+﻿import type { Ctx } from '@milkdown/ctx'
 import { $prose } from '@milkdown/utils'
 import { Plugin, PluginKey, TextSelection, type Command } from '@milkdown/prose/state'
 import type { EditorView, NodeView, NodeViewConstructor, ViewMutationRecord } from '@milkdown/prose/view'
 import type { Node as ProseNode } from '@milkdown/prose/model'
 import hljs from 'highlight.js'
+import { hideCodeLanguageDropdown, showCodeLanguageDropdown } from '../utils/codeLanguageDropdown'
 
-const POPULAR_LANGUAGES = [
-  'javascript', 'typescript', 'python', 'java', 'c', 'cpp', 'csharp',
-  'go', 'rust', 'ruby', 'php', 'swift', 'kotlin',
-  'bash', 'shell', 'sql',
-  'html', 'css', 'json', 'xml', 'yaml', 'markdown',
-  'plaintext',
-]
-
-/** 全量语言列表：常用语言靠前 + hljs 支持的所有语言 */
-const ALL_LANGUAGES = (() => {
-  const seen = new Set<string>(POPULAR_LANGUAGES)
-  const extra = hljs.listLanguages().filter((lang) => {
-    if (seen.has(lang)) return false
-    seen.add(lang)
-    return true
-  })
-  return [...POPULAR_LANGUAGES, ...extra]
-})()
-
-let globalDropdown: HTMLDivElement | null = null
-let globalList: HTMLDivElement | null = null
-let searchInput: HTMLInputElement | null = null
-let activeView: EditorView | null = null
-let activeGetPos: (() => number | undefined) | null = null
-let activeIndex = -1
-
-/** 对 item 中的匹配文本加 <span class="highlight"> 高亮 */
-function highlightMatch(text: string, query: string): string {
-  if (!query) return text
-  const idx = text.toLowerCase().indexOf(query.toLowerCase())
-  if (idx === -1) return text
-  return (
-    text.slice(0, idx) +
-    `<span class="highlight">${text.slice(idx, idx + query.length)}</span>` +
-    text.slice(idx + query.length)
-  )
+type CodeBlockHandle = {
+  view: EditorView
+  getPos: () => number | undefined
+  badge: HTMLSpanElement
 }
 
-/** 过滤语言列表：按空格分词，所有分词都匹配才算 */
-function filterLanguages(query: string): string[] {
-  const trimmed = query.trim().toLowerCase()
-  if (!trimmed) return ALL_LANGUAGES
+type CodeBlockWrapper = HTMLDivElement & { __markflowCodeBlock?: CodeBlockHandle }
 
-  const terms = trimmed.split(/\s+/)
-  return ALL_LANGUAGES.filter((lang) =>
-    terms.every((t) => lang.toLowerCase().includes(t)),
-  )
+function setCodeBlockHandle(wrapper: HTMLDivElement, handle: CodeBlockHandle) {
+  ;(wrapper as CodeBlockWrapper).__markflowCodeBlock = handle
 }
 
-/** 重建列表 DOM */
-function renderList(items: string[], query: string) {
-  if (!globalList) return
-  globalList.innerHTML = ''
-
-  if (items.length === 0) {
-    const empty = document.createElement('div')
-    empty.className = 'code-lang-dropdown-empty'
-    empty.textContent = '无匹配语言'
-    globalList.appendChild(empty)
-    return
-  }
-
-  items.forEach((lang) => {
-    const item = document.createElement('div')
-    item.className = 'code-lang-dropdown-item'
-    item.dataset.lang = lang
-    item.innerHTML = highlightMatch(lang, query)
-    item.addEventListener('mousedown', (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-      selectLanguage(lang)
-    })
-    globalList!.appendChild(item)
-  })
+function clearCodeBlockHandle(wrapper: HTMLDivElement) {
+  delete (wrapper as CodeBlockWrapper).__markflowCodeBlock
 }
 
-function selectLanguage(lang: string) {
-  if (activeView && activeGetPos) {
-    const pos = activeGetPos()
-    if (pos != null) {
-      activeView.dispatch(
-        activeView.state.tr.setNodeAttribute(pos, 'language', lang),
-      )
-    }
-  }
-  hideDropdown()
-}
-
-function onSearchInput() {
-  if (!searchInput) return
-  const query = searchInput.value
-  const items = filterLanguages(query)
-  renderList(items, query)
-  activeIndex = -1
-}
-
-function onSearchKeyDown(e: KeyboardEvent) {
-  if (!globalList) return
-  const items = globalList.querySelectorAll<HTMLDivElement>('.code-lang-dropdown-item')
-  if (items.length === 0) return
-
-  switch (e.key) {
-    case 'ArrowDown':
-      e.preventDefault()
-      activeIndex = Math.min(activeIndex + 1, items.length - 1)
-      updateActiveItem(items)
-      break
-    case 'ArrowUp':
-      e.preventDefault()
-      activeIndex = Math.max(activeIndex - 1, 0)
-      updateActiveItem(items)
-      break
-    case 'Enter': {
-      e.preventDefault()
-      const index = activeIndex >= 0 ? activeIndex : 0
-      if (index < items.length) {
-        selectLanguage(items[index].dataset.lang || '')
+function openLangDropdown(
+  badge: HTMLSpanElement,
+  view: EditorView,
+  getPos: () => number | undefined,
+) {
+  showCodeLanguageDropdown(badge, {
+    onSelect: (lang) => {
+      const pos = getPos()
+      if (pos != null) {
+        view.dispatch(view.state.tr.setNodeAttribute(pos, 'language', lang))
       }
-      break
-    }
-    case 'Escape':
-      e.preventDefault()
-      hideDropdown()
-      break
-  }
-}
-
-function updateActiveItem(items: NodeListOf<HTMLDivElement>) {
-  items.forEach((el, i) => {
-    el.classList.toggle('active', i === activeIndex)
-  })
-  // 滚动到可见区域
-  if (activeIndex >= 0 && items[activeIndex]) {
-    items[activeIndex].scrollIntoView({ block: 'nearest' })
-  }
-}
-
-function getDropdown(): HTMLDivElement {
-  if (globalDropdown) return globalDropdown
-
-  const dropdown = document.createElement('div')
-  dropdown.className = 'code-lang-dropdown'
-
-  // --- 搜索输入区域 ---
-  const searchWrap = document.createElement('div')
-  searchWrap.className = 'code-lang-search-wrap'
-
-  const searchIcon = document.createElement('span')
-  searchIcon.className = 'code-lang-search-icon'
-  searchIcon.textContent = '\u{1F50D}' // 🔍
-
-  const input = document.createElement('input')
-  input.className = 'code-lang-search-input'
-  input.type = 'text'
-  input.placeholder = '搜索语言…'
-  input.spellcheck = false
-  input.autocomplete = 'off'
-  input.addEventListener('input', onSearchInput)
-  input.addEventListener('keydown', onSearchKeyDown)
-
-  searchWrap.appendChild(searchIcon)
-  searchWrap.appendChild(input)
-  dropdown.appendChild(searchWrap)
-  searchInput = input
-
-  // --- 列表区域 ---
-  const list = document.createElement('div')
-  list.className = 'code-lang-dropdown-list'
-  dropdown.appendChild(list)
-  globalList = list
-
-  // 首次渲染全部语言
-  renderList(ALL_LANGUAGES, '')
-
-  document.body.appendChild(dropdown)
-
-  document.addEventListener('mousedown', (e) => {
-    if (dropdown.style.display !== 'none' && !dropdown.contains(e.target as Node)) {
-      hideDropdown()
-    }
-  })
-
-  globalDropdown = dropdown
-  return dropdown
-}
-
-function showDropdown(anchor: HTMLElement, view: EditorView, getPos: () => number | undefined) {
-  const dropdown = getDropdown()
-  activeView = view
-  activeGetPos = getPos
-  activeIndex = -1
-
-  // 重置搜索
-  if (searchInput) {
-    searchInput.value = ''
-    renderList(ALL_LANGUAGES, '')
-  }
-
-  const rect = anchor.getBoundingClientRect()
-  dropdown.style.position = 'fixed'
-  dropdown.style.top = `${rect.bottom + 4}px`
-  dropdown.style.right = `${window.innerWidth - rect.right}px`
-  dropdown.style.minWidth = `${Math.max(rect.width, 160)}px`
-  dropdown.style.left = ''
-  dropdown.style.width = ''
-  dropdown.style.display = 'block'
-
-  // 聚焦搜索框
-  requestAnimationFrame(() => {
-    searchInput?.focus()
+    },
   })
 }
 
-function hideDropdown() {
-  if (globalDropdown) {
-    globalDropdown.style.display = 'none'
-  }
-  activeView = null
-  activeGetPos = null
-  activeIndex = -1
-}
-
-/** 当光标在代码块末尾时，ArrowDown 退出至代码块下方 */
+/** 褰撳厜鏍囧湪浠ｇ爜鍧楁湯灏炬椂锛孉rrowDown 閫€鍑鸿嚦浠ｇ爜鍧椾笅鏂?*/
 const exitCodeBlockCommand: Command = (state, dispatch) => {
   const { $from } = state.selection
   let codeBlockDepth = -1
@@ -261,12 +71,14 @@ const exitCodeBlockCommand: Command = (state, dispatch) => {
 
 function buildCodeBlockDOM(lang: string): {
   wrapper: HTMLDivElement
+  actions: HTMLDivElement
   badge: HTMLSpanElement
   label: HTMLSpanElement
   chevron: HTMLSpanElement
   pre: HTMLPreElement
   code: HTMLElement
   highlightCode: HTMLElement
+  editSpacer: HTMLDivElement
   copyBtn: HTMLButtonElement
 } {
   const wrapper = document.createElement('div')
@@ -281,21 +93,24 @@ function buildCodeBlockDOM(lang: string): {
   const layers = document.createElement('div')
   layers.className = 'code-block-layers'
 
-  // 可见的高亮代码层（与 contentDOM 同格叠放）
-  const highlightCode = document.createElement('code')
+  // 鍙鐨勯珮浜唬鐮佸眰锛堜笌 contentDOM 鍚屾牸鍙犳斁锛?  const highlightCode = document.createElement('code')
   highlightCode.className = 'hljs code-block-highlight'
   if (lang) {
     highlightCode.classList.add(`language-${lang}`)
   }
   layers.appendChild(highlightCode)
 
-  // contentDOM：ProseMirror 管理此元素
-  const code = document.createElement('code')
+  // contentDOM锛歅roseMirror 绠＄悊姝ゅ厓绱?  const code = document.createElement('code')
   code.className = 'code-block-editable'
   if (lang) {
     code.classList.add(`language-${lang}`)
   }
   layers.appendChild(code)
+
+  const editSpacer = document.createElement('div')
+  editSpacer.className = 'code-block-edit-spacer'
+  editSpacer.setAttribute('aria-hidden', 'true')
+  layers.appendChild(editSpacer)
 
   pre.appendChild(layers)
 
@@ -316,29 +131,52 @@ function buildCodeBlockDOM(lang: string): {
   const copyBtn = document.createElement('button')
   copyBtn.type = 'button'
   copyBtn.className = 'code-copy-btn'
-  copyBtn.textContent = '复制'
+  copyBtn.textContent = '澶嶅埗'
 
   const actions = document.createElement('div')
   actions.className = 'code-block-actions'
   actions.appendChild(badge)
   actions.appendChild(copyBtn)
 
-  wrapper.appendChild(pre)
+  // actions 缃簬 pre 涔嬪墠锛岄厤鍚?z-index 淇濊瘉鍙充笂瑙掑彲鐐瑰嚮
   wrapper.appendChild(actions)
+  wrapper.appendChild(pre)
 
-  return { wrapper, badge, label, chevron, pre, code, highlightCode, copyBtn }
+  return { wrapper, actions, badge, label, chevron, pre, code, highlightCode, editSpacer, copyBtn }
 }
 
+/** 鍦?actions 涓婄粦瀹?mousedown锛堟崟鑾烽樁娈碉級锛屾墿澶у彲鐐瑰尯鍩熷苟閬垮厤 ProseMirror 鎶㈢劍鐐?*/
 function attachClickHandlers(
+  actions: HTMLDivElement,
   badge: HTMLSpanElement,
   view: EditorView,
   getPos: () => number | undefined,
-) {
-  badge.addEventListener('mousedown', (e) => {
+): ((e: MouseEvent) => void) | null {
+  if (actions.dataset.langDropdownAttached) return null
+
+  const handler = (e: MouseEvent) => {
+    if (!(e.target as HTMLElement).closest?.('.code-lang-badge')) return
     e.preventDefault()
     e.stopPropagation()
-    showDropdown(badge, view, getPos)
-  })
+    openLangDropdown(badge, view, getPos)
+  }
+
+  actions.addEventListener('mousedown', handler, true)
+  actions.dataset.langDropdownAttached = 'true'
+  return handler
+}
+
+/** WYSIWYG 瀹瑰櫒绾у厹搴曪細浠?wrapper 璇诲彇涓婁笅鏂囷紝涓嶄緷璧?WeakMap */
+export function handleLangBadgeCaptureMouseDown(e: MouseEvent): boolean {
+  const badge = (e.target as HTMLElement).closest?.('.code-lang-badge') as HTMLSpanElement | null
+  if (!badge) return false
+  const wrapper = badge.closest('.milkdown-code-block') as CodeBlockWrapper | null
+  const ctx = wrapper?.__markflowCodeBlock
+  if (!ctx) return false
+  e.preventDefault()
+  e.stopPropagation()
+  openLangDropdown(ctx.badge, ctx.view, ctx.getPos)
+  return true
 }
 
 class CodeBlockNodeView implements NodeView {
@@ -347,36 +185,42 @@ class CodeBlockNodeView implements NodeView {
   private pre: HTMLPreElement
   private code: HTMLElement
   private highlightCode: HTMLElement
+  private editSpacer: HTMLDivElement
+  private actions: HTMLDivElement
   private badge: HTMLSpanElement
   private label: HTMLSpanElement
   private view: EditorView
   private getPos: () => number | undefined
   private trailingObserver: MutationObserver
   private highlightTimer: ReturnType<typeof setTimeout> | null = null
+  private actionsMouseDownHandler: ((e: MouseEvent) => void) | null = null
 
   constructor(node: ProseNode, view: EditorView, getPos: () => number | undefined) {
     this.view = view
     this.getPos = getPos
 
     const lang = node.attrs.language || ''
-    const { wrapper, badge, label, pre, code, highlightCode } = buildCodeBlockDOM(lang)
+    const { wrapper, actions, badge, label, pre, code, highlightCode, editSpacer } = buildCodeBlockDOM(lang)
+
+    setCodeBlockHandle(wrapper, { view, getPos, badge })
 
     if (lang) {
-      attachClickHandlers(badge, view, getPos)
+      this.actionsMouseDownHandler = attachClickHandlers(actions, badge, view, getPos)
       wrapper.classList.add('has-language')
     }
 
     this.dom = wrapper
+    this.actions = actions
     this.pre = pre
     this.code = code
     this.highlightCode = highlightCode
+    this.editSpacer = editSpacer
     this.badge = badge
     this.label = label
     this.contentDOM = code
 
-    // 复制交互由 WysiwygEditor 容器捕获阶段委托处理（见 handleCodeCopyCapture*）
-
-    // 首次高亮
+    // 澶嶅埗浜や簰鐢?WysiwygEditor 瀹瑰櫒鎹曡幏闃舵濮旀墭澶勭悊锛堣 handleCodeCopyCapture*锛?
+    // 棣栨楂樹寒
     this.highlightContent(node.textContent, lang)
     requestAnimationFrame(() => this.syncTrailingBreak())
 
@@ -384,7 +228,7 @@ class CodeBlockNodeView implements NodeView {
     this.trailingObserver.observe(this.code, { childList: true, subtree: true })
   }
 
-  /** 同步 ProseMirror 尾部 <br>，使高亮层行数与光标层一致 */
+  /** 鍚屾 ProseMirror 灏鹃儴 <br>锛屼娇楂樹寒灞傝鏁颁笌鍏夋爣灞備竴鑷?*/
   private syncTrailingBreak() {
     const hasTrailing = !!this.code.querySelector('.ProseMirror-trailingBreak')
     let mirror = this.highlightCode.querySelector('.hljs-trailing-mirror')
@@ -402,7 +246,7 @@ class CodeBlockNodeView implements NodeView {
 
   private layerSyncTimer: ReturnType<typeof requestAnimationFrame> | null = null
 
-  /** 测量高亮层与编辑层的视觉行数，若不一致则在编辑层补 padding，保证光标可达 */
+  /** 娴嬮噺楂樹寒灞備笌缂栬緫灞傜殑瑙嗚琛屾暟锛岃嫢涓嶄竴鑷村垯鍦ㄧ紪杈戝眰琛?padding锛屼繚璇佸厜鏍囧彲杈?*/
   private syncLayerLineCount() {
     if (this.layerSyncTimer) return
     this.layerSyncTimer = requestAnimationFrame(() => {
@@ -420,14 +264,14 @@ class CodeBlockNodeView implements NodeView {
       if (highlightLines.size > editLines.size) {
         const diff = highlightLines.size - editLines.size
         const lineHeight = parseFloat(getComputedStyle(this.code).lineHeight) || 24
-        this.code.style.paddingBottom = `${diff * lineHeight}px`
+        this.editSpacer.style.height = `${diff * lineHeight}px`
       } else {
-        this.code.style.paddingBottom = '0px'
+        this.editSpacer.style.height = '0px'
       }
     })
   }
 
-  /** 防抖调度高亮，避免大代码块逐字输入时卡顿 */
+  /** 闃叉姈璋冨害楂樹寒锛岄伩鍏嶅ぇ浠ｇ爜鍧楅€愬瓧杈撳叆鏃跺崱椤?*/
   private scheduleHighlight(text: string, lang: string) {
     if (this.highlightTimer) clearTimeout(this.highlightTimer)
     this.highlightTimer = setTimeout(() => {
@@ -436,7 +280,7 @@ class CodeBlockNodeView implements NodeView {
     }, 80)
   }
 
-  /** 用 hljs 给高亮代码层着色 */
+  /** 鐢?hljs 缁欓珮浜唬鐮佸眰鐫€鑹?*/
   private highlightContent(text: string, lang: string) {
     const code = this.highlightCode
     code.className = 'hljs code-block-highlight'
@@ -476,7 +320,7 @@ class CodeBlockNodeView implements NodeView {
     const lang = node.attrs.language || ''
     const text = node.textContent
 
-    // 重新高亮（防抖）
+    // 閲嶆柊楂樹寒锛堥槻鎶栵級
     this.scheduleHighlight(text, lang)
 
     // Sync data-language and code class for linkage
@@ -495,9 +339,14 @@ class CodeBlockNodeView implements NodeView {
     if (lang) {
       this.dom.classList.add('has-language')
       this.badge.style.display = ''
-      if (!this.badge.dataset.clickAttached) {
-        this.badge.dataset.clickAttached = 'true'
-        attachClickHandlers(this.badge, this.view, this.getPos)
+      setCodeBlockHandle(this.dom, { view: this.view, getPos: this.getPos, badge: this.badge })
+      if (!this.actions.dataset.langDropdownAttached) {
+        this.actionsMouseDownHandler = attachClickHandlers(
+          this.actions,
+          this.badge,
+          this.view,
+          this.getPos,
+        )
       }
     } else {
       this.dom.classList.remove('has-language')
@@ -511,7 +360,12 @@ class CodeBlockNodeView implements NodeView {
     if (this.highlightTimer) clearTimeout(this.highlightTimer)
     if (this.layerSyncTimer) cancelAnimationFrame(this.layerSyncTimer)
     this.trailingObserver.disconnect()
-    hideDropdown()
+    if (this.actionsMouseDownHandler) {
+      this.actions.removeEventListener('mousedown', this.actionsMouseDownHandler, true)
+      delete this.actions.dataset.langDropdownAttached
+    }
+    clearCodeBlockHandle(this.dom)
+    hideCodeLanguageDropdown()
   }
 
   stopEvent(event: Event): boolean {
@@ -521,8 +375,7 @@ class CodeBlockNodeView implements NodeView {
   }
 
   ignoreMutation(mutation: ViewMutationRecord) {
-    // 只忽略 contentDOM 之外的突变（高亮层、语言标签等自定义 UI）
-    // contentDOM 上的突变需要让 ProseMirror 处理，以保证文档状态与 DOM 同步
+    // 鍙拷鐣?contentDOM 涔嬪鐨勭獊鍙橈紙楂樹寒灞傘€佽瑷€鏍囩绛夎嚜瀹氫箟 UI锛?    // contentDOM 涓婄殑绐佸彉闇€瑕佽 ProseMirror 澶勭悊锛屼互淇濊瘉鏂囨。鐘舵€佷笌 DOM 鍚屾
     if (!this.contentDOM) return true
     if (mutation.type === 'selection') return true
     return !this.contentDOM.contains(mutation.target)
@@ -533,6 +386,11 @@ export const codeBlockLabelPlugin = $prose((_ctx: Ctx) => {
   return new Plugin({
     key: new PluginKey('MARKFLOW_CODE_BLOCK_LABEL'),
     props: {
+      handleDOMEvents: {
+        mousedown(_view, event) {
+          return handleLangBadgeCaptureMouseDown(event)
+        },
+      },
       nodeViews: {
         code_block: (node, view, getPos): NodeView => {
           return new CodeBlockNodeView(node, view, getPos)
