@@ -6,10 +6,36 @@ import type { Node as ProseNode } from '@milkdown/prose/model'
 import hljs from 'highlight.js'
 import { hideCodeLanguageDropdown, showCodeLanguageDropdown } from '../utils/codeLanguageDropdown'
 
-const badgeContexts = new WeakMap<
-  HTMLSpanElement,
-  { view: EditorView; getPos: () => number | undefined }
->()
+type CodeBlockHandle = {
+  view: EditorView
+  getPos: () => number | undefined
+  badge: HTMLSpanElement
+}
+
+type CodeBlockWrapper = HTMLDivElement & { __markflowCodeBlock?: CodeBlockHandle }
+
+function setCodeBlockHandle(wrapper: HTMLDivElement, handle: CodeBlockHandle) {
+  ;(wrapper as CodeBlockWrapper).__markflowCodeBlock = handle
+}
+
+function clearCodeBlockHandle(wrapper: HTMLDivElement) {
+  delete (wrapper as CodeBlockWrapper).__markflowCodeBlock
+}
+
+function openLangDropdown(
+  badge: HTMLSpanElement,
+  view: EditorView,
+  getPos: () => number | undefined,
+) {
+  showCodeLanguageDropdown(badge, {
+    onSelect: (lang) => {
+      const pos = getPos()
+      if (pos != null) {
+        view.dispatch(view.state.tr.setNodeAttribute(pos, 'language', lang))
+      }
+    },
+  })
+}
 
 /** 当光标在代码块末尾时，ArrowDown 退出至代码块下方 */
 const exitCodeBlockCommand: Command = (state, dispatch) => {
@@ -45,12 +71,14 @@ const exitCodeBlockCommand: Command = (state, dispatch) => {
 
 function buildCodeBlockDOM(lang: string): {
   wrapper: HTMLDivElement
+  actions: HTMLDivElement
   badge: HTMLSpanElement
   label: HTMLSpanElement
   chevron: HTMLSpanElement
   pre: HTMLPreElement
   code: HTMLElement
   highlightCode: HTMLElement
+  editSpacer: HTMLDivElement
   copyBtn: HTMLButtonElement
 } {
   const wrapper = document.createElement('div')
@@ -81,6 +109,11 @@ function buildCodeBlockDOM(lang: string): {
   }
   layers.appendChild(code)
 
+  const editSpacer = document.createElement('div')
+  editSpacer.className = 'code-block-edit-spacer'
+  editSpacer.setAttribute('aria-hidden', 'true')
+  layers.appendChild(editSpacer)
+
   pre.appendChild(layers)
 
   const badge = document.createElement('span')
@@ -107,50 +140,45 @@ function buildCodeBlockDOM(lang: string): {
   actions.appendChild(badge)
   actions.appendChild(copyBtn)
 
-  wrapper.appendChild(pre)
+  // actions 置于 pre 之前，配合 z-index 保证右上角可点击
   wrapper.appendChild(actions)
+  wrapper.appendChild(pre)
 
-  return { wrapper, badge, label, chevron, pre, code, highlightCode, copyBtn }
+  return { wrapper, actions, badge, label, chevron, pre, code, highlightCode, editSpacer, copyBtn }
 }
 
-function registerLangBadge(
+/** 在 actions 上绑定 mousedown（捕获阶段），扩大可点区域并避免 ProseMirror 抢焦点 */
+function attachClickHandlers(
+  actions: HTMLDivElement,
   badge: HTMLSpanElement,
   view: EditorView,
   getPos: () => number | undefined,
-) {
-  badgeContexts.set(badge, { view, getPos })
+): ((e: MouseEvent) => void) | null {
+  if (actions.dataset.langDropdownAttached) return null
+
+  const handler = (e: MouseEvent) => {
+    if (!(e.target as HTMLElement).closest?.('.code-lang-badge')) return
+    e.preventDefault()
+    e.stopPropagation()
+    openLangDropdown(badge, view, getPos)
+  }
+
+  actions.addEventListener('mousedown', handler, true)
+  actions.dataset.langDropdownAttached = 'true'
+  return handler
 }
 
-function unregisterLangBadge(badge: HTMLSpanElement) {
-  badgeContexts.delete(badge)
-}
-
-/** WYSIWYG：捕获阶段打开语言下拉，避免 ProseMirror 在 mousedown 时抢焦点 */
-export function handleLangBadgeCaptureMouseDown(e: MouseEvent): void {
+/** WYSIWYG 容器级兜底：从 wrapper 读取上下文，不依赖 WeakMap */
+export function handleLangBadgeCaptureMouseDown(e: MouseEvent): boolean {
   const badge = (e.target as HTMLElement).closest?.('.code-lang-badge') as HTMLSpanElement | null
-  if (!badge) return
-  const ctx = badgeContexts.get(badge)
-  if (!ctx) return
+  if (!badge) return false
+  const wrapper = badge.closest('.milkdown-code-block') as CodeBlockWrapper | null
+  const ctx = wrapper?.__markflowCodeBlock
+  if (!ctx) return false
   e.preventDefault()
   e.stopPropagation()
-  showCodeLanguageDropdown(badge, {
-    onSelect: (lang) => {
-      const pos = ctx.getPos()
-      if (pos != null) {
-        ctx.view.dispatch(
-          ctx.view.state.tr.setNodeAttribute(pos, 'language', lang),
-        )
-      }
-    },
-  })
-}
-
-function attachClickHandlers(
-  badge: HTMLSpanElement,
-  view: EditorView,
-  getPos: () => number | undefined,
-) {
-  registerLangBadge(badge, view, getPos)
+  openLangDropdown(ctx.badge, ctx.view, ctx.getPos)
+  return true
 }
 
 class CodeBlockNodeView implements NodeView {
@@ -159,29 +187,36 @@ class CodeBlockNodeView implements NodeView {
   private pre: HTMLPreElement
   private code: HTMLElement
   private highlightCode: HTMLElement
+  private editSpacer: HTMLDivElement
+  private actions: HTMLDivElement
   private badge: HTMLSpanElement
   private label: HTMLSpanElement
   private view: EditorView
   private getPos: () => number | undefined
   private trailingObserver: MutationObserver
   private highlightTimer: ReturnType<typeof setTimeout> | null = null
+  private actionsMouseDownHandler: ((e: MouseEvent) => void) | null = null
 
   constructor(node: ProseNode, view: EditorView, getPos: () => number | undefined) {
     this.view = view
     this.getPos = getPos
 
     const lang = node.attrs.language || ''
-    const { wrapper, badge, label, pre, code, highlightCode } = buildCodeBlockDOM(lang)
+    const { wrapper, actions, badge, label, pre, code, highlightCode, editSpacer } = buildCodeBlockDOM(lang)
+
+    setCodeBlockHandle(wrapper, { view, getPos, badge })
 
     if (lang) {
-      attachClickHandlers(badge, view, getPos)
+      this.actionsMouseDownHandler = attachClickHandlers(actions, badge, view, getPos)
       wrapper.classList.add('has-language')
     }
 
     this.dom = wrapper
+    this.actions = actions
     this.pre = pre
     this.code = code
     this.highlightCode = highlightCode
+    this.editSpacer = editSpacer
     this.badge = badge
     this.label = label
     this.contentDOM = code
@@ -232,9 +267,9 @@ class CodeBlockNodeView implements NodeView {
       if (highlightLines.size > editLines.size) {
         const diff = highlightLines.size - editLines.size
         const lineHeight = parseFloat(getComputedStyle(this.code).lineHeight) || 24
-        this.code.style.paddingBottom = `${diff * lineHeight}px`
+        this.editSpacer.style.height = `${diff * lineHeight}px`
       } else {
-        this.code.style.paddingBottom = '0px'
+        this.editSpacer.style.height = '0px'
       }
     })
   }
@@ -307,9 +342,14 @@ class CodeBlockNodeView implements NodeView {
     if (lang) {
       this.dom.classList.add('has-language')
       this.badge.style.display = ''
-      if (!this.badge.dataset.clickAttached) {
-        this.badge.dataset.clickAttached = 'true'
-        attachClickHandlers(this.badge, this.view, this.getPos)
+      setCodeBlockHandle(this.dom, { view: this.view, getPos: this.getPos, badge: this.badge })
+      if (!this.actions.dataset.langDropdownAttached) {
+        this.actionsMouseDownHandler = attachClickHandlers(
+          this.actions,
+          this.badge,
+          this.view,
+          this.getPos,
+        )
       }
     } else {
       this.dom.classList.remove('has-language')
@@ -323,7 +363,11 @@ class CodeBlockNodeView implements NodeView {
     if (this.highlightTimer) clearTimeout(this.highlightTimer)
     if (this.layerSyncTimer) cancelAnimationFrame(this.layerSyncTimer)
     this.trailingObserver.disconnect()
-    unregisterLangBadge(this.badge)
+    if (this.actionsMouseDownHandler) {
+      this.actions.removeEventListener('mousedown', this.actionsMouseDownHandler, true)
+      delete this.actions.dataset.langDropdownAttached
+    }
+    clearCodeBlockHandle(this.dom)
     hideCodeLanguageDropdown()
   }
 
@@ -346,6 +390,11 @@ export const codeBlockLabelPlugin = $prose((_ctx: Ctx) => {
   return new Plugin({
     key: new PluginKey('MARKFLOW_CODE_BLOCK_LABEL'),
     props: {
+      handleDOMEvents: {
+        mousedown(_view, event) {
+          return handleLangBadgeCaptureMouseDown(event)
+        },
+      },
       nodeViews: {
         code_block: (node, view, getPos): NodeView => {
           return new CodeBlockNodeView(node, view, getPos)

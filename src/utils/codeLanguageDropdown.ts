@@ -162,10 +162,14 @@ function getDropdown(): HTMLDivElement {
   dropdown.style.display = 'none'
   document.body.appendChild(dropdown)
 
-  document.addEventListener('mousedown', (event) => {
-    if (dropdown.style.display !== 'none' && !dropdown.contains(event.target as Node)) {
-      hideCodeLanguageDropdown()
-    }
+  // 用 click 关闭，避免 mousedown 打开后同一事件冒泡到 document 立刻关闭
+  document.addEventListener('click', (event) => {
+    if (dropdown.style.display === 'none') return
+    const target = event.target as Node
+    if (dropdown.contains(target)) return
+    const anchor = (target as HTMLElement).closest?.('.code-lang-badge, .preview-code-lang-badge')
+    if (anchor) return
+    hideCodeLanguageDropdown()
   })
 
   globalDropdown = dropdown
