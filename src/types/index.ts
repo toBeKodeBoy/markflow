@@ -33,12 +33,28 @@ export interface TocJumpTarget {
   id: number
 }
 
+/** PDF 纸张尺寸 */
+export type PdfPageSize = 'A4' | 'A3' | 'Letter'
+
+/** PDF 页边距预设 */
+export type PdfMarginPreset = 'default' | 'narrow' | 'wide' | 'none'
+
+/** PDF 导出选项（持久化到 AppSettings） */
+export interface PdfExportOptions {
+  pageSize: PdfPageSize
+  margin: PdfMarginPreset
+  /** 是否打印背景色（代码块、表格底色等） */
+  printBackground: boolean
+}
+
 export interface AppSettings {
   theme: 'light' | 'dark' | 'system'
   fontSize: number
   editorFontFamily: string
   previewVisible: boolean
   sidebarVisible: boolean
+  /** PDF 导出选项（可选，缺省用默认值） */
+  pdfExport?: PdfExportOptions
 }
 
 // uTools preload bridge type
@@ -54,7 +70,12 @@ export interface MarkFlowBridge {
   saveSettings: (settings: AppSettings) => void
   showNotification: (msg: string) => void
   saveMarkdownFile: (filename: string, content: string) => boolean
-  savePdfFile: (filename: string, markdownContent: string) => boolean | Promise<boolean>
+  /** Typora 路线：完整 HTML → Chromium printToPDF */
+  savePdfFromHtml: (
+    filename: string,
+    html: string,
+    options?: PdfExportOptions
+  ) => Promise<{ ok: true } | { ok: false; reason: 'cancel' | 'error' }>
   openMarkdownFile: () => string | null
   isDarkTheme: () => boolean
   hideMainWindow: () => void

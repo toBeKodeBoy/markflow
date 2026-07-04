@@ -22,7 +22,6 @@
     "@lezer/highlight": "^1.2.3",
     "@lezer/lr": "^1.4.10",
     "@lezer/markdown": "^1.6.4",
-    "@mdpdf/mdpdf": "^0.1.6",
     "@milkdown/components": "^7.21.2",
     "@milkdown/core": "^7.21.2",
     "@milkdown/plugin-clipboard": "^7.21.2",
