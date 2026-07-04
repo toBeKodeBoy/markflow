@@ -52,10 +52,28 @@ window.markflow = {
   }),
   showNotification: vi.fn(),
   saveMarkdownFile: vi.fn(() => true),
+  savePdfFile: vi.fn(() => Promise.resolve(true)),
   openMarkdownFile: vi.fn(() => '# Test content\n'),
   isDarkTheme: vi.fn(() => false),
   hideMainWindow: vi.fn(),
   copyText: vi.fn(() => true),
+  getAssetIndex: vi.fn(() => {
+    const raw = mockStorage.getItem('markflow_asset_index')
+    return raw ? JSON.parse(raw) : []
+  }),
+  saveAssetIndex: vi.fn((index) => {
+    mockStorage.setItem('markflow_asset_index', JSON.stringify(index))
+  }),
+  getAsset: vi.fn((id: string) => {
+    const raw = mockStorage.getItem(`markflow_asset_${id}`)
+    return raw ? JSON.parse(raw) : null
+  }),
+  saveAsset: vi.fn((id: string, record) => {
+    mockStorage.setItem(`markflow_asset_${id}`, JSON.stringify(record))
+  }),
+  removeAsset: vi.fn((id: string) => {
+    mockStorage.deleteItem(`markflow_asset_${id}`)
+  }),
 }
 
 // ---- mock localStorage fallback ----
@@ -86,4 +104,101 @@ Object.defineProperty(window, 'matchMedia', {
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
   })),
+})
+
+// ---- mock IndexedDB for browser asset fallback tests ----
+class IDBRequestMock<T = unknown> {
+  result: T | undefined
+  error: Error | null = null
+  onsuccess: ((ev: Event) => void) | null = null
+  onerror: ((ev: Event) => void) | null = null
+  _resolve(value: T) {
+    this.result = value
+    this.onsuccess?.({} as Event)
+  }
+  _reject(err: Error) {
+    this.error = err
+    this.onerror?.({} as Event)
+  }
+}
+
+class IDBTransactionMock {
+  oncomplete: (() => void) | null = null
+  onerror: (() => void) | null = null
+  error: Error | null = null
+  constructor(private store: IDBObjectStoreMock, private db: IDBDatabaseMock) {}
+  objectStore() { return this.store }
+  _finish() {
+    queueMicrotask(() => this.oncomplete?.())
+  }
+}
+
+class IDBObjectStoreMock {
+  private data = new Map<string, unknown>()
+  private tx: IDBTransactionMock | null = null
+  _bindTx(tx: IDBTransactionMock) { this.tx = tx }
+  get(key: string) {
+    const req = new IDBRequestMock()
+    queueMicrotask(() => {
+      req._resolve(this.data.get(key))
+      this.tx?._finish()
+    })
+    return req
+  }
+  put(value: unknown, key: string) {
+    const req = new IDBRequestMock()
+    this.data.set(key, value)
+    queueMicrotask(() => {
+      req._resolve(undefined)
+      this.tx?._finish()
+    })
+    return req
+  }
+  delete(key: string) {
+    const req = new IDBRequestMock()
+    this.data.delete(key)
+    queueMicrotask(() => {
+      req._resolve(undefined)
+      this.tx?._finish()
+    })
+    return req
+  }
+  clear() { this.data.clear() }
+}
+
+const idbStore = new IDBObjectStoreMock()
+
+class IDBDatabaseMock {
+  objectStoreNames = { contains: () => true }
+  transaction() {
+    const tx = new IDBTransactionMock(idbStore, this)
+    idbStore._bindTx(tx)
+    return tx
+  }
+  close() {}
+  createObjectStore() { return idbStore }
+}
+
+;(globalThis as any).__clearMockIdb = () => idbStore.clear()
+
+const idbOpen = vi.fn(() => {
+  const req = new IDBRequestMock<IDBDatabaseMock>()
+  queueMicrotask(() => req._resolve(new IDBDatabaseMock()))
+  return req
+})
+idbOpen.mockImplementation(() => {
+  const req = new IDBRequestMock<IDBDatabaseMock>()
+  queueMicrotask(() => req._resolve(new IDBDatabaseMock()))
+  return req
+})
+
+Object.defineProperty(window, 'indexedDB', {
+  writable: true,
+  value: {
+    open: idbOpen,
+  },
+})
+
+beforeEach(() => {
+  idbStore.clear()
 })

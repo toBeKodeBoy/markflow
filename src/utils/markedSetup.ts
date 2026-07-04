@@ -3,6 +3,7 @@ import hljs from 'highlight.js'
 import DOMPurify from 'dompurify'
 import { escapeHtml } from './escapeHtml'
 import { COPY_TEXT } from './codeCopy'
+import { renderImageHtml } from './imageScale'
 
 /** 去掉 \<u> / \</u> 等转义，避免 marked 输出字面量标签 */
 export function normalizeUnderlineMarkdown(md: string): string {
@@ -59,6 +60,17 @@ const underlineHtmlExtension: TokenizerAndRendererExtension = {
   },
 }
 
+/** 图片渲染：等比例缩放 + 居中完整显示 */
+const imageRenderer: RendererExtension = {
+  name: 'image',
+  renderer(token) {
+    const href = token.href ?? ''
+    const alt = token.text ?? ''
+    const title = token.title ?? null
+    return renderImageHtml(href, alt, title)
+  },
+}
+
 /** 代码块渲染扩展：语法高亮 + 右上角语言标签 */
 const codeBlockRenderer: RendererExtension = {
   name: 'code',
@@ -86,7 +98,7 @@ const codeBlockRenderer: RendererExtension = {
   },
 }
 
-marked.use({ extensions: [highlightMarkExtension, underlineHtmlExtension, codeBlockRenderer] })
+marked.use({ extensions: [highlightMarkExtension, underlineHtmlExtension, codeBlockRenderer, imageRenderer] })
 
 marked.setOptions({
   breaks: true,

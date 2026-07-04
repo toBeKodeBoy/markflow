@@ -9,3 +9,9 @@ export const PREVIEW_RENDER_DEBOUNCE_MS = 150
 
 /** Extra debounce (ms) for preview when content exceeds large-file threshold. */
 export const PREVIEW_LARGE_DEBOUNCE_MS = 600
+
+/** Max dimension (px) for stored image assets. */
+export const ASSET_MAX_DIMENSION = 1920
+
+/** Max size (bytes) for a single stored image asset. */
+export const ASSET_MAX_BYTES = 2 * 1024 * 1024

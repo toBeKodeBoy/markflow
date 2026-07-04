@@ -33,6 +33,12 @@ describe('preload 桥接契约', () => {
     expect(typeof api.isDarkTheme).toBe('function')
     expect(typeof api.hideMainWindow).toBe('function')
     expect(typeof api.copyText).toBe('function')
+    // 图片资源接口
+    expect(typeof api.getAssetIndex).toBe('function')
+    expect(typeof api.saveAssetIndex).toBe('function')
+    expect(typeof api.getAsset).toBe('function')
+    expect(typeof api.saveAsset).toBe('function')
+    expect(typeof api.removeAsset).toBe('function')
   })
 
   it('getNoteList 应返回 NoteListItem[]', () => {

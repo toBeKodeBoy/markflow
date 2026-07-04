@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useStorage } from '../composables/useStorage'
+import { getAssetStorage } from '../composables/useAssetStorage'
+import { collectAllNoteContents } from '../utils/resolveMarkdownAssets'
 import { LARGE_FILE_THRESHOLD } from '../constants'
 import type { Note, NoteListItem, Folder, TocJumpTarget } from '../types'
 
@@ -154,6 +156,11 @@ export const useNoteStore = defineStore('note', () => {
   function deleteNote(id: string) {
     storage.removeNote(id)
     noteList.value = storage.getNoteList()
+    const contents = collectAllNoteContents(
+      () => storage.getNoteList(),
+      (noteId) => storage.getNote(noteId)
+    )
+    void getAssetStorage().gcOrphans(contents)
     if (currentNote.value?.id === id) {
       if (noteList.value.length > 0) {
         openNote(noteList.value[0].id)

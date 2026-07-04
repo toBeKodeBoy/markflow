@@ -34,6 +34,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { oneDark } from '@codemirror/theme-one-dark'
 import { autoCloseBracketsExtensions } from '../extensions/autoCloseBrackets'
 import { buildInlineCodeInsert } from '../utils/inlineCode'
+import { getImageFileFromDataTransfer, handleImageInsert } from '../utils/imageInsert'
 import { useNoteStore } from '../stores/note'
 import { useScrollSync } from '../composables/useScrollSync'
 
@@ -151,9 +152,21 @@ function onEditorScroll() {
 onMounted(() => {
   initEditor(store.liveContent || store.currentNote?.content || '')
   attachScrollListener()
+  const host = editorEl.value
+  if (host) {
+    host.addEventListener('paste', onPasteImage)
+    host.addEventListener('dragover', onDragOverImage)
+    host.addEventListener('drop', onDropImage)
+  }
 })
 
 onBeforeUnmount(() => {
+  const host = editorEl.value
+  if (host) {
+    host.removeEventListener('paste', onPasteImage)
+    host.removeEventListener('dragover', onDragOverImage)
+    host.removeEventListener('drop', onDropImage)
+  }
   if (updateTimer) {
     clearTimeout(updateTimer)
     updateTimer = null
@@ -240,5 +253,37 @@ function insertTable() {
   const sel = view.state.selection.main
   view.dispatch({ changes: { from: sel.from, to: sel.to, insert: table } })
   view.focus()
+}
+
+function insertMarkdownAtCursor(markdown: string) {
+  if (!view) return
+  const sel = view.state.selection.main
+  const prefix = sel.from > 0 && view.state.sliceDoc(sel.from - 1, sel.from) !== '\n' ? '\n' : ''
+  const insert = prefix + markdown + '\n'
+  view.dispatch({
+    changes: { from: sel.from, to: sel.to, insert },
+    selection: { anchor: sel.from + insert.length },
+  })
+  view.focus()
+}
+
+function onPasteImage(e: ClipboardEvent) {
+  const file = e.clipboardData ? getImageFileFromDataTransfer(e.clipboardData) : null
+  if (!file) return
+  e.preventDefault()
+  void handleImageInsert(file, insertMarkdownAtCursor)
+}
+
+function onDragOverImage(e: DragEvent) {
+  const file = e.dataTransfer ? getImageFileFromDataTransfer(e.dataTransfer) : null
+  if (!file) return
+  e.preventDefault()
+}
+
+function onDropImage(e: DragEvent) {
+  const file = e.dataTransfer ? getImageFileFromDataTransfer(e.dataTransfer) : null
+  if (!file) return
+  e.preventDefault()
+  void handleImageInsert(file, insertMarkdownAtCursor)
 }
 </script>

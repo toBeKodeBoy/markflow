@@ -69,7 +69,7 @@ describe('编辑器卸载 flush', () => {
   it('WysiwygEditor 卸载时 flush markdown', () => {
     const src = readSrc('src/components/WysiwygEditor.vue')
     expect(src).toMatch(/getMarkdown\(\)\(ctx\)/)
-    expect(src).toMatch(/store\.updateCurrentContent\(markdown\)/)
+    expect(src).toMatch(/store\.updateCurrentContent\(persisted\)/)
   })
 })
 

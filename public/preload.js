@@ -121,5 +121,26 @@ window.markflow = {
       console.error('[MarkFlow] utools.copyText 失败:', e);
       return false;
     }
+  },
+
+  // ---- 图片资源存储 ----
+  getAssetIndex: function () {
+    return utools.dbStorage.getItem('markflow_asset_index') || [];
+  },
+
+  saveAssetIndex: function (index) {
+    utools.dbStorage.setItem('markflow_asset_index', index);
+  },
+
+  getAsset: function (id) {
+    return utools.dbStorage.getItem('markflow_asset_' + id) || null;
+  },
+
+  saveAsset: function (id, record) {
+    utools.dbStorage.setItem('markflow_asset_' + id, record);
+  },
+
+  removeAsset: function (id) {
+    utools.dbStorage.removeItem('markflow_asset_' + id);
   }
 };
