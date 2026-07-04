@@ -22,7 +22,12 @@
         <span>+ 新建</span>
       </button>
       <button class="btn-icon" @click="exportNote" title="导出 .md 文件" :disabled="!store.currentNote">⬇</button>
-      <button class="btn-icon" @click="exportPdf" title="导出 PDF" :disabled="!store.currentNote">PDF</button>
+      <button
+        class="btn-icon"
+        @click="openPdfModal"
+        :title="pdfExporting ? '正在导出 PDF…' : '导出 PDF'"
+        :disabled="!store.currentNote || pdfExporting"
+      >{{ pdfExporting ? '…' : 'PDF' }}</button>
       <button class="btn-icon" @click="importNote" title="导入 .md 文件">⬆</button>
       <button class="btn-icon" :class="{ active: tocVisible }" @click="$emit('toggleToc')" title="目录">目录</button>
       <button class="btn-icon" @click="theme.toggle()" :title="theme.isDark.value ? '切换亮色' : '切换暗色'">
@@ -30,13 +35,22 @@
       </button>
     </div>
   </header>
+
+  <PdfExportModal
+    :visible="pdfModalVisible"
+    :exporting="pdfExporting"
+    @confirm="onPdfConfirm"
+    @cancel="pdfModalVisible = false"
+  />
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useNoteStore } from '../stores/note'
 import { useTheme } from '../composables/useTheme'
-import { exportPdf } from '../utils/exportPdf'
-import type { ViewMode } from '../types'
+import { exportPdf, pdfExporting, sanitizeFilename } from '../utils/exportPdf'
+import PdfExportModal from './PdfExportModal.vue'
+import type { PdfExportOptions, ViewMode } from '../types'
 
 defineProps<{ viewMode: ViewMode; tocVisible: boolean }>()
 const emit = defineEmits<{ toggleSidebar: []; setViewMode: [mode: ViewMode]; toggleToc: [] }>()
@@ -47,6 +61,17 @@ function emitSetViewMode(mode: ViewMode) {
 
 const store = useNoteStore()
 const theme = useTheme()
+const pdfModalVisible = ref(false)
+
+function openPdfModal() {
+  if (!store.currentNote || pdfExporting.value) return
+  pdfModalVisible.value = true
+}
+
+async function onPdfConfirm(options: PdfExportOptions) {
+  pdfModalVisible.value = false
+  await exportPdf(options)
+}
 
 /** 在当前文件夹下创建新笔记 */
 function createNote() {
@@ -56,8 +81,11 @@ function createNote() {
 /** 导出当前笔记为 .md 文件（uTools 环境或浏览器下载） */
 function exportNote() {
   if (!store.currentNote) return
-  const filename = store.currentNote.title + '.md'
-  const content = store.currentNote.content
+  const content = store.liveContent
+  if (content !== store.currentNote.content) {
+    store.updateCurrentContent(content)
+  }
+  const filename = sanitizeFilename(store.currentNote.title) + '.md'
   if (typeof window.markflow !== 'undefined') {
     const ok = window.markflow.saveMarkdownFile(filename, content)
     if (ok) window.markflow.showNotification('导出成功：' + filename)
@@ -67,6 +95,7 @@ function exportNote() {
     a.href = URL.createObjectURL(blob)
     a.download = filename
     a.click()
+    URL.revokeObjectURL(a.href)
   }
 }
 

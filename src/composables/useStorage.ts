@@ -69,7 +69,14 @@ const localFallback = {
 
 /** 返回默认应用设置 */
 function defaultSettings(): AppSettings {
-  return { theme: 'system', fontSize: 14, editorFontFamily: 'monospace', previewVisible: true, sidebarVisible: true }
+  return {
+    theme: 'system',
+    fontSize: 14,
+    editorFontFamily: 'monospace',
+    previewVisible: true,
+    sidebarVisible: true,
+    pdfExport: { pageSize: 'A4', margin: 'default', printBackground: true },
+  }
 }
 
 /** 包装 uTools 存储写入方法，统一异常处理 */

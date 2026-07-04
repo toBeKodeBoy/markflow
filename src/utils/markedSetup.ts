@@ -4,6 +4,9 @@ import DOMPurify from 'dompurify'
 import { escapeHtml } from './escapeHtml'
 import { COPY_TEXT } from './codeCopy'
 import { renderImageHtml } from './imageScale'
+import { HeadingSlugger } from './headingSlug'
+
+const headingSlugger = new HeadingSlugger()
 
 /** 去掉 \<u> / \</u> 等转义，避免 marked 输出字面量标签 */
 export function normalizeUnderlineMarkdown(md: string): string {
@@ -71,6 +74,37 @@ const imageRenderer: RendererExtension = {
   },
 }
 
+/** 页内锚点 href 解码，与 heading id 保持一致（marked 默认会 percent-encode） */
+function normalizeFragmentHref(href: string): string {
+  if (!href.startsWith('#')) return escapeHtml(href)
+  try {
+    return `#${decodeURIComponent(href.slice(1))}`
+  } catch {
+    return escapeHtml(href)
+  }
+}
+
+/** 链接渲染：页内锚点保持未编码，便于 PDF 内跳转 */
+const linkRenderer: RendererExtension = {
+  name: 'link',
+  renderer(token) {
+    const href = normalizeFragmentHref(token.href ?? '')
+    const text = this.parser.parseInline(token.tokens)
+    const title = token.title ? ` title="${escapeHtml(token.title)}"` : ''
+    return `<a href="${href}"${title}>${text}</a>`
+  },
+}
+
+/** 标题渲染：注入 id，供 PDF / 预览内锚点跳转 */
+const headingRenderer: RendererExtension = {
+  name: 'heading',
+  renderer(token) {
+    const text = this.parser.parseInline(token.tokens)
+    const id = headingSlugger.slug(token.text)
+    return `<h${token.depth} id="${escapeHtml(id)}">${text}</h${token.depth}>\n`
+  },
+}
+
 /** 代码块渲染扩展：语法高亮 + 右上角语言标签 */
 const codeBlockRenderer: RendererExtension = {
   name: 'code',
@@ -98,7 +132,16 @@ const codeBlockRenderer: RendererExtension = {
   },
 }
 
-marked.use({ extensions: [highlightMarkExtension, underlineHtmlExtension, codeBlockRenderer, imageRenderer] })
+marked.use({
+  extensions: [
+    highlightMarkExtension,
+    underlineHtmlExtension,
+    headingRenderer,
+    linkRenderer,
+    codeBlockRenderer,
+    imageRenderer,
+  ],
+})
 
 marked.setOptions({
   breaks: true,
@@ -106,6 +149,7 @@ marked.setOptions({
 })
 
 export function parseMarkdown(content: string): string {
+  headingSlugger.reset()
   const normalized = normalizeUnderlineMarkdown(content)
   const html = marked.parse(normalized, { async: false })
   const raw = typeof html === 'string' ? html : ''

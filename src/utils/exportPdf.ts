@@ -1,135 +1,143 @@
+import { ref } from 'vue'
+import type { PdfExportOptions } from '../types'
 import { useNoteStore } from '../stores/note'
 import { showAppNotification } from './notify'
-import { parseMarkdown } from './markedSetup'
-import { escapeHtml } from './escapeHtml'
 import { resolveMarkdownForDisplay } from './resolveMarkdownAssets'
+import { buildPrintDocument } from './printDocument'
+import { loadPdfOptions, normalizePdfOptions, savePdfOptions } from './pdfOptions'
+
+/** 导出进行中，供工具栏禁用按钮 */
+export const pdfExporting = ref(false)
+
+/** 超过此长度提示较慢；超过上限则中止（含内联 data URL） */
+const PDF_WARN_CHARS = 5_000_000
+const PDF_MAX_CHARS = 20_000_000
+
+export type PdfSaveResult =
+  | boolean
+  | { ok: true }
+  | { ok: false; reason: 'cancel' | 'error' }
 
 /**
- * 导出当前笔记为 PDF。
+ * 导出当前笔记为 PDF（Typora 路线：预览同款 HTML + Chromium 排版）。
  *
- * uTools 环境：走 preload 桥接 → @mdpdf/mdpdf Rust 引擎 → 保存对话框 → 写入文件
- * 浏览器回退：弹出新窗口，渲染 HTML，调用 window.print() → 用户选"另存为 PDF"
+ * @param options 导出选项；缺省读取并沿用上次设置
  */
-export async function exportPdf(): Promise<void> {
+export async function exportPdf(options?: Partial<PdfExportOptions>): Promise<void> {
+  if (pdfExporting.value) return
+
   const store = useNoteStore()
   if (!store.currentNote) return
 
-  const title = store.currentNote.title
-  const content = await resolveMarkdownForDisplay(store.currentNote.content)
+  const opts = normalizePdfOptions(options ?? loadPdfOptions())
+  savePdfOptions(opts)
 
-  if (typeof window.markflow !== 'undefined' && window.markflow.savePdfFile) {
-    // uTools 环境
-    const filename = title + '.pdf'
-    const result = await window.markflow.savePdfFile(filename, content)
-    if (result) {
-      window.markflow.showNotification('PDF 导出成功：' + filename)
+  pdfExporting.value = true
+  try {
+    const markdown = store.liveContent
+    if (markdown !== store.currentNote.content) {
+      store.updateCurrentContent(markdown)
     }
-  } else {
-    // 浏览器回退：print()
-    await openPrintWindow(content, title)
+
+    const title = store.currentNote.title
+    const content = await resolveMarkdownForDisplay(markdown)
+
+    if (content.length > PDF_MAX_CHARS) {
+      showAppNotification('文档过大（含图片），无法导出 PDF，请减少图片后重试')
+      return
+    }
+    if (content.length > PDF_WARN_CHARS) {
+      showAppNotification('文档较大，导出可能需要较长时间…')
+    }
+
+    const filename = `${sanitizeFilename(title)}.pdf`
+    const html = buildPrintDocument(content, title, opts)
+
+    if (typeof window.markflow !== 'undefined' && window.markflow.savePdfFromHtml) {
+      const result = await window.markflow.savePdfFromHtml(filename, html, opts)
+      handleNativeSaveResult(result, filename)
+    } else {
+      showAppNotification('浏览器环境请在打印设置中关闭页眉页脚')
+      await printViaBrowser(html)
+    }
+  } catch (err) {
+    console.error('[MarkFlow] PDF 导出失败:', err)
+    showAppNotification('PDF 导出失败，请稍后重试')
+  } finally {
+    pdfExporting.value = false
   }
 }
 
-async function openPrintWindow(markdown: string, title: string): Promise<void> {
-  const html = await buildPdfHtml(markdown, title)
-  const win = window.open('', '_blank')
-  if (!win) {
-    showAppNotification('导出失败：浏览器阻止了弹出窗口，请允许弹出窗口后重试')
+function handleNativeSaveResult(result: PdfSaveResult, filename: string): void {
+  const ok = result === true || (typeof result === 'object' && result.ok === true)
+  if (ok) {
+    showAppNotification('PDF 导出成功：' + filename)
     return
   }
-  win.document.write(html)
-  win.document.close()
-  win.document.title = title
-  // 打印完成后自动关闭窗口
-  win.onafterprint = () => win.close()
+  const reason =
+    typeof result === 'object' && result && 'reason' in result ? result.reason : 'error'
+  if (reason === 'cancel') return
+  showAppNotification('PDF 导出失败，请稍后重试')
+}
+
+/** Windows / 跨平台非法文件名字符 */
+export function sanitizeFilename(name: string): string {
+  const cleaned = name.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim()
+  return cleaned || 'untitled'
+}
+
+/** 浏览器回退：隐藏 iframe 加载打印文档后调用系统打印 */
+async function printViaBrowser(html: string): Promise<void> {
+  const iframe = document.createElement('iframe')
+  iframe.setAttribute('aria-hidden', 'true')
+  iframe.style.cssText =
+    'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;'
+  document.body.appendChild(iframe)
+
+  const doc = iframe.contentDocument
+  const win = iframe.contentWindow
+  if (!doc || !win) {
+    iframe.remove()
+    showAppNotification('导出失败：无法创建打印预览')
+    return
+  }
+
+  doc.open()
+  doc.write(html)
+  doc.close()
+
+  await waitForImages(doc)
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+
+  const cleanup = () => {
+    try {
+      iframe.remove()
+    } catch {
+      /* ignore */
+    }
+  }
+  win.onafterprint = cleanup
+  setTimeout(cleanup, 60_000)
+
+  win.focus()
   win.print()
 }
 
-function buildPdfHtml(markdown: string, title: string): string {
-  let bodyHtml = ''
-  try {
-    bodyHtml = parseMarkdown(markdown)
-  } catch {
-    bodyHtml = escapeHtml(markdown)
-  }
+function waitForImages(doc: Document): Promise<void> {
+  const images = Array.from(doc.images)
+  if (images.length === 0) return Promise.resolve()
 
-  return `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${escapeHtml(title)}</title>
-<style>
-  @page {
-    margin: 20mm 15mm;
-  }
-  * { box-sizing: border-box; }
-  body {
-    font: 14px/1.7 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
-    color: #333;
-    padding: 0;
-    margin: 0;
-  }
-  h1, h2, h3, h4 { page-break-after: avoid; }
-  h1 { font-size: 1.6em; border-bottom: 1px solid #eee; padding-bottom: 8px; }
-  h2 { font-size: 1.35em; border-bottom: 1px solid #f0f0f0; padding-bottom: 4px; }
-  h3 { font-size: 1.2em; }
-  pre {
-    background: #f6f8fa;
-    padding: 14px;
-    border-radius: 4px;
-    overflow-x: auto;
-    font-size: 13px;
-    line-height: 1.5;
-    page-break-inside: avoid;
-  }
-  code {
-    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-    background: #f0f0f0;
-    padding: 2px 5px;
-    border-radius: 3px;
-    font-size: 0.9em;
-  }
-  pre code { background: none; padding: 0; }
-  table { border-collapse: collapse; width: 100%; margin: 8px 0; page-break-inside: avoid; }
-  th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: left; }
-  th { background: #f6f8fa; font-weight: 600; }
-  tr:nth-child(even) { background: #fafbfc; }
-  img {
-    max-width: 100%;
-    height: auto;
-    display: block;
-    width: 100%;
-    object-fit: contain;
-  }
-  .markflow-image-wrapper { text-align: center; margin: 8px 0; }
-  .markflow-image-frame {
-    position: relative;
-    display: inline-block;
-    max-width: 100%;
-    vertical-align: top;
-  }
-  .markflow-img-scale-10 { width: 10%; }
-  .markflow-img-scale-30 { width: 30%; }
-  .markflow-img-scale-50 { width: 50%; }
-  .markflow-img-scale-100 { width: 100%; }
-  blockquote {
-    border-left: 4px solid #ddd;
-    margin: 8px 0;
-    padding: 4px 16px;
-    color: #666;
-  }
-  p { margin: 6px 0; }
-  ul, ol { padding-left: 24px; }
-  hr { border: none; border-top: 1px solid #ddd; margin: 16px 0; }
-  a { color: #0366d6; text-decoration: none; }
-  u { text-decoration: underline; text-underline-offset: 2px; text-decoration-color: #888; }
-  mark.highlight-mark { background: #fff3a3; padding: 0 2px; border-radius: 2px; }
-  .markdown-body { padding: 0; max-width: 100%; }
-</style>
-</head>
-<body class="markdown-body">
-${bodyHtml}
-</body>
-</html>`
+  return Promise.all(
+    images.map(
+      (img) =>
+        new Promise<void>((resolve) => {
+          if (img.complete) {
+            resolve()
+            return
+          }
+          img.onload = () => resolve()
+          img.onerror = () => resolve()
+        })
+    )
+  ).then(() => undefined)
 }

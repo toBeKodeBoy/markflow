@@ -340,6 +340,57 @@ input:focus { border-color: var(--primary); }
 .modal-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
 .modal-input { width: 100%; padding: 8px 10px; font-size: 14px; margin-bottom: 12px; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+.pdf-export-modal { min-width: 320px; }
+
+.pdf-option-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.pdf-option-label {
+  flex: 0 0 56px;
+  color: var(--text-muted);
+}
+
+.pdf-option-select {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: var(--font-ui);
+  color: var(--text);
+  background: var(--bg-editor);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  outline: none;
+}
+
+.pdf-option-select:focus { border-color: var(--primary); }
+
+.pdf-option-check {
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.pdf-option-check input {
+  accent-color: var(--primary);
+}
+
+.pdf-export-tip {
+  margin: 0 0 14px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
 .btn-primary { padding: 6px 16px; background: var(--primary); color: white; border-radius: var(--radius); }
 .btn-primary:hover { background: var(--primary-hover); }
 .modal-actions button:not(.btn-primary) { padding: 6px 12px; border-radius: var(--radius); }

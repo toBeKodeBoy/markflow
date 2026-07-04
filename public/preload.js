@@ -74,33 +74,81 @@ window.markflow = {
     return null;
   },
 
-  // 导出 PDF（使用 @mdpdf/mdpdf Rust 原生引擎）
-  savePdfFile: function (filename, markdownContent) {
-    var path = utools.showSaveDialog({
+  /**
+   * 导出 PDF（Typora 路线：完整 HTML + ubrowser Chromium printToPDF）
+   * options: { pageSize, margin, printBackground }
+   * 返回 Promise<{ ok: true } | { ok: false, reason: 'cancel' | 'error' }>
+   */
+  savePdfFromHtml: function (filename, html, options) {
+    var savePath = utools.showSaveDialog({
       title: '导出 PDF',
       defaultPath: filename.replace(/\.md$/, '.pdf'),
       filters: [{ name: 'PDF', extensions: ['pdf'] }]
     });
-    if (!path) return false;
+    if (!savePath) return Promise.resolve({ ok: false, reason: 'cancel' });
+
+    var opts = options || {};
+    var pageSize = opts.pageSize || 'A4';
+    var printBackground = opts.printBackground !== false;
+
+    var fs = require('fs');
+    var os = require('os');
+    var path = require('path');
+    var pathToFileURL = require('url').pathToFileURL;
+    var tmpPath = path.join(os.tmpdir(), 'markflow-print-' + Date.now() + '.html');
+
+    function cleanupTmp() {
+      try {
+        if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+      } catch (e) {
+        /* ignore */
+      }
+    }
 
     try {
-      var mdpdf = require('@mdpdf/mdpdf');
-      // markdownToPdf 返回 Promise<Uint8Array>
-      var pdfBuf = mdpdf.markdownToPdf(markdownContent);
-      // 处理同步化（@mdpdf/mdpdf 是 async，但 preload 可以用 .then）
-      // 注意：这里用同步风格等待，uTools preload 中实际是异步执行
-      return pdfBuf.then(function (buf) {
-        require('fs').writeFileSync(path, Buffer.from(buf));
-        return true;
-      }).catch(function (err) {
-        console.error('[MarkFlow] PDF 导出失败:', err);
-        return false;
-      });
+      fs.writeFileSync(tmpPath, html, 'utf-8');
+      var fileUrl = pathToFileURL(tmpPath).href;
+
+      if (!utools.ubrowser || typeof utools.ubrowser.goto !== 'function') {
+        cleanupTmp();
+        console.error('[MarkFlow] utools.ubrowser 不可用');
+        return Promise.resolve({ ok: false, reason: 'error' });
+      }
+
+      return utools.ubrowser
+        .goto(fileUrl)
+        .wait(function () {
+          var imgs = document.images;
+          for (var i = 0; i < imgs.length; i++) {
+            if (!imgs[i].complete) return false;
+          }
+          return true;
+        }, 15000)
+        .pdf(
+          {
+            printBackground: printBackground,
+            pageSize: pageSize
+          },
+          savePath
+        )
+        .run({ show: false, width: 1024, height: 768 })
+        .then(function () {
+          cleanupTmp();
+          return { ok: true };
+        })
+        .catch(function (err) {
+          cleanupTmp();
+          console.error('[MarkFlow] PDF 导出失败:', err);
+          return { ok: false, reason: 'error' };
+        });
     } catch (err) {
+      cleanupTmp();
       console.error('[MarkFlow] PDF 导出初始化失败:', err);
-      return false;
+      return Promise.resolve({ ok: false, reason: 'error' });
     }
   },
+
+
 
   // 获取 uTools 主题（dark/light）
   isDarkTheme: function () {
