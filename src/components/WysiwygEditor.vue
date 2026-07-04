@@ -17,6 +17,7 @@ import { editorViewOptionsCtx } from '@milkdown/core'
 import { useNoteStore } from '../stores/note'
 import { useTocJumpHandler } from '../composables/useTocJumpHandler'
 import { markdownPaste } from '../plugins/markdownPaste'
+import { imagePaste } from '../plugins/imagePaste'
 import { plainTextFallback } from '../plugins/plainTextFallback'
 import { highlightMarkPlugins } from '../plugins/highlightMark'
 import { underlineMarkPlugins } from '../plugins/underlineMark'
@@ -27,6 +28,7 @@ import {
   handleCodeCopyCaptureClick,
   handleCodeCopyCaptureMouseDown,
 } from '../utils/codeCopy'
+import { resolveMarkdownForDisplay, persistMarkdownAssets } from '../utils/resolveMarkdownAssets'
 
 /** 粘贴 HTML 清洗：剥离 ProseMirror schema 不兼容的元素，防止 replaceSelection 异常触发静默粘贴失败 */
 function sanitizePastedHTML(html: string): string {
@@ -76,16 +78,20 @@ async function initEditor(content: string) {
     if (containerRef.value) containerRef.value.innerHTML = ''
     if (!containerRef.value) return
 
+    const displayContent = await resolveMarkdownForDisplay(normalizeUnderlineMarkdown(content))
+
     editor = await Editor.make()
       .config((ctx) => {
         ctx.set(rootCtx, containerRef.value!)
-        ctx.set(defaultValueCtx, normalizeUnderlineMarkdown(content))
+        ctx.set(defaultValueCtx, displayContent)
         ctx.get(listenerCtx).markdownUpdated((_, markdown) => {
-          store.setLiveContent(markdown)
-          if (saveTimer) clearTimeout(saveTimer)
-          saveTimer = setTimeout(() => {
-            store.updateCurrentContent(markdown)
-          }, 300)
+          void persistMarkdownAssets(markdown).then((persisted) => {
+            store.setLiveContent(persisted)
+            if (saveTimer) clearTimeout(saveTimer)
+            saveTimer = setTimeout(() => {
+              store.updateCurrentContent(persisted)
+            }, 300)
+          })
         })
         ctx.update(editorViewOptionsCtx, (prev) => ({
           ...prev,
@@ -100,6 +106,7 @@ async function initEditor(content: string) {
       .use(gfm)
       .use(highlightMarkPlugins)
       .use(underlineMarkPlugins)
+      .use(imagePaste)
       .use(markdownPaste)
       .use(clipboard)
       .use(plainTextFallback)
@@ -113,9 +120,10 @@ async function initEditor(content: string) {
     if (pendingContent !== null) {
       const pc = pendingContent
       pendingContent = null
+      const displayPc = await resolveMarkdownForDisplay(normalizeUnderlineMarkdown(pc))
       editor.action((ctx) => {
-        if (getMarkdown()(ctx) === pc) return
-        replaceAll(normalizeUnderlineMarkdown(pc))(ctx)
+        if (getMarkdown()(ctx) === displayPc) return
+        replaceAll(displayPc)(ctx)
       })
     }
   })()
@@ -132,9 +140,12 @@ watch(
       pendingContent = content
       return
     }
-    editor.action((ctx) => {
-      if (getMarkdown()(ctx) === content) return
-      replaceAll(normalizeUnderlineMarkdown(content))(ctx)
+    void resolveMarkdownForDisplay(normalizeUnderlineMarkdown(content)).then((displayContent) => {
+      if (!editor) return
+      editor.action((ctx) => {
+        if (getMarkdown()(ctx) === displayContent) return
+        replaceAll(displayContent)(ctx)
+      })
     })
   }
 )
@@ -168,11 +179,12 @@ onBeforeUnmount(async () => {
     saveTimer = null
   }
   if (editor) {
-    editor.action((ctx) => {
-      const markdown = getMarkdown()(ctx)
-      store.setLiveContent(markdown)
-      store.updateCurrentContent(markdown)
+    const markdown = await new Promise<string>((resolve) => {
+      editor!.action((ctx) => resolve(getMarkdown()(ctx)))
     })
+    const persisted = await persistMarkdownAssets(markdown)
+    store.setLiveContent(persisted)
+    store.updateCurrentContent(persisted)
     await editor.destroy()
     editor = null
   }

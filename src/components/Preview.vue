@@ -12,6 +12,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { parseMarkdown } from '../utils/markedSetup'
+import { resolveMarkdownForDisplay } from '../utils/resolveMarkdownAssets'
 import { handleCodeCopyCaptureClick } from '../utils/codeCopy'
 import { writeClipboard } from '../utils/clipboard'
 import { useNoteStore } from '../stores/note'
@@ -44,13 +45,20 @@ function scheduleRender(content: string) {
     ? PREVIEW_LARGE_DEBOUNCE_MS
     : PREVIEW_RENDER_DEBOUNCE_MS
   renderTimer = setTimeout(() => {
-    try {
-      renderedHtml.value = parseMarkdown(content) || '<p class="empty-preview">预览渲染失败</p>'
-    } catch {
-      renderedHtml.value = '<p class="empty-preview">预览渲染失败</p>'
-    } finally {
-      previewLoading.value = false
-    }
+    void resolveMarkdownForDisplay(content)
+      .then((resolved) => {
+        try {
+          renderedHtml.value = parseMarkdown(resolved) || '<p class="empty-preview">预览渲染失败</p>'
+        } catch {
+          renderedHtml.value = '<p class="empty-preview">预览渲染失败</p>'
+        }
+      })
+      .catch(() => {
+        renderedHtml.value = '<p class="empty-preview">预览渲染失败</p>'
+      })
+      .finally(() => {
+        previewLoading.value = false
+      })
   }, delay)
 }
 

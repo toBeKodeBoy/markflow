@@ -1,6 +1,9 @@
 /** WYSIWYG 所见即所得（UI 标签「预览」）| split 分屏 | source 源码 | focus 专注 */
 export type ViewMode = 'live' | 'split' | 'source' | 'focus'
 
+import type { AssetIndexItem, AssetRecord } from './asset'
+export type { AssetIndexItem, AssetRecord } from './asset'
+
 export interface Note {
   id: string
   title: string
@@ -56,6 +59,11 @@ export interface MarkFlowBridge {
   isDarkTheme: () => boolean
   hideMainWindow: () => void
   copyText: (text: string) => boolean
+  getAssetIndex: () => AssetIndexItem[]
+  saveAssetIndex: (index: AssetIndexItem[]) => void
+  getAsset: (id: string) => AssetRecord | null
+  saveAsset: (id: string, record: AssetRecord) => void
+  removeAsset: (id: string) => void
 }
 
 declare global {

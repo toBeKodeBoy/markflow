@@ -2,6 +2,7 @@ import { useNoteStore } from '../stores/note'
 import { showAppNotification } from './notify'
 import { parseMarkdown } from './markedSetup'
 import { escapeHtml } from './escapeHtml'
+import { resolveMarkdownForDisplay } from './resolveMarkdownAssets'
 
 /**
  * 导出当前笔记为 PDF。
@@ -14,7 +15,7 @@ export async function exportPdf(): Promise<void> {
   if (!store.currentNote) return
 
   const title = store.currentNote.title
-  const content = store.currentNote.content
+  const content = await resolveMarkdownForDisplay(store.currentNote.content)
 
   if (typeof window.markflow !== 'undefined' && window.markflow.savePdfFile) {
     // uTools 环境
@@ -25,12 +26,12 @@ export async function exportPdf(): Promise<void> {
     }
   } else {
     // 浏览器回退：print()
-    openPrintWindow(content, title)
+    await openPrintWindow(content, title)
   }
 }
 
-function openPrintWindow(markdown: string, title: string): void {
-  const html = buildPdfHtml(markdown, title)
+async function openPrintWindow(markdown: string, title: string): Promise<void> {
+  const html = await buildPdfHtml(markdown, title)
   const win = window.open('', '_blank')
   if (!win) {
     showAppNotification('导出失败：浏览器阻止了弹出窗口，请允许弹出窗口后重试')
