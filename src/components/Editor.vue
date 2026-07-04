@@ -82,8 +82,8 @@ function buildExtensions() {
       }
     }),
     EditorView.theme({
-      '&': { height: '100%', fontSize: '14px' },
-      '.cm-scroller': { fontFamily: "'JetBrains Mono', 'Fira Code', monospace", overflow: 'auto' },
+      '&': { height: '100%', fontSize: 'var(--editor-font-size, 14px)' },
+      '.cm-scroller': { fontFamily: 'var(--editor-font-family, var(--font-mono))', overflow: 'auto' },
       '.cm-content': { padding: '16px' },
     })
   ]

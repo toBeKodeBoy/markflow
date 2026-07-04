@@ -5,7 +5,7 @@
       <input
         v-model="store.searchQuery"
         type="text"
-        placeholder="搜索笔记..."
+        placeholder="搜索标题或正文..."
         class="search-input"
       />
     </div>

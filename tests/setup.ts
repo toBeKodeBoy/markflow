@@ -52,7 +52,7 @@ window.markflow = {
   }),
   showNotification: vi.fn(),
   saveMarkdownFile: vi.fn(() => true),
-  savePdfFile: vi.fn(() => Promise.resolve(true)),
+  savePdfFromHtml: vi.fn(() => Promise.resolve({ ok: true })),
   openMarkdownFile: vi.fn(() => '# Test content\n'),
   isDarkTheme: vi.fn(() => false),
   hideMainWindow: vi.fn(),

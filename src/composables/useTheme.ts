@@ -1,4 +1,5 @@
 import { ref, onMounted } from 'vue'
+import type { AppSettings } from '../types'
 import { useStorage } from './useStorage'
 
 const isDark = ref(false)
@@ -42,7 +43,23 @@ export function useTheme() {
     storage.saveSettings(settings)
   }
 
+  /** 从设置面板切换主题模式 */
+  function setTheme(theme: AppSettings['theme']) {
+    const settings = storage.getSettings()
+    settings.theme = theme
+    storage.saveSettings(settings)
+    if (theme === 'system') {
+      if (typeof window.markflow !== 'undefined') {
+        applyTheme(window.markflow.isDarkTheme())
+      } else {
+        applyTheme(detectSystemTheme())
+      }
+    } else {
+      applyTheme(theme === 'dark')
+    }
+  }
+
   onMounted(() => init())
 
-  return { isDark, toggle, applyTheme, init }
+  return { isDark, toggle, setTheme, applyTheme, init }
 }

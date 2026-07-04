@@ -30,6 +30,7 @@
       >{{ pdfExporting ? '…' : 'PDF' }}</button>
       <button class="btn-icon" @click="importNote" title="导入 .md 文件">⬆</button>
       <button class="btn-icon" :class="{ active: tocVisible }" @click="$emit('toggleToc')" title="目录">目录</button>
+      <button class="btn-icon" @click="openSettings" title="设置">⚙</button>
       <button class="btn-icon" @click="theme.toggle()" :title="theme.isDark.value ? '切换亮色' : '切换暗色'">
         {{ theme.isDark.value ? '☀' : '🌙' }}
       </button>
@@ -42,6 +43,12 @@
     @confirm="onPdfConfirm"
     @cancel="pdfModalVisible = false"
   />
+
+  <SettingsModal
+    :visible="settingsModalVisible"
+    @confirm="onSettingsConfirm"
+    @cancel="settingsModalVisible = false"
+  />
 </template>
 
 <script setup lang="ts">
@@ -49,8 +56,11 @@ import { ref } from 'vue'
 import { useNoteStore } from '../stores/note'
 import { useTheme } from '../composables/useTheme'
 import { exportPdf, pdfExporting, sanitizeFilename } from '../utils/exportPdf'
+import { showAppNotification } from '../utils/notify'
 import PdfExportModal from './PdfExportModal.vue'
-import type { PdfExportOptions, ViewMode } from '../types'
+import SettingsModal from './SettingsModal.vue'
+import type { AppSettings, PdfExportOptions, ViewMode } from '../types'
+import { useAppSettings } from '../composables/useAppSettings'
 
 defineProps<{ viewMode: ViewMode; tocVisible: boolean }>()
 const emit = defineEmits<{ toggleSidebar: []; setViewMode: [mode: ViewMode]; toggleToc: [] }>()
@@ -61,7 +71,9 @@ function emitSetViewMode(mode: ViewMode) {
 
 const store = useNoteStore()
 const theme = useTheme()
+const appSettings = useAppSettings()
 const pdfModalVisible = ref(false)
+const settingsModalVisible = ref(false)
 
 function openPdfModal() {
   if (!store.currentNote || pdfExporting.value) return
@@ -71,6 +83,20 @@ function openPdfModal() {
 async function onPdfConfirm(options: PdfExportOptions) {
   pdfModalVisible.value = false
   await exportPdf(options)
+}
+
+function openSettings() {
+  settingsModalVisible.value = true
+}
+
+function onSettingsConfirm(settings: AppSettings) {
+  settingsModalVisible.value = false
+  theme.setTheme(settings.theme)
+  appSettings.save({
+    fontSize: settings.fontSize,
+    editorFontFamily: settings.editorFontFamily,
+  })
+  showAppNotification('设置已保存')
 }
 
 /** 在当前文件夹下创建新笔记 */

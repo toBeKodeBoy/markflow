@@ -252,6 +252,24 @@ describe('useNoteStore', () => {
       expect(store.filteredNoteList[0].title).toBe('Beta')
     })
 
+    it('filteredNoteList 应按正文过滤', () => {
+      const store = useNoteStore()
+      store.createNoteWithContent('# 标题A\n唯一关键词xyz')
+      store.createNoteWithContent('# 标题B\n普通内容')
+      store.searchQuery = 'xyz'
+      expect(store.filteredNoteList).toHaveLength(1)
+      expect(store.filteredNoteList[0].title).toBe('标题A')
+    })
+
+    it('updateCurrentContent 后正文搜索应即时更新', () => {
+      const store = useNoteStore()
+      store.createNoteWithContent('# 笔记')
+      store.searchQuery = '新插入的词'
+      expect(store.filteredNoteList).toHaveLength(0)
+      store.updateCurrentContent('# 笔记\n新插入的词')
+      expect(store.filteredNoteList).toHaveLength(1)
+    })
+
     it('filteredNoteList 应按文件夹过滤', () => {
       const store = useNoteStore()
       store.createNoteWithContent('# A', 'f1')

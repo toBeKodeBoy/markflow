@@ -8,6 +8,11 @@ import type { Note, NoteListItem, Folder, TocJumpTarget } from '../types'
 
 const TITLE_SCAN_LINES = 50
 
+/** 将笔记正文规范化为可搜索文本（小写） */
+function normalizeForSearch(text: string): string {
+  return text.toLowerCase()
+}
+
 /** 生成唯一 ID：当前时间戳(36进制) + 随机数(36进制) */
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2)
@@ -40,6 +45,8 @@ export const useNoteStore = defineStore('note', () => {
   const folderList = ref<Folder[]>([])
   const searchQuery = ref('')
   const activeFolderId = ref<string | null>(null)
+  /** 笔记正文搜索索引（id → 小写正文），loadNoteList 时重建 */
+  const contentSearchIndex = ref<Record<string, string>>({})
   const tocVisible = ref(false)
   const tocJumpTarget = ref<TocJumpTarget | null>(null)
   const pendingLargeFileSwitch = ref(false)
@@ -53,7 +60,11 @@ export const useNoteStore = defineStore('note', () => {
     }
     if (searchQuery.value.trim()) {
       const q = searchQuery.value.toLowerCase()
-      list = list.filter(n => n.title.toLowerCase().includes(q))
+      list = list.filter(
+        (n) =>
+          n.title.toLowerCase().includes(q) ||
+          (contentSearchIndex.value[n.id]?.includes(q) ?? false)
+      )
     }
     return list
   })
@@ -75,10 +86,29 @@ export const useNoteStore = defineStore('note', () => {
     tocVisible.value = visible
   }
 
+  /** 更新单篇笔记的正文搜索索引 */
+  function updateSearchIndex(id: string, content: string) {
+    contentSearchIndex.value = {
+      ...contentSearchIndex.value,
+      [id]: normalizeForSearch(content),
+    }
+  }
+
+  /** 从存储重建全部笔记的正文搜索索引 */
+  function rebuildSearchIndex() {
+    const index: Record<string, string> = {}
+    for (const item of noteList.value) {
+      const note = storage.getNote(item.id)
+      if (note?.content) index[item.id] = normalizeForSearch(note.content)
+    }
+    contentSearchIndex.value = index
+  }
+
   /** 从存储加载笔记列表和文件夹列表 */
   function loadNoteList() {
     noteList.value = storage.getNoteList()
     folderList.value = storage.getFolderList()
+    rebuildSearchIndex()
   }
 
   /** 打开指定笔记：从存储读取完整内容，设为当前，检查大文件策略 */
@@ -110,6 +140,7 @@ export const useNoteStore = defineStore('note', () => {
     }
     storage.saveNote(note)
     noteList.value = storage.getNoteList()
+    updateSearchIndex(note.id, note.content)
     currentNote.value = note
     liveContent.value = note.content
     return note
@@ -130,6 +161,7 @@ export const useNoteStore = defineStore('note', () => {
     }
     storage.saveNote(note)
     noteList.value = storage.getNoteList()
+    updateSearchIndex(note.id, content)
     currentNote.value = note
     liveContent.value = content
     applyLargeFilePolicy(content)
@@ -145,6 +177,7 @@ export const useNoteStore = defineStore('note', () => {
     currentNote.value.title = title
     currentNote.value.updatedAt = Date.now()
     storage.saveNote(currentNote.value)
+    updateSearchIndex(currentNote.value.id, content)
     const idx = noteList.value.findIndex(n => n.id === currentNote.value!.id)
     if (idx >= 0) {
       noteList.value[idx].title = title
@@ -156,6 +189,9 @@ export const useNoteStore = defineStore('note', () => {
   function deleteNote(id: string) {
     storage.removeNote(id)
     noteList.value = storage.getNoteList()
+    const nextIndex = { ...contentSearchIndex.value }
+    delete nextIndex[id]
+    contentSearchIndex.value = nextIndex
     const contents = collectAllNoteContents(
       () => storage.getNoteList(),
       (noteId) => storage.getNote(noteId)

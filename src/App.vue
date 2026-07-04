@@ -32,17 +32,20 @@ import Toc from './components/Toc.vue'
 import ImageLightbox from './components/ImageLightbox.vue'
 import { useNoteStore } from './stores/note'
 import { useTheme } from './composables/useTheme'
+import { useAppSettings } from './composables/useAppSettings'
 import { useImageLightbox } from './composables/useImageLightbox'
 import { showAppNotification } from './utils/notify'
 import type { ViewMode } from './types'
 
 const store = useNoteStore()
 useTheme()
+useAppSettings().load()
 const { visible: lightboxVisible, closeLightbox } = useImageLightbox()
 
 const viewMode = ref<ViewMode>('live')
 const prevMode = ref<ViewMode>('live')
-const sidebarVisible = ref(true)
+const appSettings = useAppSettings()
+const sidebarVisible = ref(appSettings.get().sidebarVisible ?? true)
 const tocVisible = ref(false)
 
 const showSidebar = computed(() => viewMode.value !== 'focus' && sidebarVisible.value)
@@ -98,6 +101,10 @@ function toggleToc() {
   tocVisible.value = !tocVisible.value
   store.setTocVisible(tocVisible.value)
 }
+
+watch(sidebarVisible, (visible) => {
+  appSettings.save({ sidebarVisible: visible })
+})
 
 watch(() => store.pendingLargeFileSwitch, (pending) => {
   if (!pending) return

@@ -89,7 +89,7 @@ const linkRenderer: RendererExtension = {
   name: 'link',
   renderer(token) {
     const href = normalizeFragmentHref(token.href ?? '')
-    const text = this.parser.parseInline(token.tokens)
+    const text = this.parser.parseInline(token.tokens ?? [])
     const title = token.title ? ` title="${escapeHtml(token.title)}"` : ''
     return `<a href="${href}"${title}>${text}</a>`
   },
@@ -99,7 +99,7 @@ const linkRenderer: RendererExtension = {
 const headingRenderer: RendererExtension = {
   name: 'heading',
   renderer(token) {
-    const text = this.parser.parseInline(token.tokens)
+    const text = this.parser.parseInline(token.tokens ?? [])
     const id = headingSlugger.slug(token.text)
     return `<h${token.depth} id="${escapeHtml(id)}">${text}</h${token.depth}>\n`
   },
