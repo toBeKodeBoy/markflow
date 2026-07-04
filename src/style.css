@@ -528,16 +528,25 @@ input:focus { border-color: var(--primary); }
 
 .markdown-body a { color: var(--primary); text-decoration: underline; }
 
-.markdown-body code {
+.markdown-body :not(pre) > code,
+.ProseMirror :not(pre) > code {
+  display: inline;
+  vertical-align: baseline;
+  white-space: nowrap;
+  word-break: normal;
   background: var(--code-bg);
   padding: 2px 6px;
   border-radius: 4px;
   font-family: var(--font-mono);
   font-size: 0.88em;
+  line-height: inherit;
   color: #e06c75;
 }
 
-[data-theme="dark"] .markdown-body code { color: #f38ba8; }
+[data-theme="dark"] .markdown-body :not(pre) > code,
+[data-theme="dark"] .ProseMirror :not(pre) > code {
+  color: #f38ba8;
+}
 
 .markdown-body pre {
   background: var(--code-bg);
@@ -669,6 +678,8 @@ input:focus { border-color: var(--primary); }
 }
 
 .markdown-body pre code {
+  display: block;
+  white-space: pre;
   background: none;
   padding: 0;
   color: inherit;
@@ -684,12 +695,16 @@ input:focus { border-color: var(--primary); }
   color: var(--text-muted);
 }
 
-.markdown-body ul, .markdown-body ol {
+.markdown-body ul, .markdown-body ol,
+.ProseMirror ul, .ProseMirror ol {
   margin: 0.8em 0;
   padding-left: 1.8em;
 }
 
-.markdown-body li { margin: 0.3em 0; }
+.markdown-body li,
+.ProseMirror li {
+  margin: 0.3em 0;
+}
 
 .markdown-body table {
   width: 100%;
@@ -864,15 +879,6 @@ input:focus { border-color: var(--primary); }
 .ProseMirror a { color: var(--primary); text-decoration: underline; }
 .ProseMirror a:hover { color: var(--primary-hover); }
 
-.ProseMirror code {
-  background: var(--code-bg);
-  color: var(--primary);
-  border-radius: 3px;
-  padding: 0.1em 0.4em;
-  font-family: var(--font-mono);
-  font-size: 0.88em;
-}
-
 .ProseMirror pre {
   background: var(--code-bg);
   border-radius: var(--radius);
@@ -1012,6 +1018,8 @@ input:focus { border-color: var(--primary); }
 }
 
 .ProseMirror pre code {
+  display: block;
+  white-space: pre;
   background: none;
   padding: 0;
   font-size: 0.9em;
@@ -1071,56 +1079,24 @@ input:focus { border-color: var(--primary); }
   color: var(--text-muted);
 }
 
-.ProseMirror ul, .ProseMirror ol {
-  padding-left: 1.8em;
-  margin: 0.5em 0;
-}
-
-.ProseMirror li { margin: 0.2em 0; }
-
-/* Milkdown list-item-block: bullets + task checkboxes */
-.ProseMirror ul:has(.milkdown-list-item-block),
-.ProseMirror ol:has(.milkdown-list-item-block) {
+/* GFM 任务列表：隐藏默认 marker，用 checkbox 字符替代 */
+.ProseMirror li[data-item-type="task"] {
   list-style: none;
-  padding-left: 0;
 }
 
-.milkdown-list-item-block .list-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  list-style: none;
-  margin: 0.2em 0;
-}
-
-.milkdown-list-item-block .label-wrapper {
-  flex-shrink: 0;
+.ProseMirror li[data-item-type="task"]::before {
+  content: '□';
+  display: inline-block;
+  width: 1.2em;
+  margin-left: -1.2em;
+  text-align: center;
   user-select: none;
-  line-height: 1.8;
-}
-
-.milkdown-list-item-block .label-wrapper .milkdown-icon.label.checked,
-.milkdown-list-item-block .label-wrapper .milkdown-icon.label.unchecked {
-  cursor: pointer;
-}
-
-.milkdown-list-item-block .label-wrapper .milkdown-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.25em;
-  min-height: 1.25em;
-  font-size: 1.1em;
   color: var(--text-muted);
 }
 
-.milkdown-list-item-block .label-wrapper .milkdown-icon.label.checked {
+.ProseMirror li[data-item-type="task"][data-checked="true"]::before {
+  content: '☑';
   color: var(--primary);
-}
-
-.milkdown-list-item-block .children {
-  flex: 1;
-  min-width: 0;
 }
 
 .ProseMirror hr {
