@@ -14,6 +14,7 @@
       <button @click="insertLine('1. ')" title="有序列表">1.</button>
       <button @click="insertLine('> ')" title="引用块">❝</button>
       <span class="sep">|</span>
+      <button @click="insertInlineCode" title="行内代码 (Ctrl/Cmd+E)">`</button>
       <button @click="insertCodeBlock" title="代码块">&lt;/&gt;</button>
       <button @click="insertTable" title="插入表格">⊞</button>
       <button @click="insertMarkdown('[', '](url)', '链接文字')" title="插入链接">🔗</button>
@@ -27,11 +28,12 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } from '@codemirror/view'
-import { EditorState, Compartment } from '@codemirror/state'
+import { EditorState, Compartment, Prec } from '@codemirror/state'
 import { closeBracketsKeymap } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { autoCloseBracketsExtensions } from '../extensions/autoCloseBrackets'
+import { buildInlineCodeInsert } from '../utils/inlineCode'
 import { useNoteStore } from '../stores/note'
 import { useScrollSync } from '../composables/useScrollSync'
 
@@ -56,12 +58,17 @@ function buildExtensions() {
     highlightActiveLine(),
     drawSelection(),
     ...autoCloseBracketsExtensions,
+    Prec.highest(
+      keymap.of([
+        { key: 'Mod-u', run: insertUnderline, preventDefault: true },
+        { key: 'Mod-e', run: insertInlineCodeCommand, preventDefault: true },
+      ]),
+    ),
     keymap.of([
       ...closeBracketsKeymap,
       ...defaultKeymap,
       ...historyKeymap,
       indentWithTab,
-      { key: 'Ctrl-u', run: insertUnderline, preventDefault: true },
     ]),
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
@@ -190,6 +197,26 @@ function insertLine(prefix: string) {
     selection: { anchor: line.from + prefix.length + (sel.from - line.from) }
   })
   view.focus()
+}
+
+/** 工具栏 / 快捷键：插入行内代码（单个反引号包裹，与文字同行） */
+function insertInlineCode() {
+  if (!view) return
+  const sel = view.state.selection.main
+  const selected = view.state.sliceDoc(sel.from, sel.to)
+  const { insert, contentStart, contentEnd } = buildInlineCodeInsert(selected)
+  view.dispatch({
+    changes: { from: sel.from, to: sel.to, insert },
+    selection: { anchor: sel.from + contentStart, head: sel.from + contentEnd },
+  })
+  view.focus()
+}
+
+/** 快捷键：Ctrl+E 插入行内代码 */
+function insertInlineCodeCommand(): boolean {
+  if (!view) return false
+  insertInlineCode()
+  return true
 }
 
 /** 工具栏：插入代码块，默认带 language 占位符便于用户替换 */
