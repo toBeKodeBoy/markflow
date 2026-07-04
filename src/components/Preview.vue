@@ -14,6 +14,7 @@ import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { parseMarkdown } from '../utils/markedSetup'
 import { resolveMarkdownForDisplay } from '../utils/resolveMarkdownAssets'
 import { handleCodeCopyCaptureClick } from '../utils/codeCopy'
+import { handleImageLightboxDblClick } from '../utils/imageLightbox'
 import { writeClipboard } from '../utils/clipboard'
 import { useNoteStore } from '../stores/note'
 import { useScrollSync } from '../composables/useScrollSync'
@@ -79,11 +80,13 @@ useTocJumpHandler(previewContentEl, store)
 
 onMounted(() => {
   previewContentEl.value?.addEventListener('click', handleCodeCopyCaptureClick, true)
+  previewContentEl.value?.addEventListener('dblclick', handleImageLightboxDblClick, true)
 })
 
 onBeforeUnmount(() => {
   if (renderTimer) clearTimeout(renderTimer)
   previewContentEl.value?.removeEventListener('click', handleCodeCopyCaptureClick, true)
+  previewContentEl.value?.removeEventListener('dblclick', handleImageLightboxDblClick, true)
 })
 
 /** 复制当前渲染 HTML 到剪贴板 */

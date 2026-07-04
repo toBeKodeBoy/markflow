@@ -95,7 +95,24 @@ function buildPdfHtml(markdown: string, title: string): string {
   th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: left; }
   th { background: #f6f8fa; font-weight: 600; }
   tr:nth-child(even) { background: #fafbfc; }
-  img { max-width: 100%; height: auto; }
+  img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    width: 100%;
+    object-fit: contain;
+  }
+  .markflow-image-wrapper { text-align: center; margin: 8px 0; }
+  .markflow-image-frame {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    vertical-align: top;
+  }
+  .markflow-img-scale-10 { width: 10%; }
+  .markflow-img-scale-30 { width: 30%; }
+  .markflow-img-scale-50 { width: 50%; }
+  .markflow-img-scale-100 { width: 100%; }
   blockquote {
     border-left: 4px solid #ddd;
     margin: 8px 0;

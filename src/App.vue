@@ -17,6 +17,7 @@
       </template>
       <Toc v-if="tocVisible && viewMode !== 'focus'" />
     </div>
+    <ImageLightbox />
   </div>
 </template>
 
@@ -28,13 +29,16 @@ import Editor from './components/Editor.vue'
 import WysiwygEditor from './components/WysiwygEditor.vue'
 import Preview from './components/Preview.vue'
 import Toc from './components/Toc.vue'
+import ImageLightbox from './components/ImageLightbox.vue'
 import { useNoteStore } from './stores/note'
 import { useTheme } from './composables/useTheme'
+import { useImageLightbox } from './composables/useImageLightbox'
 import { showAppNotification } from './utils/notify'
 import type { ViewMode } from './types'
 
 const store = useNoteStore()
 useTheme()
+const { visible: lightboxVisible, closeLightbox } = useImageLightbox()
 
 const viewMode = ref<ViewMode>('live')
 const prevMode = ref<ViewMode>('live')
@@ -109,9 +113,14 @@ function exitFocus() {
   viewMode.value = prevMode.value
 }
 
-/** 全局键盘监听：Esc 退出专注模式 */
+/** 全局键盘监听：Esc 优先关闭图片预览，其次退出专注模式 */
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && viewMode.value === 'focus') exitFocus()
+  if (e.key !== 'Escape') return
+  if (lightboxVisible.value) {
+    closeLightbox()
+    return
+  }
+  if (viewMode.value === 'focus') exitFocus()
 }
 
 onMounted(() => {

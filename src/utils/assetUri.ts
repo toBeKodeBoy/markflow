@@ -1,4 +1,5 @@
 import type { AssetRecord } from '../types/asset'
+import { DEFAULT_IMAGE_SCALE, formatScaleTitle, type ImageScale } from './imageScale'
 
 export const ASSET_URI_PREFIX = 'markflow-asset://'
 
@@ -19,8 +20,10 @@ export function generateAssetId(): string {
 }
 
 /** 构建 Markdown 图片引用（持久化格式） */
-export function buildAssetMarkdown(alt: string, assetId: string): string {
-  return `![${alt}](${ASSET_URI_PREFIX}${assetId})`
+export function buildAssetMarkdown(alt: string, assetId: string, scale?: ImageScale): string {
+  const s = scale ?? DEFAULT_IMAGE_SCALE
+  const titleAttr = s === DEFAULT_IMAGE_SCALE ? '' : ` "${formatScaleTitle(s)}"`
+  return `![${alt}](${ASSET_URI_PREFIX}${assetId}${titleAttr})`
 }
 
 /** 从 asset URI 或带 title 的 href 提取 ID */
@@ -63,7 +66,7 @@ export function resolveAssetsInMarkdown(
   )
 }
 
-/** 持久化前：data URL → markflow-asset://（去掉 title，保持存储简洁） */
+/** 持久化前：data URL → markflow-asset://（保留 scale title） */
 export function restoreAssetRefsInMarkdown(
   markdown: string,
   findIdByData: (base64: string) => string | null
@@ -71,8 +74,10 @@ export function restoreAssetRefsInMarkdown(
   return markdown.replace(
     DATA_IMAGE_MD_RE,
     (match, alt: string, b64: string) => {
+      const titleMatch = match.match(/\s+"([^"]*)"\s*\)$/)
+      const titleSuffix = titleMatch ? ` "${titleMatch[1]}"` : ''
       const id = findIdByData(b64)
-      return id ? `![${alt}](${ASSET_URI_PREFIX}${id})` : match
+      return id ? `![${alt}](${ASSET_URI_PREFIX}${id}${titleSuffix})` : match
     }
   )
 }

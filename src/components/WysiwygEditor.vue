@@ -18,6 +18,7 @@ import { useNoteStore } from '../stores/note'
 import { useTocJumpHandler } from '../composables/useTocJumpHandler'
 import { markdownPaste } from '../plugins/markdownPaste'
 import { imagePaste } from '../plugins/imagePaste'
+import { imageScalePlugin } from '../plugins/imageScale'
 import { plainTextFallback } from '../plugins/plainTextFallback'
 import { highlightMarkPlugins } from '../plugins/highlightMark'
 import { underlineMarkPlugins } from '../plugins/underlineMark'
@@ -28,6 +29,7 @@ import {
   handleCodeCopyCaptureClick,
   handleCodeCopyCaptureMouseDown,
 } from '../utils/codeCopy'
+import { handleImageLightboxDblClick } from '../utils/imageLightbox'
 import { resolveMarkdownForDisplay, persistMarkdownAssets } from '../utils/resolveMarkdownAssets'
 
 /** 粘贴 HTML 清洗：剥离 ProseMirror schema 不兼容的元素，防止 replaceSelection 异常触发静默粘贴失败 */
@@ -107,6 +109,7 @@ async function initEditor(content: string) {
       .use(highlightMarkPlugins)
       .use(underlineMarkPlugins)
       .use(imagePaste)
+      .use(imageScalePlugin)
       .use(markdownPaste)
       .use(clipboard)
       .use(plainTextFallback)
@@ -165,6 +168,7 @@ onMounted(() => {
   if (host) {
     host.addEventListener('mousedown', handleCodeCopyCaptureMouseDown, true)
     host.addEventListener('click', handleCodeCopyCaptureClick, true)
+    host.addEventListener('dblclick', handleImageLightboxDblClick, true)
   }
 })
 
@@ -173,6 +177,7 @@ onBeforeUnmount(async () => {
   if (host) {
     host.removeEventListener('mousedown', handleCodeCopyCaptureMouseDown, true)
     host.removeEventListener('click', handleCodeCopyCaptureClick, true)
+    host.removeEventListener('dblclick', handleImageLightboxDblClick, true)
   }
   if (saveTimer) {
     clearTimeout(saveTimer)
