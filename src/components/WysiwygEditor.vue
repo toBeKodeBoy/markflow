@@ -12,7 +12,6 @@ import { gfm } from '@milkdown/preset-gfm'
 import { clipboard } from '@milkdown/plugin-clipboard'
 import { listener, listenerCtx } from '@milkdown/plugin-listener'
 import { history } from '@milkdown/plugin-history'
-import { listItemBlockComponent } from '@milkdown/components/list-item-block'
 import { getMarkdown, replaceAll } from '@milkdown/utils'
 import { editorViewOptionsCtx } from '@milkdown/core'
 import { useNoteStore } from '../stores/note'
@@ -99,7 +98,6 @@ async function initEditor(content: string) {
       .use(codeBlockExitPlugin)
       .use(commonmark)
       .use(gfm)
-      .use(listItemBlockComponent)
       .use(highlightMarkPlugins)
       .use(underlineMarkPlugins)
       .use(markdownPaste)

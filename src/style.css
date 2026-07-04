@@ -684,12 +684,16 @@ input:focus { border-color: var(--primary); }
   color: var(--text-muted);
 }
 
-.markdown-body ul, .markdown-body ol {
+.markdown-body ul, .markdown-body ol,
+.ProseMirror ul, .ProseMirror ol {
   margin: 0.8em 0;
   padding-left: 1.8em;
 }
 
-.markdown-body li { margin: 0.3em 0; }
+.markdown-body li,
+.ProseMirror li {
+  margin: 0.3em 0;
+}
 
 .markdown-body table {
   width: 100%;
@@ -1071,56 +1075,24 @@ input:focus { border-color: var(--primary); }
   color: var(--text-muted);
 }
 
-.ProseMirror ul, .ProseMirror ol {
-  padding-left: 1.8em;
-  margin: 0.5em 0;
-}
-
-.ProseMirror li { margin: 0.2em 0; }
-
-/* Milkdown list-item-block: bullets + task checkboxes */
-.ProseMirror ul:has(.milkdown-list-item-block),
-.ProseMirror ol:has(.milkdown-list-item-block) {
+/* GFM 任务列表：隐藏默认 marker，用 checkbox 字符替代 */
+.ProseMirror li[data-item-type="task"] {
   list-style: none;
-  padding-left: 0;
 }
 
-.milkdown-list-item-block .list-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  list-style: none;
-  margin: 0.2em 0;
-}
-
-.milkdown-list-item-block .label-wrapper {
-  flex-shrink: 0;
+.ProseMirror li[data-item-type="task"]::before {
+  content: '□';
+  display: inline-block;
+  width: 1.2em;
+  margin-left: -1.2em;
+  text-align: center;
   user-select: none;
-  line-height: 1.8;
-}
-
-.milkdown-list-item-block .label-wrapper .milkdown-icon.label.checked,
-.milkdown-list-item-block .label-wrapper .milkdown-icon.label.unchecked {
-  cursor: pointer;
-}
-
-.milkdown-list-item-block .label-wrapper .milkdown-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.25em;
-  min-height: 1.25em;
-  font-size: 1.1em;
   color: var(--text-muted);
 }
 
-.milkdown-list-item-block .label-wrapper .milkdown-icon.label.checked {
+.ProseMirror li[data-item-type="task"][data-checked="true"]::before {
+  content: '☑';
   color: var(--primary);
-}
-
-.milkdown-list-item-block .children {
-  flex: 1;
-  min-width: 0;
 }
 
 .ProseMirror hr {
