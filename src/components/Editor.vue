@@ -1,26 +1,22 @@
 <template>
   <div class="editor-pane">
-    <div class="editor-toolbar">
-      <button @click="insertMarkdown('**', '**', '粗体')" title="粗体 (Ctrl+B)"><b>B</b></button>
-      <button @click="insertMarkdown('*', '*', '斜体')" title="斜体 (Ctrl+I)"><i>I</i></button>
-      <button @click="insertMarkdown('~~', '~~', '删除线')" title="删除线"><s>S</s></button>
-      <button @click="insertMarkdown('<u>', '</u>', '下划线')" title="下划线 (Ctrl+U)"><u>U</u></button>
-      <span class="sep">|</span>
-      <button @click="insertLine('# ')" title="标题 1">H1</button>
-      <button @click="insertLine('## ')" title="标题 2">H2</button>
-      <button @click="insertLine('### ')" title="标题 3">H3</button>
-      <span class="sep">|</span>
-      <button @click="insertLine('- ')" title="无序列表">≡</button>
-      <button @click="insertLine('1. ')" title="有序列表">1.</button>
-      <button @click="insertLine('> ')" title="引用块">❝</button>
-      <span class="sep">|</span>
-      <button @click="insertInlineCode" title="行内代码 (Ctrl/Cmd+E)">`</button>
-      <button @click="insertCodeBlock" title="代码块">&lt;/&gt;</button>
-      <button @click="insertTable" title="插入表格">⊞</button>
-      <button @click="insertMarkdown('[', '](url)', '链接文字')" title="插入链接">🔗</button>
-      <span class="sep">|</span>
-      <span class="char-count">{{ charCount }} 字</span>
-    </div>
+    <FormatToolbar
+      :char-count="charCount"
+      @bold="insertMarkdown('**', '**', '粗体')"
+      @italic="insertMarkdown('*', '*', '斜体')"
+      @strike="insertMarkdown('~~', '~~', '删除线')"
+      @underline="insertUnderline()"
+      @h1="insertLine('# ')"
+      @h2="insertLine('## ')"
+      @h3="insertLine('### ')"
+      @bullet-list="insertLine('- ')"
+      @ordered-list="insertLine('1. ')"
+      @blockquote="insertLine('> ')"
+      @inline-code="insertInlineCode()"
+      @code-block="insertCodeBlock()"
+      @table="insertTable()"
+      @link="insertMarkdown('[', '](url)', '链接文字')"
+    />
     <div ref="editorEl" class="cm-host"></div>
   </div>
 </template>
@@ -37,6 +33,7 @@ import { buildInlineCodeInsert } from '../utils/inlineCode'
 import { getImageFileFromDataTransfer, handleImageInsert } from '../utils/imageInsert'
 import { useNoteStore } from '../stores/note'
 import { useScrollSync } from '../composables/useScrollSync'
+import FormatToolbar from './FormatToolbar.vue'
 
 const store = useNoteStore()
 const { setRatio } = useScrollSync()

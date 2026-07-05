@@ -21,7 +21,7 @@ describe('ViewMode 类型', () => {
   it('App.vue 与 Toolbar.vue 应引用共享 ViewMode', () => {
     expect(readSrc('src/App.vue')).toMatch(/import type \{ ViewMode \} from '\.\/types'/)
     expect(readSrc('src/components/Toolbar.vue')).toMatch(
-      /import type \{ AppSettings, PdfExportOptions, ViewMode \} from '\.\.\/types'/
+      /import type \{ AppSettings, ImportFolderScanResult, PdfExportOptions, ViewMode \} from '\.\.\/types'/
     )
   })
 })

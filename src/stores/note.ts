@@ -5,6 +5,10 @@ import { getAssetStorage } from '../composables/useAssetStorage'
 import { collectAllNoteContents } from '../utils/resolveMarkdownAssets'
 import { LARGE_FILE_THRESHOLD } from '../constants'
 import { applyTocToContent } from '../utils/generateTocMarkdown'
+import { migrateLegacyPathFolders, collectDescendantFolderIds, nextSiblingOrder, wouldCreateFolderCycle, getFolderDeleteImpact } from '../utils/folderTree'
+import { buildBackup, applyBackup, parseBackup, downloadBackupJson, type MarkFlowBackup } from '../utils/backup'
+import { runFolderImport, saveImportImageAsAsset } from '../utils/importFolderService'
+import type { ImportFolderOptions, ImportFolderProgress, ImportFolderResult, ImportFolderScanResult } from '../types/import'
 import type { Note, NoteListItem, Folder, TocJumpTarget, EditorContentPush } from '../types'
 
 const TITLE_SCAN_LINES = 50
@@ -45,7 +49,10 @@ export const useNoteStore = defineStore('note', () => {
   const liveContent = ref('')
   const folderList = ref<Folder[]>([])
   const searchQuery = ref('')
+  const activeTagFilter = ref<string | null>(null)
   const activeFolderId = ref<string | null>(null)
+  /** 递增时 Sidebar 从 settings 重载展开/选中状态 */
+  const sidebarStateRevision = ref(0)
   /** 笔记正文搜索索引（id → 小写正文），loadNoteList 时重建 */
   const contentSearchIndex = ref<Record<string, string>>({})
   const tocVisible = ref(false)
@@ -55,19 +62,41 @@ export const useNoteStore = defineStore('note', () => {
   let tocJumpSeq = 0
   let editorContentPushSeq = 0
 
-  /** 根据 activeFolderId 和 searchQuery 过滤后的笔记列表 */
-  const filteredNoteList = computed(() => {
+  /** 根据 searchQuery / activeTagFilter 过滤（不含文件夹筛选） */
+  const searchedNoteList = computed(() => {
     let list = noteList.value
-    if (activeFolderId.value) {
-      list = list.filter(n => n.folderId === activeFolderId.value)
+    if (activeTagFilter.value) {
+      const tag = activeTagFilter.value.toLowerCase()
+      list = list.filter((n) => n.tags?.some((t) => t.toLowerCase() === tag))
     }
     if (searchQuery.value.trim()) {
       const q = searchQuery.value.toLowerCase()
       list = list.filter(
         (n) =>
           n.title.toLowerCase().includes(q) ||
-          (contentSearchIndex.value[n.id]?.includes(q) ?? false)
+          (contentSearchIndex.value[n.id]?.includes(q) ?? false) ||
+          (n.tags?.some((t) => t.toLowerCase().includes(q)) ?? false)
       )
+    }
+    return list
+  })
+
+  /** 全部笔记中使用过的标签（去重、按字母序） */
+  const allTags = computed(() => {
+    const set = new Set<string>()
+    for (const note of noteList.value) {
+      for (const tag of note.tags ?? []) {
+        if (tag.trim()) set.add(tag.trim())
+      }
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, 'zh'))
+  })
+
+  /** 根据 activeFolderId 和 searchQuery 过滤后的笔记列表 */
+  const filteredNoteList = computed(() => {
+    let list = searchedNoteList.value
+    if (activeFolderId.value) {
+      list = list.filter(n => n.folderId === activeFolderId.value)
     }
     return list
   })
@@ -110,7 +139,10 @@ export const useNoteStore = defineStore('note', () => {
   /** 从存储加载笔记列表和文件夹列表 */
   function loadNoteList() {
     noteList.value = storage.getNoteList()
-    folderList.value = storage.getFolderList()
+    const rawFolders = storage.getFolderList()
+    const { folders, changed } = migrateLegacyPathFolders(rawFolders)
+    folderList.value = folders
+    if (changed) storage.saveFolderList(folders)
     rebuildSearchIndex()
   }
 
@@ -175,7 +207,8 @@ export const useNoteStore = defineStore('note', () => {
   function updateCurrentContent(content: string) {
     if (!currentNote.value) return
     liveContent.value = content
-    const title = extractTitle(content)
+    const keepImportedTitle = !!currentNote.value.importSourcePath
+    const title = keepImportedTitle ? currentNote.value.title : extractTitle(content)
     currentNote.value.content = content
     currentNote.value.title = title
     currentNote.value.updatedAt = Date.now()
@@ -216,53 +249,111 @@ export const useNoteStore = defineStore('note', () => {
     if (!note) return
     note.title = title
     note.updatedAt = Date.now()
+    delete note.importSourcePath
     storage.saveNote(note)
     noteList.value = storage.getNoteList()
-    if (currentNote.value?.id === id) currentNote.value.title = title
+    if (currentNote.value?.id === id) {
+      currentNote.value.title = title
+      delete currentNote.value.importSourcePath
+    }
+  }
+
+  /** 将笔记排到目标文件夹末尾（同级 sortOrder） */
+  function bumpNoteSortOrder(id: string, folderId: string | undefined) {
+    const note = storage.getNote(id)
+    if (!note) return
+    const siblings = noteList.value.filter((n) => n.folderId === folderId && n.id !== id)
+    const maxOrder = siblings.reduce((max, n) => Math.max(max, n.sortOrder ?? 0), 0)
+    note.sortOrder = maxOrder + 1
+    note.updatedAt = Date.now()
+    storage.saveNote(note)
+    noteList.value = storage.getNoteList()
+    if (currentNote.value?.id === id) {
+      currentNote.value.sortOrder = note.sortOrder
+      currentNote.value.updatedAt = note.updatedAt
+    }
   }
 
   /** 移动笔记到指定文件夹 */
   function moveNote(id: string, folderId: string | undefined) {
     const note = storage.getNote(id)
     if (!note) return
-    if (note.folderId === folderId) return
+    if (note.folderId === folderId) {
+      bumpNoteSortOrder(id, folderId)
+      return
+    }
 
     note.folderId = folderId
+    note.sortOrder = undefined
     note.updatedAt = Date.now()
     storage.saveNote(note)
     noteList.value = storage.getNoteList()
+    bumpNoteSortOrder(id, folderId)
 
     if (currentNote.value?.id === id) {
       currentNote.value.folderId = folderId
+      currentNote.value.sortOrder = note.sortOrder
     }
   }
 
   /** 创建文件夹并持久化 */
-  function createFolder(name: string) {
-    const folder: Folder = { id: generateId(), name, order: folderList.value.length }
+  function createFolder(name: string, parentId?: string) {
+    const folder: Folder = {
+      id: generateId(),
+      name,
+      order: nextSiblingOrder(folderList.value, parentId),
+      parentId,
+    }
     folderList.value.push(folder)
     storage.saveFolderList(folderList.value)
     return folder
   }
 
-  /** 删除文件夹：笔记移回根目录，清除当前文件夹筛选 */
+  /** 移动文件夹到新的父级；同父级时排到末尾 */
+  function moveFolder(id: string, newParentId: string | undefined): boolean {
+    if (wouldCreateFolderCycle(folderList.value, id, newParentId)) return false
+    const folder = folderList.value.find((f) => f.id === id)
+    if (!folder) return false
+    if (folder.parentId === newParentId) {
+      folder.order = nextSiblingOrder(folderList.value, newParentId, id)
+      storage.saveFolderList(folderList.value)
+      return true
+    }
+    folder.parentId = newParentId
+    folder.order = nextSiblingOrder(folderList.value, newParentId, id)
+    storage.saveFolderList(folderList.value)
+    return true
+  }
+
+  /** 删除文件夹：子文件夹一并删除，笔记移入父文件夹（无父级则根目录） */
   function deleteFolder(id: string) {
+    const target = folderList.value.find((f) => f.id === id)
+    const moveTo = target?.parentId
+    const idsToDelete = collectDescendantFolderIds(id, folderList.value)
+
     for (const item of noteList.value) {
-      if (item.folderId !== id) continue
+      if (!item.folderId || !idsToDelete.has(item.folderId)) continue
       const note = storage.getNote(item.id)
       if (!note) continue
-      note.folderId = undefined
+      note.folderId = moveTo
       note.updatedAt = Date.now()
       storage.saveNote(note)
-      item.folderId = undefined
+      item.folderId = moveTo
       item.updatedAt = note.updatedAt
     }
-    if (currentNote.value?.folderId === id) {
-      currentNote.value.folderId = undefined
+    if (currentNote.value?.folderId && idsToDelete.has(currentNote.value.folderId)) {
+      currentNote.value.folderId = moveTo
     }
-    folderList.value = folderList.value.filter(f => f.id !== id)
+    folderList.value = folderList.value.filter((f) => !idsToDelete.has(f.id))
     storage.saveFolderList(folderList.value)
-    if (activeFolderId.value === id) activeFolderId.value = null
+    if (activeFolderId.value && idsToDelete.has(activeFolderId.value)) {
+      activeFolderId.value = null
+    }
+  }
+
+  /** 删除前影响统计 */
+  function getDeleteFolderImpact(folderId: string) {
+    return getFolderDeleteImpact(folderList.value, noteList.value, folderId)
   }
 
   /** 请求跳转到目录指定标题：递增 seq 触发 watcher */
@@ -282,6 +373,67 @@ export const useNoteStore = defineStore('note', () => {
     return true
   }
 
+  /** 设置标签过滤 */
+  function setActiveTagFilter(tag: string | null) {
+    activeTagFilter.value = tag
+  }
+
+  /** 更新笔记标签 */
+  function setNoteTags(id: string, tags: string[]) {
+    const note = storage.getNote(id)
+    if (!note) return
+    note.tags = tags
+    note.updatedAt = Date.now()
+    storage.saveNote(note)
+    noteList.value = storage.getNoteList()
+    if (currentNote.value?.id === id) currentNote.value.tags = tags
+  }
+
+  /** 切换笔记置顶 */
+  function toggleNotePinned(id: string) {
+    const note = storage.getNote(id)
+    if (!note) return
+    note.pinned = !note.pinned
+    note.updatedAt = Date.now()
+    storage.saveNote(note)
+    noteList.value = storage.getNoteList()
+    if (currentNote.value?.id === id) currentNote.value.pinned = note.pinned
+  }
+
+  /** 导出全量备份 JSON */
+  function exportLibraryBackup(): MarkFlowBackup {
+    return buildBackup(storage)
+  }
+
+  /** 下载备份文件 */
+  function downloadLibraryBackup() {
+    downloadBackupJson(buildBackup(storage))
+  }
+
+  /** 从备份 JSON 恢复（清空旧图片资源） */
+  async function restoreLibraryBackup(json: string) {
+    const backup = parseBackup(json)
+    const assetStorage = getAssetStorage()
+    await assetStorage.clearAllAssets()
+    applyBackup(backup, storage)
+    loadNoteList()
+    activeFolderId.value = storage.getSettings().sidebarActiveFolderId ?? null
+    activeTagFilter.value = null
+    searchQuery.value = ''
+    sidebarStateRevision.value++
+    if (noteList.value.length > 0) {
+      openNote(noteList.value[0].id)
+    } else {
+      currentNote.value = null
+      liveContent.value = ''
+    }
+    return backup
+  }
+
+  function notifySidebarStateChanged() {
+    sidebarStateRevision.value++
+  }
+
   /** 重命名文件夹并持久化 */
   function renameFolder(id: string, name: string) {
     const folder = folderList.value.find(f => f.id === id)
@@ -291,12 +443,77 @@ export const useNoteStore = defineStore('note', () => {
     }
   }
 
+  /** 清空全部笔记、文件夹与图片资源（保留应用设置） */
+  async function clearAllLibraryData() {
+    const assetStorage = getAssetStorage()
+    storage.clearAllNotesAndFolders()
+    await assetStorage.clearAllAssets()
+    noteList.value = []
+    folderList.value = []
+    contentSearchIndex.value = {}
+    currentNote.value = null
+    liveContent.value = ''
+    activeFolderId.value = null
+    searchQuery.value = ''
+    activeTagFilter.value = null
+  }
+
+  /** 批量导入文件夹扫描结果 */
+  async function batchImportFromFolder(
+    scan: ImportFolderScanResult,
+    options: ImportFolderOptions,
+    onProgress?: (progress: ImportFolderProgress) => void
+  ): Promise<ImportFolderResult> {
+    if (options.replaceExisting) {
+      await clearAllLibraryData()
+    }
+
+    const assetStorage = getAssetStorage()
+    const result = await runFolderImport(scan, options, {
+      getFolderList: () => folderList.value,
+      saveFolderList: (list) => {
+        folderList.value = list
+        storage.saveFolderList(list)
+      },
+      saveNote: (note) => {
+        storage.saveNote(note)
+        updateSearchIndex(note.id, note.content)
+      },
+      removeNote: (id) => {
+        storage.removeNote(id)
+      },
+      removeAsset: (id) => assetStorage.removeAssetAsync(id),
+      getExistingTitles: () =>
+        options.replaceExisting ? new Set<string>() : new Set(noteList.value.map((n) => n.title)),
+      saveImageFromBase64: (base64, mime, filename) =>
+        saveImportImageAsAsset(base64, mime, filename, assetStorage.saveFromBlob),
+      onProgress,
+    })
+
+    noteList.value = storage.getNoteList()
+    folderList.value = storage.getFolderList()
+
+    if (result.firstImportedNoteId) {
+      openNote(result.firstImportedNoteId)
+      const imported = storage.getNote(result.firstImportedNoteId)
+      if (imported?.folderId) {
+        activeFolderId.value = imported.folderId
+      }
+    }
+
+    return result
+  }
+
   return {
-    noteList, currentNote, liveContent, folderList, searchQuery, activeFolderId, filteredNoteList,
+    noteList, currentNote, liveContent, folderList, searchQuery, activeTagFilter, activeFolderId,
+    searchedNoteList, filteredNoteList, allTags, sidebarStateRevision,
     tocVisible, tocJumpTarget, editorContentPush, pendingLargeFileSwitch,
     loadNoteList, openNote, createNote, createNoteWithContent, setLiveContent, setTocVisible,
     updateCurrentContent, deleteNote, renameNote, moveNote, requestTocJump, insertAutoToc,
     clearPendingLargeFileSwitch,
-    createFolder, deleteFolder, renameFolder
+    createFolder, deleteFolder, renameFolder, moveFolder, getDeleteFolderImpact,
+    setActiveTagFilter, setNoteTags, toggleNotePinned,
+    exportLibraryBackup, downloadLibraryBackup, restoreLibraryBackup, notifySidebarStateChanged,
+    batchImportFromFolder, clearAllLibraryData
   }
 })

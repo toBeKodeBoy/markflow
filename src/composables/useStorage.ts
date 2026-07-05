@@ -75,6 +75,7 @@ function defaultSettings(): AppSettings {
     editorFontFamily: 'monospace',
     previewVisible: true,
     sidebarVisible: true,
+    sidebarWidth: 240,
     pdfExport: { pageSize: 'A4', margin: 'default', printBackground: true },
   }
 }
@@ -123,7 +124,15 @@ export function useStorage() {
     bridge.saveNote(note.id, note)
     const list = getNoteList()
     const idx = list.findIndex(n => n.id === note.id)
-    const item: NoteListItem = { id: note.id, title: note.title, folderId: note.folderId, updatedAt: note.updatedAt }
+    const item: NoteListItem = {
+      id: note.id,
+      title: note.title,
+      folderId: note.folderId,
+      updatedAt: note.updatedAt,
+      tags: note.tags?.length ? [...note.tags] : undefined,
+      pinned: note.pinned || undefined,
+      sortOrder: note.sortOrder,
+    }
     if (idx >= 0) list[idx] = item
     else list.unshift(item)
     saveNoteList(list)
@@ -134,6 +143,15 @@ export function useStorage() {
     const list = getNoteList().filter(n => n.id !== id)
     saveNoteList(list)
     bridge.removeNote(id)
+  }
+
+  /** 清空全部笔记与文件夹（保留应用设置） */
+  function clearAllNotesAndFolders() {
+    for (const item of getNoteList()) {
+      bridge.removeNote(item.id)
+    }
+    saveNoteList([])
+    saveFolderList([])
   }
 
   /** 获取文件夹列表 */
@@ -156,5 +174,5 @@ export function useStorage() {
     bridge.saveSettings(settings)
   }
 
-  return { getNoteList, saveNoteList, getNote, saveNote, removeNote, getFolderList, saveFolderList, getSettings, saveSettings }
+  return { getNoteList, saveNoteList, getNote, saveNote, removeNote, clearAllNotesAndFolders, getFolderList, saveFolderList, getSettings, saveSettings }
 }

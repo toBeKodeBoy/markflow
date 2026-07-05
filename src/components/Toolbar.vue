@@ -1,153 +1,567 @@
 <template>
+
   <header class="topbar">
+
     <div class="topbar-left">
-      <button class="btn-icon" @click="$emit('toggleSidebar')" title="切换侧边栏">☰</button>
-      <div class="app-logo">
-        <span class="logo-icon">M↓</span>
-        <span class="logo-name">MarkFlow</span>
+
+      <button
+
+        class="btn-icon"
+
+        @click="$emit('toggleSidebar')"
+
+        title="切换侧边栏"
+
+        aria-label="切换侧边栏"
+
+      >
+
+        <AppIcon name="menu" :size="18" />
+
+      </button>
+
+      <div v-if="store.currentNote" class="note-context">
+
+        <div class="note-context-title" :title="store.currentNote.title">
+
+          {{ store.currentNote.title }}
+
+        </div>
+
+        <div v-if="folderPath" class="note-context-path">{{ folderPath }}</div>
+
       </div>
+
+      <div v-else class="app-logo">
+
+        <span class="logo-icon">M↓</span>
+
+        <span class="logo-name">MarkFlow</span>
+
+      </div>
+
     </div>
+
+
 
     <div class="topbar-center">
+
       <div class="view-mode-switcher">
-        <button :class="{ active: viewMode === 'live' }" @click="emitSetViewMode('live')" title="实时预览">预览</button>
-        <button :class="{ active: viewMode === 'split' }" @click="emitSetViewMode('split')" title="分屏编辑">分屏</button>
-        <button :class="{ active: viewMode === 'source' }" @click="emitSetViewMode('source')" title="源代码模式">源码</button>
-        <button :class="{ active: viewMode === 'focus' }" @click="emitSetViewMode('focus')" title="专注模式">专注</button>
+
+        <button
+
+          :class="{ active: viewMode === 'live' }"
+
+          @click="emitSetViewMode('live')"
+
+          title="实时编辑（WYSIWYG）"
+
+        >编辑</button>
+
+        <button
+
+          :class="{ active: viewMode === 'split' }"
+
+          @click="emitSetViewMode('split')"
+
+          title="分屏编辑"
+
+        >分屏</button>
+
+        <button
+
+          :class="{ active: viewMode === 'source' }"
+
+          @click="emitSetViewMode('source')"
+
+          title="源代码模式"
+
+        >源码</button>
+
+        <button
+
+          :class="{ active: viewMode === 'focus' }"
+
+          @click="emitSetViewMode('focus')"
+
+          title="专注模式"
+
+        >专注</button>
+
       </div>
+
     </div>
+
+
 
     <div class="topbar-right">
-      <button class="btn-action" @click="createNote" title="新建笔记">
-        <span>+ 新建</span>
+
+      <button class="btn-action" @click="createNote" title="新建笔记" aria-label="新建笔记">
+
+        <AppIcon name="plus" :size="14" />
+
+        <span class="btn-action-label">新建</span>
+
       </button>
-      <button class="btn-icon" @click="exportNote" title="导出 .md 文件" :disabled="!store.currentNote">⬇</button>
+
+
+
+      <div class="import-menu-wrap" ref="fileMenuRef">
+
+        <button
+
+          class="btn-icon btn-icon-text"
+
+          :class="{ active: fileMenuOpen }"
+
+          @click="toggleFileMenu"
+
+          title="文件操作"
+
+          aria-label="文件操作"
+
+          aria-haspopup="menu"
+
+          :aria-expanded="fileMenuOpen"
+
+        >
+
+          <AppIcon name="file-menu" :size="16" />
+
+          <span class="btn-icon-label">文件</span>
+
+        </button>
+
+        <div v-if="fileMenuOpen" class="import-dropdown file-dropdown" role="menu">
+
+          <button type="button" role="menuitem" :disabled="!store.currentNote" @click="exportNote">
+
+            导出 Markdown
+
+          </button>
+
+          <button
+
+            type="button"
+
+            role="menuitem"
+
+            :disabled="!store.currentNote || pdfExporting"
+
+            @click="openPdfFromMenu"
+
+          >
+
+            {{ pdfExporting ? '正在导出 PDF…' : '导出 PDF' }}
+
+          </button>
+
+          <div class="dropdown-divider" role="separator" />
+
+          <button type="button" role="menuitem" @click="importNote">导入文件</button>
+
+          <button type="button" role="menuitem" @click="openImportFolder">导入文件夹</button>
+
+        </div>
+
+      </div>
+
+
+
       <button
-        class="btn-icon"
-        @click="openPdfModal"
-        :title="pdfExporting ? '正在导出 PDF…' : '导出 PDF'"
-        :disabled="!store.currentNote || pdfExporting"
-      >{{ pdfExporting ? '…' : 'PDF' }}</button>
-      <button class="btn-icon" @click="importNote" title="导入 .md 文件">⬆</button>
-      <button class="btn-icon" :class="{ active: tocVisible }" @click="$emit('toggleToc')" title="目录">目录</button>
-      <button class="btn-icon" @click="openSettings" title="设置">⚙</button>
-      <button class="btn-icon" @click="theme.toggle()" :title="theme.isDark.value ? '切换亮色' : '切换暗色'">
-        {{ theme.isDark.value ? '☀' : '🌙' }}
+
+        class="btn-icon btn-icon-text"
+
+        :class="{ active: tocVisible }"
+
+        @click="$emit('toggleToc')"
+
+        title="目录"
+
+        aria-label="目录"
+
+      >
+
+        <AppIcon name="toc" :size="16" />
+
+        <span class="btn-icon-label">目录</span>
+
       </button>
+
+      <button class="btn-icon" @click="openSettings" title="设置" aria-label="设置">
+
+        <AppIcon name="settings" :size="16" />
+
+      </button>
+
     </div>
+
   </header>
 
+
+
   <PdfExportModal
+
     :visible="pdfModalVisible"
+
     :exporting="pdfExporting"
+
     @confirm="onPdfConfirm"
+
     @cancel="pdfModalVisible = false"
+
   />
+
+
 
   <SettingsModal
+
     :visible="settingsModalVisible"
+
     @confirm="onSettingsConfirm"
+
     @cancel="settingsModalVisible = false"
+
+    @import-folder="onSettingsImportFolder"
+
+    @backup-restored="onBackupRestored"
+
   />
+
+
+
+  <ImportFolderModal
+
+    :visible="importFolderVisible"
+
+    :scan="importFolderScan"
+
+    @cancel="closeImportFolder"
+
+    @done="closeImportFolder"
+
+  />
+
 </template>
 
+
+
 <script setup lang="ts">
-import { ref } from 'vue'
+
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+
 import { useNoteStore } from '../stores/note'
+
 import { useTheme } from '../composables/useTheme'
+
 import { exportPdf, pdfExporting, sanitizeFilename } from '../utils/exportPdf'
+
 import { showAppNotification } from '../utils/notify'
+
+import { pickFolderScan } from '../utils/importFolderDevScan'
+
+import { getFolderPathLabel } from '../utils/folderTree'
+
 import PdfExportModal from './PdfExportModal.vue'
+
 import SettingsModal from './SettingsModal.vue'
-import type { AppSettings, PdfExportOptions, ViewMode } from '../types'
+
+import ImportFolderModal from './ImportFolderModal.vue'
+
+import AppIcon from './AppIcon.vue'
+
+import type { AppSettings, ImportFolderScanResult, PdfExportOptions, ViewMode } from '../types'
+
 import { useAppSettings } from '../composables/useAppSettings'
 
+
+
 defineProps<{ viewMode: ViewMode; tocVisible: boolean }>()
+
 const emit = defineEmits<{ toggleSidebar: []; setViewMode: [mode: ViewMode]; toggleToc: [] }>()
 
+
+
 function emitSetViewMode(mode: ViewMode) {
+
   emit('setViewMode', mode)
+
 }
+
+
 
 const store = useNoteStore()
+
 const theme = useTheme()
+
 const appSettings = useAppSettings()
+
 const pdfModalVisible = ref(false)
+
 const settingsModalVisible = ref(false)
 
+const fileMenuOpen = ref(false)
+
+const importFolderVisible = ref(false)
+
+const importFolderScan = ref<ImportFolderScanResult | null>(null)
+
+const fileMenuRef = ref<HTMLElement | null>(null)
+
+
+
+const folderPath = computed(() => {
+
+  const folderId = store.currentNote?.folderId
+
+  if (!folderId) return ''
+
+  return getFolderPathLabel(store.folderList, folderId)
+
+})
+
+
+
 function openPdfModal() {
+
   if (!store.currentNote || pdfExporting.value) return
+
   pdfModalVisible.value = true
+
 }
+
+
+
+function openPdfFromMenu() {
+
+  closeFileMenu()
+
+  openPdfModal()
+
+}
+
+
 
 async function onPdfConfirm(options: PdfExportOptions) {
+
   pdfModalVisible.value = false
+
   await exportPdf(options)
+
 }
+
+
 
 function openSettings() {
+
   settingsModalVisible.value = true
+
 }
+
+
 
 function onSettingsConfirm(settings: AppSettings) {
+
   settingsModalVisible.value = false
+
   theme.setTheme(settings.theme)
+
   appSettings.save({
+
     fontSize: settings.fontSize,
+
     editorFontFamily: settings.editorFontFamily,
+
   })
+
   showAppNotification('设置已保存')
+
 }
+
+
+
+function toggleFileMenu() {
+
+  fileMenuOpen.value = !fileMenuOpen.value
+
+}
+
+
+
+function closeFileMenu() {
+
+  fileMenuOpen.value = false
+
+}
+
+
+
+function onDocumentClick(e: MouseEvent) {
+
+  if (!fileMenuOpen.value) return
+
+  const el = fileMenuRef.value
+
+  if (el && !el.contains(e.target as Node)) closeFileMenu()
+
+}
+
+
+
+onMounted(() => document.addEventListener('click', onDocumentClick))
+
+onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
+
+
 
 /** 在当前文件夹下创建新笔记 */
+
 function createNote() {
+
   store.createNote(store.activeFolderId ?? undefined)
+
 }
+
+
 
 /** 导出当前笔记为 .md 文件（uTools 环境或浏览器下载） */
+
 function exportNote() {
+
+  closeFileMenu()
+
   if (!store.currentNote) return
+
   const content = store.liveContent
+
   if (content !== store.currentNote.content) {
+
     store.updateCurrentContent(content)
+
   }
+
   const filename = sanitizeFilename(store.currentNote.title) + '.md'
+
   if (typeof window.markflow !== 'undefined') {
+
     const ok = window.markflow.saveMarkdownFile(filename, content)
+
     if (ok) window.markflow.showNotification('导出成功：' + filename)
+
   } else {
+
     const blob = new Blob([content], { type: 'text/markdown' })
+
     const a = document.createElement('a')
+
     a.href = URL.createObjectURL(blob)
+
     a.download = filename
+
     a.click()
+
     URL.revokeObjectURL(a.href)
+
   }
+
 }
 
+
+
 /** 导入 .md 文件为笔记（uTools 环境或文件选择器） */
+
 function importNote() {
+
+  closeFileMenu()
+
+  const folderId = store.activeFolderId ?? undefined
+
   if (typeof window.markflow !== 'undefined') {
+
     const content = window.markflow.openMarkdownFile()
+
     if (content !== null) {
-      store.createNoteWithContent(content)
+
+      store.createNoteWithContent(content, folderId)
+
       window.markflow.showNotification('导入成功')
+
     }
+
   } else {
+
     const input = document.createElement('input')
+
     input.type = 'file'
+
     input.accept = '.md,.txt'
+
     input.onchange = (e) => {
+
       const file = (e.target as HTMLInputElement).files?.[0]
+
       if (!file) return
+
       const reader = new FileReader()
+
       reader.onload = (ev) => {
+
         const content = ev.target?.result as string
-        store.createNoteWithContent(content)
+
+        store.createNoteWithContent(content, folderId)
+
       }
+
       reader.readAsText(file)
+
     }
+
     input.click()
+
   }
+
 }
+
+
+
+async function openImportFolder() {
+
+  closeFileMenu()
+
+  const scan = await pickFolderScan()
+
+  if (!scan) return
+
+  importFolderScan.value = scan
+
+  importFolderVisible.value = true
+
+}
+
+
+
+function onSettingsImportFolder() {
+
+  settingsModalVisible.value = false
+
+  void openImportFolder()
+
+}
+
+function onBackupRestored() {
+  settingsModalVisible.value = false
+}
+
+
+
+function closeImportFolder() {
+
+  importFolderVisible.value = false
+
+  importFolderScan.value = null
+
+}
+
 </script>
+
+

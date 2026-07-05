@@ -12,6 +12,9 @@ export const EDITOR_FONT_OPTIONS: { value: string; label: string }[] = [
 
 const MIN_FONT_SIZE = 12
 const MAX_FONT_SIZE = 24
+const MIN_SIDEBAR_WIDTH = 200
+const MAX_SIDEBAR_WIDTH = 360
+const DEFAULT_SIDEBAR_WIDTH = 240
 
 const settingsRef = ref<AppSettings | null>(null)
 
@@ -19,6 +22,12 @@ const settingsRef = ref<AppSettings | null>(null)
 export function clampFontSize(size: number): number {
   if (!Number.isFinite(size)) return 14
   return Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, Math.round(size)))
+}
+
+/** 规范化侧栏宽度到合法范围 */
+export function clampSidebarWidth(width: number): number {
+  if (!Number.isFinite(width)) return DEFAULT_SIDEBAR_WIDTH
+  return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(width)))
 }
 
 /** 将设置应用到 document 上的编辑器 CSS 变量 */
@@ -44,10 +53,15 @@ export function useAppSettings() {
   }
 
   function save(partial: Partial<AppSettings>): AppSettings {
+    const current = storage.getSettings()
     const next: AppSettings = {
-      ...storage.getSettings(),
+      ...current,
       ...partial,
-      fontSize: partial.fontSize !== undefined ? clampFontSize(partial.fontSize) : storage.getSettings().fontSize,
+      fontSize: partial.fontSize !== undefined ? clampFontSize(partial.fontSize) : current.fontSize,
+      sidebarWidth:
+        partial.sidebarWidth !== undefined
+          ? clampSidebarWidth(partial.sidebarWidth)
+          : clampSidebarWidth(current.sidebarWidth ?? DEFAULT_SIDEBAR_WIDTH),
     }
     storage.saveSettings(next)
     settingsRef.value = next

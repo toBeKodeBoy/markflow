@@ -74,6 +74,16 @@ window.markflow = {
     return null;
   },
 
+  // 选择文件夹并扫描 Markdown 文件（导入文件夹，异步分批避免阻塞 UI）
+  openMarkdownFolder: function () {
+    var paths = utools.showOpenDialog({
+      title: '导入文件夹',
+      properties: ['openDirectory']
+    });
+    if (!paths || !paths.length) return Promise.resolve(null);
+    return scanMarkdownFolderAsync(paths[0]);
+  },
+
   /**
    * 导出 PDF（Typora 路线：完整 HTML + ubrowser Chromium printToPDF）
    * options: { pageSize, margin, printBackground }
@@ -192,3 +202,183 @@ window.markflow = {
     utools.dbStorage.removeItem('markflow_asset_' + id);
   }
 };
+
+// ---- 文件夹导入扫描（异步分批，扩展名规则与 importFolderHelpers.ts 保持一致） ----
+var SKIP_DIR_NAMES = { '.git': 1, node_modules: 1, '.svn': 1, __pycache__: 1, '.idea': 1, dist: 1, build: 1 };
+var TEXT_IMPORT_EXT = {
+  md: 1, markdown: 1, mdown: 1, mkd: 1, txt: 1, text: 1,
+  json: 1, jsonc: 1, yaml: 1, yml: 1, toml: 1, xml: 1, html: 1, htm: 1, css: 1, scss: 1, sass: 1, less: 1,
+  js: 1, mjs: 1, cjs: 1, jsx: 1, ts: 1, tsx: 1, vue: 1, svelte: 1,
+  py: 1, rb: 1, go: 1, rs: 1, java: 1, kt: 1, kts: 1, swift: 1, c: 1, cpp: 1, cc: 1, h: 1, hpp: 1, cs: 1,
+  sql: 1, sh: 1, bash: 1, zsh: 1, ps1: 1, bat: 1, cmd: 1,
+  ini: 1, cfg: 1, conf: 1, env: 1, properties: 1,
+  log: 1, csv: 1, tsv: 1,
+  adoc: 1, asciidoc: 1, org: 1, tex: 1, latex: 1, bib: 1, rst: 1
+};
+var IMAGE_IMPORT_EXT = { png: 1, jpg: 1, jpeg: 1, gif: 1, webp: 1, svg: 1, bmp: 1, ico: 1 };
+var SKIP_IMPORT_EXT = {
+  exe: 1, dll: 1, so: 1, dylib: 1, zip: 1, rar: 1, '7z': 1, tar: 1, gz: 1, bz2: 1, xz: 1,
+  pdf: 1, doc: 1, docx: 1, xls: 1, xlsx: 1, ppt: 1, pptx: 1,
+  mp3: 1, mp4: 1, avi: 1, mov: 1, mkv: 1, wav: 1, flac: 1, ogg: 1, webm: 1,
+  woff: 1, woff2: 1, ttf: 1, otf: 1, eot: 1,
+  bin: 1, obj: 1, o: 1, class: 1, jar: 1, wasm: 1, dmg: 1, iso: 1,
+  db: 1, sqlite: 1, sqlite3: 1
+};
+var TEXT_IMPORT_BASENAMES = {
+  dockerfile: 1, makefile: 1, license: 1, readme: 1, changelog: 1, authors: 1, contributing: 1
+};
+var IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i;
+var REL_IMAGE_MD_RE = /!\[[^\]]*\]\((?!https?:|markflow-asset:|data:)([^)\s]+)(?:\s+"[^"]*")?\)/g;
+var SCAN_MAX_DEPTH = 20;
+var SCAN_DIRS_PER_TICK = 12;
+
+function getFileExtension(name) {
+  var dot = name.lastIndexOf('.');
+  if (dot <= 0) return '';
+  return name.slice(dot + 1).toLowerCase();
+}
+
+function shouldSkipImportFilename(name) {
+  var ext = getFileExtension(name);
+  return !!(ext && SKIP_IMPORT_EXT[ext]);
+}
+
+function isImportableTextFilename(name) {
+  if (shouldSkipImportFilename(name)) return false;
+  var lower = name.toLowerCase();
+  if (TEXT_IMPORT_BASENAMES[lower]) return true;
+  var ext = getFileExtension(name);
+  return !!(ext && TEXT_IMPORT_EXT[ext]);
+}
+
+function isImportableImageFilename(name) {
+  if (shouldSkipImportFilename(name)) return false;
+  return !!IMAGE_IMPORT_EXT[getFileExtension(name)];
+}
+
+function mimeFromImagePath(fullPath, path) {
+  var ext = getFileExtension(path.basename(fullPath));
+  if (ext === 'jpg') return 'image/jpeg';
+  if (ext === 'svg') return 'image/svg+xml';
+  if (ext === 'ico') return 'image/x-icon';
+  if (ext === 'bmp') return 'image/bmp';
+  return 'image/' + ext;
+}
+
+function shouldSkipImportDir(name) {
+  if (SKIP_DIR_NAMES[name]) return true;
+  return name.charAt(0) === '.';
+}
+
+function collectImages(content, mdFullPath, fs, path) {
+  var images = [];
+  var m;
+  REL_IMAGE_MD_RE.lastIndex = 0;
+  while ((m = REL_IMAGE_MD_RE.exec(content)) !== null) {
+    var relImg = m[1].trim().replace(/^<|>$/g, '');
+    var imgPath = path.resolve(path.dirname(mdFullPath), relImg);
+    try {
+      if (!fs.existsSync(imgPath) || !IMAGE_EXT_RE.test(imgPath)) continue;
+      var buf = fs.readFileSync(imgPath);
+      var ext = path.extname(imgPath).slice(1).toLowerCase();
+      var mime = ext === 'jpg' ? 'image/jpeg' : 'image/' + ext;
+      images.push({ relPath: relImg, base64: buf.toString('base64'), mime: mime });
+    } catch (e) {
+      /* skip unreadable image */
+    }
+  }
+  return images;
+}
+
+function scanMarkdownFolderAsync(rootPath) {
+  var fs = require('fs');
+  var path = require('path');
+  var files = [];
+  var queue = [{ dir: rootPath, relBase: '', depth: 0 }];
+  var visited = Object.create(null);
+
+  function resolveVisited(dir) {
+    try {
+      return fs.realpathSync.native ? fs.realpathSync.native(dir) : fs.realpathSync(dir);
+    } catch (e) {
+      return path.resolve(dir);
+    }
+  }
+
+  return new Promise(function (resolve) {
+    function processTick() {
+      var batch = 0;
+      while (queue.length > 0 && batch < SCAN_DIRS_PER_TICK) {
+        batch++;
+        var item = queue.shift();
+        if (item.depth > SCAN_MAX_DEPTH) continue;
+
+        var absDir = path.resolve(item.dir);
+        var visitKey = resolveVisited(absDir);
+        if (visited[visitKey]) continue;
+        visited[visitKey] = true;
+
+        var entries;
+        try {
+          entries = fs.readdirSync(absDir, { withFileTypes: true });
+        } catch (e) {
+          continue;
+        }
+
+        for (var i = 0; i < entries.length; i++) {
+          var entry = entries[i];
+          if (entry.isDirectory()) {
+            if (shouldSkipImportDir(entry.name)) continue;
+            var nextRel = item.relBase ? item.relBase + '/' + entry.name : entry.name;
+            queue.push({
+              dir: path.join(absDir, entry.name),
+              relBase: nextRel,
+              depth: item.depth + 1
+            });
+          } else if (entry.isFile()) {
+            var relPath = item.relBase ? item.relBase + '/' + entry.name : entry.name;
+            var fullPath = path.join(absDir, entry.name);
+            relPath = relPath.replace(/\\/g, '/');
+
+            if (isImportableImageFilename(entry.name)) {
+              try {
+                var imgBuf = fs.readFileSync(fullPath);
+                files.push({
+                  relativePath: relPath,
+                  content: '',
+                  images: [],
+                  standaloneImage: {
+                    relPath: entry.name,
+                    base64: imgBuf.toString('base64'),
+                    mime: mimeFromImagePath(fullPath, path)
+                  }
+                });
+              } catch (e) {
+                /* skip unreadable image */
+              }
+            } else if (isImportableTextFilename(entry.name)) {
+              try {
+                var content = fs.readFileSync(fullPath, 'utf-8');
+                files.push({
+                  relativePath: relPath,
+                  content: content,
+                  images: collectImages(content, fullPath, fs, path)
+                });
+              } catch (e) {
+                /* skip unreadable text */
+              }
+            }
+          }
+        }
+      }
+
+      if (queue.length > 0) {
+        setImmediate(processTick);
+      } else {
+        resolve({ rootPath: rootPath, files: files });
+      }
+    }
+
+    setImmediate(processTick);
+  });
+}
