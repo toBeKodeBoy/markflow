@@ -144,6 +144,37 @@ describe('useNoteStore', () => {
     })
   })
 
+  describe('imported note title', () => {
+    it('updateCurrentContent 不应覆盖导入笔记的文件名标题', async () => {
+      const store = useNoteStore()
+      await store.batchImportFromFolder(
+        {
+          rootPath: '/tmp/lib',
+          files: [{ relativePath: 'readme.md', content: '# Project Title\n\nbody', images: [] }],
+        },
+        { preserveStructure: true, onConflict: 'rename', importImages: false, replaceExisting: false, selectedPaths: null }
+      )
+      expect(store.currentNote?.title).toBe('readme')
+      store.updateCurrentContent('# Project Title\n\nbody edited')
+      expect(store.currentNote?.title).toBe('readme')
+    })
+
+    it('renameNote 后应恢复从正文提取标题', async () => {
+      const store = useNoteStore()
+      await store.batchImportFromFolder(
+        {
+          rootPath: '/tmp/lib',
+          files: [{ relativePath: 'readme.md', content: '# Title\n\n', images: [] }],
+        },
+        { preserveStructure: true, onConflict: 'rename', importImages: false, replaceExisting: false, selectedPaths: null }
+      )
+      const id = store.currentNote!.id
+      store.renameNote(id, 'custom')
+      store.updateCurrentContent('# New Heading\n\n')
+      expect(store.currentNote?.title).toBe('New Heading')
+    })
+  })
+
   // ===== 移动笔记 =====
   describe('moveNote', () => {
     it('应将笔记移动到指定文件夹', () => {
@@ -170,17 +201,17 @@ describe('useNoteStore', () => {
       expect(store.noteList.find(n => n.id === id)?.folderId).toBeUndefined()
     })
 
-    it('移动到同一文件夹时不应更新', () => {
+    it('移动到同一文件夹时应更新 sortOrder', () => {
       const store = useNoteStore()
       const folder = store.createFolder('工作')
       store.createNoteWithContent('# A', folder.id)
       const id = store.currentNote!.id
-      const updatedAt = store.currentNote!.updatedAt
+      const before = store.noteList.find((n) => n.id === id)?.sortOrder
 
       store.moveNote(id, folder.id)
 
       expect(store.currentNote!.folderId).toBe(folder.id)
-      expect(store.currentNote!.updatedAt).toBe(updatedAt)
+      expect(store.noteList.find((n) => n.id === id)?.sortOrder).toBeGreaterThan(before ?? 0)
     })
 
     it('移动当前笔记时应同步 currentNote.folderId', () => {
@@ -224,6 +255,39 @@ describe('useNoteStore', () => {
       const saved = store.noteList.find(n => n.id === note.id)
       expect(saved?.folderId).toBeUndefined()
       expect(store.currentNote?.folderId).toBeUndefined()
+    })
+
+    it('deleteFolder 子文件夹笔记应移入父文件夹', () => {
+      const store = useNoteStore()
+      const parent = store.createFolder('docs')
+      const child = store.createFolder('api', parent.id)
+      const note = store.createNote(child.id)
+      store.deleteFolder(child.id)
+      expect(store.folderList.some((f) => f.id === child.id)).toBe(false)
+      expect(store.noteList.find((n) => n.id === note.id)?.folderId).toBe(parent.id)
+    })
+
+    it('moveFolder 应更新 parentId 并拒绝形成环', () => {
+      const store = useNoteStore()
+      const a = store.createFolder('a')
+      const b = store.createFolder('b', a.id)
+      expect(store.moveFolder(a.id, b.id)).toBe(false)
+      expect(store.moveFolder(b.id, undefined)).toBe(true)
+      expect(store.folderList.find((f) => f.id === b.id)?.parentId).toBeUndefined()
+    })
+
+    it('createFolder 同级 order 递增', () => {
+      const store = useNoteStore()
+      const a = store.createFolder('a')
+      const b = store.createFolder('b')
+      expect(b.order).toBeGreaterThan(a.order)
+    })
+
+    it('toggleNotePinned 应切换置顶', () => {
+      const store = useNoteStore()
+      const note = store.createNote()
+      store.toggleNotePinned(note.id)
+      expect(store.noteList.find((n) => n.id === note.id)?.pinned).toBe(true)
     })
 
     it('renameFolder 应更新名称', () => {
@@ -302,6 +366,34 @@ describe('useNoteStore', () => {
       store.pendingLargeFileSwitch = true
       store.clearPendingLargeFileSwitch()
       expect(store.pendingLargeFileSwitch).toBe(false)
+    })
+  })
+
+  // ===== 文件夹导入 =====
+  describe('batchImportFromFolder', () => {
+    it('应批量导入并创建虚拟文件夹', async () => {
+      const store = useNoteStore()
+      const result = await store.batchImportFromFolder(
+        {
+          rootPath: '/tmp/lib',
+          files: [
+            { relativePath: 'readme.md', content: '# Readme', images: [] },
+            { relativePath: 'docs/guide.md', content: '# Guide', images: [] },
+          ],
+        },
+        {
+          preserveStructure: true,
+          onConflict: 'rename',
+          importImages: false,
+          replaceExisting: false,
+          selectedPaths: null,
+        }
+      )
+
+      expect(result.imported).toBe(2)
+      expect(store.folderList.some((f) => f.name === 'docs')).toBe(true)
+      expect(store.noteList).toHaveLength(2)
+      expect(store.currentNote?.title).toBe('readme')
     })
   })
 })

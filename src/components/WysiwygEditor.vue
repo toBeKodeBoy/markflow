@@ -1,5 +1,22 @@
 <template>
   <div class="editor-pane wysiwyg-pane">
+    <FormatToolbar
+      :char-count="charCount"
+      @bold="onToolbarBold"
+      @italic="onToolbarItalic"
+      @strike="onToolbarStrike"
+      @underline="onToolbarUnderline"
+      @h1="onToolbarH1"
+      @h2="onToolbarH2"
+      @h3="onToolbarH3"
+      @bullet-list="onToolbarBulletList"
+      @ordered-list="onToolbarOrderedList"
+      @blockquote="onToolbarBlockquote"
+      @inline-code="onToolbarInlineCode"
+      @code-block="onToolbarCodeBlock"
+      @table="onToolbarTable"
+      @link="onToolbarLink"
+    />
     <div ref="containerRef" :class="['milkdown-host', { 'milkdown-dark': isDark }]"></div>
   </div>
 </template>
@@ -34,6 +51,21 @@ import {
 import { handleImageLightboxDblClick } from '../utils/imageLightbox'
 import { handlePreviewFragmentClick } from '../utils/previewFragmentNav'
 import { resolveMarkdownForDisplay, persistMarkdownAssets } from '../utils/resolveMarkdownAssets'
+import FormatToolbar from './FormatToolbar.vue'
+import {
+  wysiwygToggleBold,
+  wysiwygToggleItalic,
+  wysiwygToggleStrike,
+  wysiwygToggleUnderline,
+  wysiwygToggleInlineCode,
+  wysiwygSetHeading,
+  wysiwygWrapBlockquote,
+  wysiwygWrapBulletList,
+  wysiwygWrapOrderedList,
+  wysiwygInsertCodeBlock,
+  wysiwygInsertTable,
+  wysiwygInsertLink,
+} from '../utils/wysiwygFormat'
 
 /** 粘贴 HTML 清洗：剥离 ProseMirror schema 不兼容的元素，防止 replaceSelection 异常触发静默粘贴失败 */
 function sanitizePastedHTML(html: string): string {
@@ -64,6 +96,23 @@ function sanitizePastedHTML(html: string): string {
 const store = useNoteStore()
 const containerRef = ref<HTMLDivElement>()
 let editor: Editor | null = null
+
+const charCount = computed(() => store.liveContent.length || store.currentNote?.content.length || 0)
+
+function onToolbarBold() { wysiwygToggleBold(editor) }
+function onToolbarItalic() { wysiwygToggleItalic(editor) }
+function onToolbarStrike() { wysiwygToggleStrike(editor) }
+function onToolbarUnderline() { wysiwygToggleUnderline(editor) }
+function onToolbarH1() { wysiwygSetHeading(editor, 1) }
+function onToolbarH2() { wysiwygSetHeading(editor, 2) }
+function onToolbarH3() { wysiwygSetHeading(editor, 3) }
+function onToolbarBulletList() { wysiwygWrapBulletList(editor) }
+function onToolbarOrderedList() { wysiwygWrapOrderedList(editor) }
+function onToolbarBlockquote() { wysiwygWrapBlockquote(editor) }
+function onToolbarInlineCode() { wysiwygToggleInlineCode(editor) }
+function onToolbarCodeBlock() { wysiwygInsertCodeBlock(editor) }
+function onToolbarTable() { wysiwygInsertTable(editor) }
+function onToolbarLink() { wysiwygInsertLink(editor) }
 
 const isDark = computed(() => document.documentElement.getAttribute('data-theme') === 'dark')
 
@@ -112,6 +161,10 @@ async function initEditor(content: string) {
         })
         ctx.update(editorViewOptionsCtx, (prev) => ({
           ...prev,
+          attributes: {
+            ...(typeof prev.attributes === 'object' ? prev.attributes : {}),
+            style: 'white-space: pre-wrap; word-wrap: break-word;',
+          },
           transformPastedHTML: (html: string) => {
             if (prev.transformPastedHTML) html = (prev.transformPastedHTML as (html: string) => string)(html)
             return sanitizePastedHTML(html)

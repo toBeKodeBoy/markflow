@@ -28,6 +28,7 @@ describe('preload 桥接契约', () => {
     // 文件对话框
     expect(typeof api.saveMarkdownFile).toBe('function')
     expect(typeof api.openMarkdownFile).toBe('function')
+    expect(typeof api.openMarkdownFolder).toBe('function')
     // 系统接口
     expect(typeof api.showNotification).toBe('function')
     expect(typeof api.isDarkTheme).toBe('function')
@@ -39,6 +40,11 @@ describe('preload 桥接契约', () => {
     expect(typeof api.getAsset).toBe('function')
     expect(typeof api.saveAsset).toBe('function')
     expect(typeof api.removeAsset).toBe('function')
+  })
+
+  it('openMarkdownFolder 应返回 Promise', async () => {
+    const result = await window.markflow.openMarkdownFolder()
+    expect(result).toHaveProperty('files')
   })
 
   it('getNoteList 应返回 NoteListItem[]', () => {
@@ -133,6 +139,7 @@ describe('Pinia Store 架构设计', () => {
     expect(typeof store.createFolder).toBe('function')
     expect(typeof store.deleteFolder).toBe('function')
     expect(typeof store.renameFolder).toBe('function')
+    expect(typeof store.batchImportFromFolder).toBe('function')
     expect(typeof store.requestTocJump).toBe('function')
     expect(typeof store.setLiveContent).toBe('function')
 

@@ -40,8 +40,30 @@
         PDF 导出选项（纸张、页边距等）可在工具栏「PDF」按钮中配置，设置会自动记住。
       </p>
 
+      <div class="settings-section">
+        <div class="settings-section-title">数据管理</div>
+        <button type="button" class="settings-action-btn" @click="emit('import-folder')">
+          导入文件夹…
+        </button>
+        <p class="settings-tip">从本地文件夹批量导入 Markdown 笔记，可选保留目录结构。</p>
+        <button type="button" class="settings-action-btn" @click="exportBackup">
+          导出备份…
+        </button>
+        <button type="button" class="settings-action-btn" @click="triggerImportBackup">
+          从备份恢复…
+        </button>
+        <input
+          ref="backupInputRef"
+          type="file"
+          accept="application/json,.json"
+          class="settings-hidden-input"
+          @change="onBackupFileSelected"
+        />
+        <p class="settings-tip">备份包含全部笔记、文件夹与侧栏展开状态（不含图片资源）。</p>
+      </div>
+
       <div class="modal-actions">
-        <button class="btn-primary" @click="confirm">保存</button>
+        <button class="btn-primary" @click="saveSettings">保存</button>
         <button @click="emit('cancel')">取消</button>
       </div>
     </div>
@@ -49,19 +71,25 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import type { AppSettings } from '../types'
 import { clampFontSize, EDITOR_FONT_OPTIONS } from '../composables/useAppSettings'
 import { useStorage } from '../composables/useStorage'
+import { useNoteStore } from '../stores/note'
+import { showAppNotification } from '../utils/notify'
 
 const props = defineProps<{ visible: boolean }>()
 
 const emit = defineEmits<{
   confirm: [settings: AppSettings]
   cancel: []
+  'import-folder': []
+  'backup-restored': []
 }>()
 
 const storage = useStorage()
+const store = useNoteStore()
+const backupInputRef = ref<HTMLInputElement>()
 const draft = reactive<AppSettings>(storage.getSettings())
 
 watch(
@@ -78,12 +106,41 @@ watch(
   }
 )
 
-function confirm() {
+function saveSettings() {
   emit('confirm', {
     ...storage.getSettings(),
     theme: draft.theme,
     fontSize: clampFontSize(draft.fontSize),
     editorFontFamily: draft.editorFontFamily,
   })
+}
+
+function exportBackup() {
+  store.downloadLibraryBackup()
+  showAppNotification('备份已开始下载')
+}
+
+function triggerImportBackup() {
+  backupInputRef.value?.click()
+}
+
+function onBackupFileSelected(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = async () => {
+    try {
+      const text = String(reader.result ?? '')
+      if (!window.confirm('从备份恢复将替换当前全部笔记与文件夹，并清除本地图片资源，是否继续？')) return
+      await store.restoreLibraryBackup(text)
+      showAppNotification('备份已恢复（图片需重新粘贴或导入）')
+      emit('backup-restored')
+    } catch (err) {
+      showAppNotification(err instanceof Error ? err.message : '备份恢复失败')
+    }
+  }
+  reader.readAsText(file)
 }
 </script>

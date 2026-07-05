@@ -4,18 +4,14 @@
  */
 import { vi, beforeEach } from 'vitest'
 
-// ---- mock uTools bridge (window.markflow) ----
-// Use localStorage as backing store so that localStorage.clear() in tests cleans all data.
 const mockStorage = {
   getItem(key: string) { return localStorage.getItem(key) },
   setItem(key: string, value: string) { localStorage.setItem(key, value) },
   deleteItem(key: string) { localStorage.removeItem(key) },
 }
 
-// Expose a helper to clear mock storage
 ;(globalThis as any).__clearMockStorage = () => {
-  const keys = Object.keys(localStorage)
-  keys.forEach(k => localStorage.removeItem(k))
+  Object.keys(localStorage).forEach(k => localStorage.removeItem(k))
 }
 
 window.markflow = {
@@ -45,7 +41,13 @@ window.markflow = {
   }),
   getSettings: vi.fn(() => {
     const raw = mockStorage.getItem('markflow_settings')
-    return raw ? JSON.parse(raw) : { theme: 'light', fontSize: 14, editorFontFamily: 'monospace', previewVisible: true, sidebarVisible: true }
+    return raw ? JSON.parse(raw) : {
+      theme: 'light',
+      fontSize: 14,
+      editorFontFamily: 'monospace',
+      previewVisible: true,
+      sidebarVisible: true,
+    }
   }),
   saveSettings: vi.fn((settings) => {
     mockStorage.setItem('markflow_settings', JSON.stringify(settings))
@@ -54,6 +56,12 @@ window.markflow = {
   saveMarkdownFile: vi.fn(() => true),
   savePdfFromHtml: vi.fn(() => Promise.resolve({ ok: true })),
   openMarkdownFile: vi.fn(() => '# Test content\n'),
+  openMarkdownFolder: vi.fn(() =>
+    Promise.resolve({
+      rootPath: '/mock/import',
+      files: [{ relativePath: 'readme.md', content: '# Test', images: [] }],
+    })
+  ),
   isDarkTheme: vi.fn(() => false),
   hideMainWindow: vi.fn(),
   copyText: vi.fn(() => true),
@@ -76,7 +84,6 @@ window.markflow = {
   }),
 }
 
-// ---- mock localStorage fallback ----
 class LocalStorageMock {
   private store: Record<string, string> = {}
   clear() { this.store = {} }
@@ -88,10 +95,8 @@ class LocalStorageMock {
 }
 Object.defineProperty(window, 'localStorage', { value: new LocalStorageMock() })
 
-// ---- mock console.warn (keep tests clean) ----
 vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-// ---- mock matchMedia ----
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: vi.fn().mockImplementation((query: string) => ({
@@ -106,7 +111,6 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 })
 
-// ---- mock IndexedDB for browser asset fallback tests ----
 class IDBRequestMock<T = unknown> {
   result: T | undefined
   error: Error | null = null
@@ -126,7 +130,7 @@ class IDBTransactionMock {
   oncomplete: (() => void) | null = null
   onerror: (() => void) | null = null
   error: Error | null = null
-  constructor(private store: IDBObjectStoreMock, private db: IDBDatabaseMock) {}
+  constructor(private store: IDBObjectStoreMock) {}
   objectStore() { return this.store }
   _finish() {
     queueMicrotask(() => this.oncomplete?.())
@@ -171,7 +175,7 @@ const idbStore = new IDBObjectStoreMock()
 class IDBDatabaseMock {
   objectStoreNames = { contains: () => true }
   transaction() {
-    const tx = new IDBTransactionMock(idbStore, this)
+    const tx = new IDBTransactionMock(idbStore)
     idbStore._bindTx(tx)
     return tx
   }
@@ -186,17 +190,10 @@ const idbOpen = vi.fn(() => {
   queueMicrotask(() => req._resolve(new IDBDatabaseMock()))
   return req
 })
-idbOpen.mockImplementation(() => {
-  const req = new IDBRequestMock<IDBDatabaseMock>()
-  queueMicrotask(() => req._resolve(new IDBDatabaseMock()))
-  return req
-})
 
 Object.defineProperty(window, 'indexedDB', {
   writable: true,
-  value: {
-    open: idbOpen,
-  },
+  value: { open: idbOpen },
 })
 
 beforeEach(() => {

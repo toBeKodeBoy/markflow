@@ -1,8 +1,18 @@
-/** WYSIWYG 所见即所得（UI 标签「预览」）| split 分屏 | source 源码 | focus 专注 */
+/** WYSIWYG 所见即所得（UI 标签「编辑」）| split 分屏 | source 源码 | focus 专注 */
 export type ViewMode = 'live' | 'split' | 'source' | 'focus'
 
 import type { AssetIndexItem, AssetRecord } from './asset'
 export type { AssetIndexItem, AssetRecord } from './asset'
+export type {
+  ImportFolderFile,
+  ImportFolderImage,
+  ImportFolderScanResult,
+  ImportFolderOptions,
+  ImportFolderProgress,
+  ImportFolderResult,
+  PersistedImportFolderOptions,
+} from './import'
+import type { ImportFolderScanResult } from './import'
 
 export interface Note {
   id: string
@@ -10,6 +20,10 @@ export interface Note {
   content: string
   folderId?: string
   tags: string[]
+  pinned?: boolean
+  sortOrder?: number
+  /** 文件夹导入时的源相对路径；存在时不从正文自动改标题 */
+  importSourcePath?: string
   createdAt: number
   updatedAt: number
 }
@@ -18,6 +32,7 @@ export interface Folder {
   id: string
   name: string
   order: number
+  parentId?: string
 }
 
 export interface NoteListItem {
@@ -25,6 +40,9 @@ export interface NoteListItem {
   title: string
   folderId?: string
   updatedAt: number
+  tags?: string[]
+  pinned?: boolean
+  sortOrder?: number
 }
 
 export interface TocJumpTarget {
@@ -59,6 +77,12 @@ export interface AppSettings {
   editorFontFamily: string
   previewVisible: boolean
   sidebarVisible: boolean
+  /** 侧栏宽度（px），默认 240 */
+  sidebarWidth?: number
+  /** 侧栏展开的文件夹 id */
+  sidebarExpandedFolderIds?: string[]
+  /** 侧栏选中的文件夹（新建笔记目标） */
+  sidebarActiveFolderId?: string | null
   /** PDF 导出选项（可选，缺省用默认值） */
   pdfExport?: PdfExportOptions
 }
@@ -83,6 +107,7 @@ export interface MarkFlowBridge {
     options?: PdfExportOptions
   ) => Promise<{ ok: true } | { ok: false; reason: 'cancel' | 'error' }>
   openMarkdownFile: () => string | null
+  openMarkdownFolder: () => Promise<ImportFolderScanResult | null>
   isDarkTheme: () => boolean
   hideMainWindow: () => void
   copyText: (text: string) => boolean

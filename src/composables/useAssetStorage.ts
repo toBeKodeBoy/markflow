@@ -281,6 +281,20 @@ export function useAssetStorage() {
     return removed
   }
 
+  async function clearAllAssets(): Promise<void> {
+    const index = getAssetIndex()
+    for (const item of index) {
+      if (bridge?.removeAsset) {
+        bridge.removeAsset(item.id)
+      } else {
+        await idbRemoveAsset(item.id)
+      }
+    }
+    saveAssetIndex([])
+    dataUrlCache.clear()
+    dataLookupCache.clear()
+  }
+
   async function warmCache(): Promise<void> {
     const index = getAssetIndex()
     await Promise.all(index.map((item) => getAssetAsync(item.id)))
@@ -299,6 +313,7 @@ export function useAssetStorage() {
     findIdByDataAsync,
     removeAsset,
     removeAssetAsync,
+    clearAllAssets,
     getTotalSize,
     gcOrphans,
     warmCache,
