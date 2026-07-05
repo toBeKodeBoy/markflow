@@ -4,7 +4,8 @@ import { useStorage } from '../composables/useStorage'
 import { getAssetStorage } from '../composables/useAssetStorage'
 import { collectAllNoteContents } from '../utils/resolveMarkdownAssets'
 import { LARGE_FILE_THRESHOLD } from '../constants'
-import type { Note, NoteListItem, Folder, TocJumpTarget } from '../types'
+import { applyTocToContent } from '../utils/generateTocMarkdown'
+import type { Note, NoteListItem, Folder, TocJumpTarget, EditorContentPush } from '../types'
 
 const TITLE_SCAN_LINES = 50
 
@@ -49,8 +50,10 @@ export const useNoteStore = defineStore('note', () => {
   const contentSearchIndex = ref<Record<string, string>>({})
   const tocVisible = ref(false)
   const tocJumpTarget = ref<TocJumpTarget | null>(null)
+  const editorContentPush = ref<EditorContentPush | null>(null)
   const pendingLargeFileSwitch = ref(false)
   let tocJumpSeq = 0
+  let editorContentPushSeq = 0
 
   /** 根据 activeFolderId 和 searchQuery 过滤后的笔记列表 */
   const filteredNoteList = computed(() => {
@@ -267,6 +270,18 @@ export const useNoteStore = defineStore('note', () => {
     tocJumpTarget.value = { line, index, id: ++tocJumpSeq }
   }
 
+  /** 将目录块插入当前笔记；成功返回 true */
+  function insertAutoToc(): boolean {
+    if (!currentNote.value) return false
+    const content = liveContent.value || currentNote.value.content
+    const next = applyTocToContent(content)
+    if (next === content) return false
+    liveContent.value = next
+    updateCurrentContent(next)
+    editorContentPush.value = { content: next, id: ++editorContentPushSeq }
+    return true
+  }
+
   /** 重命名文件夹并持久化 */
   function renameFolder(id: string, name: string) {
     const folder = folderList.value.find(f => f.id === id)
@@ -278,9 +293,10 @@ export const useNoteStore = defineStore('note', () => {
 
   return {
     noteList, currentNote, liveContent, folderList, searchQuery, activeFolderId, filteredNoteList,
-    tocVisible, tocJumpTarget, pendingLargeFileSwitch,
+    tocVisible, tocJumpTarget, editorContentPush, pendingLargeFileSwitch,
     loadNoteList, openNote, createNote, createNoteWithContent, setLiveContent, setTocVisible,
-    updateCurrentContent, deleteNote, renameNote, moveNote, requestTocJump, clearPendingLargeFileSwitch,
+    updateCurrentContent, deleteNote, renameNote, moveNote, requestTocJump, insertAutoToc,
+    clearPendingLargeFileSwitch,
     createFolder, deleteFolder, renameFolder
   }
 })

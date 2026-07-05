@@ -1,8 +1,17 @@
 <template>
   <div class="toc-pane">
     <div class="toc-title">
-      目录
-      <span v-if="headings.length > 0" class="toc-count">{{ headings.length }}</span>
+      <span class="toc-title-text">
+        目录
+        <span v-if="headings.length > 0" class="toc-count">{{ headings.length }}</span>
+      </span>
+      <button
+        class="toc-insert-btn"
+        type="button"
+        title="插入目录到文档"
+        :disabled="headings.length === 0"
+        @click="insertToc"
+      >生成</button>
     </div>
     <div v-if="headings.length === 0" class="toc-empty">暂无标题</div>
     <div v-else ref="listRef" class="toc-list" @scroll="onListScroll">
@@ -39,6 +48,7 @@
 import { ref, computed } from 'vue'
 import { useNoteStore } from '../stores/note'
 import { useTocHeadings, type TocHeading } from '../composables/useTocHeadings'
+import { showAppNotification } from '../utils/notify'
 
 const store = useNoteStore()
 const headings = useTocHeadings()
@@ -73,5 +83,14 @@ function onListScroll(e: Event) {
 /** 点击标题跳转到编辑器中对应位置 */
 function jumpTo(item: TocHeading) {
   store.requestTocJump(item.line, item.index)
+}
+
+/** 将 Markdown 目录块插入文档 */
+function insertToc() {
+  if (store.insertAutoToc()) {
+    showAppNotification('已插入目录')
+  } else {
+    showAppNotification('当前文档没有可生成的标题')
+  }
 }
 </script>

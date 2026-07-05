@@ -22,14 +22,17 @@ import { imageScalePlugin } from '../plugins/imageScale'
 import { plainTextFallback } from '../plugins/plainTextFallback'
 import { highlightMarkPlugins } from '../plugins/highlightMark'
 import { underlineMarkPlugins } from '../plugins/underlineMark'
+import { htmlRenderPlugins } from '../plugins/htmlRender'
 import { codeBlockLabelPlugin, codeBlockExitPlugin } from '../plugins/codeBlockLabel'
+import { headingIdPlugins } from '../plugins/headingId'
 import { autoCloseBracketsPlugin } from '../plugins/autoCloseBrackets'
-import { normalizeUnderlineMarkdown } from '../utils/markedSetup'
+import { normalizeMarkdownForParse } from '../utils/markedSetup'
 import {
   handleCodeCopyCaptureClick,
   handleCodeCopyCaptureMouseDown,
 } from '../utils/codeCopy'
 import { handleImageLightboxDblClick } from '../utils/imageLightbox'
+import { handlePreviewFragmentClick } from '../utils/previewFragmentNav'
 import { resolveMarkdownForDisplay, persistMarkdownAssets } from '../utils/resolveMarkdownAssets'
 
 /** 粘贴 HTML 清洗：剥离 ProseMirror schema 不兼容的元素，防止 replaceSelection 异常触发静默粘贴失败 */
@@ -68,6 +71,18 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 let initing: Promise<void> | null = null
 /** 编辑器未就绪时暂存待切换的内容，初始化后自动应用 */
 let pendingContent: string | null = null
+/** 编辑器未就绪时暂存外部写入（如插入目录），初始化后自动应用 */
+let pendingEditorPush: string | null = null
+
+/** 将 markdown 写入 WYSIWYG 编辑器 */
+async function applyEditorMarkdown(markdown: string) {
+  const displayContent = await resolveMarkdownForDisplay(normalizeMarkdownForParse(markdown))
+  if (!editor) return
+  editor.action((ctx) => {
+    if (getMarkdown()(ctx) === displayContent) return
+    replaceAll(displayContent)(ctx)
+  })
+}
 
 /** 初始化 Milkdown WYSIWYG 编辑器（含 commonmark/GFM/clipboard/listener/history 插件），支持销毁重建 */
 async function initEditor(content: string) {
@@ -80,7 +95,7 @@ async function initEditor(content: string) {
     if (containerRef.value) containerRef.value.innerHTML = ''
     if (!containerRef.value) return
 
-    const displayContent = await resolveMarkdownForDisplay(normalizeUnderlineMarkdown(content))
+    const displayContent = await resolveMarkdownForDisplay(normalizeMarkdownForParse(content))
 
     editor = await Editor.make()
       .config((ctx) => {
@@ -108,26 +123,36 @@ async function initEditor(content: string) {
       .use(gfm)
       .use(highlightMarkPlugins)
       .use(underlineMarkPlugins)
+      .use(htmlRenderPlugins)
       .use(imagePaste)
       .use(imageScalePlugin)
       .use(markdownPaste)
       .use(clipboard)
       .use(plainTextFallback)
       .use(codeBlockLabelPlugin)
+      .use(headingIdPlugins)
       .use(autoCloseBracketsPlugin)
       .use(listener)
       .use(history)
       .create()
 
+    editor.action((ctx) => {
+      const md = getMarkdown()(ctx)
+      void persistMarkdownAssets(md).then((persisted) => {
+        store.setLiveContent(persisted)
+      })
+    })
+
     // 初始化完成后，应用初始化期间暂存的待切换内容
     if (pendingContent !== null) {
       const pc = pendingContent
       pendingContent = null
-      const displayPc = await resolveMarkdownForDisplay(normalizeUnderlineMarkdown(pc))
-      editor.action((ctx) => {
-        if (getMarkdown()(ctx) === displayPc) return
-        replaceAll(displayPc)(ctx)
-      })
+      await applyEditorMarkdown(pc)
+    }
+    if (pendingEditorPush !== null) {
+      const push = pendingEditorPush
+      pendingEditorPush = null
+      await applyEditorMarkdown(push)
     }
   })()
   await initing
@@ -143,7 +168,7 @@ watch(
       pendingContent = content
       return
     }
-    void resolveMarkdownForDisplay(normalizeUnderlineMarkdown(content)).then((displayContent) => {
+    void resolveMarkdownForDisplay(normalizeMarkdownForParse(content)).then((displayContent) => {
       if (!editor) return
       editor.action((ctx) => {
         if (getMarkdown()(ctx) === displayContent) return
@@ -153,6 +178,16 @@ watch(
   }
 )
 
+watch(() => store.editorContentPush?.id, () => {
+  const push = store.editorContentPush
+  if (!push) return
+  if (!editor) {
+    pendingEditorPush = push.content
+    return
+  }
+  void applyEditorMarkdown(push.content)
+})
+
 watch(isDark, (dark) => {
   if (containerRef.value) {
     containerRef.value.classList.toggle('milkdown-dark', dark)
@@ -161,13 +196,19 @@ watch(isDark, (dark) => {
 
 useTocJumpHandler(containerRef, store)
 
+/** WYSIWYG 点击：页内锚点跳转 + 代码复制 */
+function onWysiwygClick(e: MouseEvent) {
+  if (handlePreviewFragmentClick(e, containerRef.value)) return
+  handleCodeCopyCaptureClick(e)
+}
+
 onMounted(() => {
   const content = store.currentNote?.content ?? store.liveContent ?? ''
   initEditor(content)
   const host = containerRef.value
   if (host) {
     host.addEventListener('mousedown', handleCodeCopyCaptureMouseDown, true)
-    host.addEventListener('click', handleCodeCopyCaptureClick, true)
+    host.addEventListener('click', onWysiwygClick, true)
     host.addEventListener('dblclick', handleImageLightboxDblClick, true)
   }
 })
@@ -176,7 +217,7 @@ onBeforeUnmount(async () => {
   const host = containerRef.value
   if (host) {
     host.removeEventListener('mousedown', handleCodeCopyCaptureMouseDown, true)
-    host.removeEventListener('click', handleCodeCopyCaptureClick, true)
+    host.removeEventListener('click', onWysiwygClick, true)
     host.removeEventListener('dblclick', handleImageLightboxDblClick, true)
   }
   if (saveTimer) {

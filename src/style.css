@@ -636,6 +636,16 @@ input:focus { border-color: var(--primary); }
 
 .markdown-body a { color: var(--primary); text-decoration: underline; }
 
+.markdown-body a.md-fragment-link {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.markdown-body a.md-fragment-link:hover {
+  color: var(--primary);
+  opacity: 0.85;
+}
+
 .markdown-body :not(pre) > code,
 .ProseMirror :not(pre) > code {
   display: inline;
@@ -812,6 +822,25 @@ input:focus { border-color: var(--primary); }
 .markdown-body li,
 .ProseMirror li {
   margin: 0.3em 0;
+}
+
+/* GFM 任务列表（分屏预览 / 导出 HTML） */
+.markdown-body ul.contains-task-list {
+  padding-left: 1.5em;
+}
+
+.markdown-body li.task-list-item {
+  list-style-type: none;
+}
+
+.markdown-body li.task-list-item + li.task-list-item {
+  margin-top: 0.25em;
+}
+
+.markdown-body .task-list-item-checkbox {
+  margin: 0 0.35em 0.1em -1.4em;
+  vertical-align: middle;
+  accent-color: var(--primary);
 }
 
 .markdown-body table {
@@ -1026,6 +1055,37 @@ input:focus { border-color: var(--primary); }
   text-decoration-thickness: 1px;
 }
 
+/* WYSIWYG 内联/块级 HTML 渲染（与分屏预览 marked 对齐） */
+.ProseMirror .markflow-html-inline {
+  display: contents;
+}
+
+.ProseMirror .markflow-html-block {
+  margin: 0.5em 0;
+}
+
+.ProseMirror b,
+.ProseMirror .markflow-html-block b,
+.ProseMirror .markflow-html-inline b {
+  font-weight: 700;
+}
+
+.ProseMirror .markflow-html-block table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5em 0;
+}
+
+.ProseMirror .markflow-html-block th,
+.ProseMirror .markflow-html-block td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+}
+
+.ProseMirror .markflow-html-block details {
+  margin: 0.5em 0;
+}
+
 /* ===== Layout visibility toggles ===== */
 .sidebar-hidden .sidebar { display: none; }
 .preview-hidden .preview-pane { display: none; }
@@ -1147,6 +1207,11 @@ input:focus { border-color: var(--primary); }
 .ProseMirror del { text-decoration: line-through; color: var(--text-muted); }
 
 .ProseMirror a { color: var(--primary); text-decoration: underline; }
+.ProseMirror a[href^="#"],
+.ProseMirror a.md-fragment-link {
+  text-decoration: none;
+  cursor: pointer;
+}
 .ProseMirror a:hover { color: var(--primary-hover); }
 
 .ProseMirror pre {
@@ -1349,24 +1414,45 @@ input:focus { border-color: var(--primary); }
   color: var(--text-muted);
 }
 
-/* GFM 任务列表：隐藏默认 marker，用 checkbox 字符替代 */
+/* GFM 任务列表（预览 / WYSIWYG） */
+.ProseMirror ul:has(li[data-item-type="task"]) {
+  list-style: none;
+  padding-left: 1.5em;
+}
+
 .ProseMirror li[data-item-type="task"] {
   list-style: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35em;
 }
 
 .ProseMirror li[data-item-type="task"]::before {
-  content: '□';
-  display: inline-block;
-  width: 1.2em;
-  margin-left: -1.2em;
-  text-align: center;
+  content: '';
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin-top: 0.35em;
+  border: 1.5px solid var(--text-muted);
+  border-radius: 3px;
+  background: var(--bg-editor);
+  box-sizing: border-box;
   user-select: none;
-  color: var(--text-muted);
 }
 
 .ProseMirror li[data-item-type="task"][data-checked="true"]::before {
-  content: '☑';
-  color: var(--primary);
+  content: '✓';
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  color: #fff;
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.ProseMirror li[data-item-type="task"] > p {
+  margin: 0;
+  flex: 1;
 }
 
 .ProseMirror hr {
@@ -1439,14 +1525,48 @@ input:focus { border-color: var(--primary); }
 .toc-title {
   font-size: 11px;
   font-weight: 600;
-  padding: 0 16px 8px;
+  padding: 0 12px 8px 16px;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
+}
+
+.toc-title-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.toc-insert-btn {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text-muted);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.toc-insert-btn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--primary);
+}
+
+.toc-insert-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .toc-count {
