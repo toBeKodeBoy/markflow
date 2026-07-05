@@ -48,6 +48,16 @@ const isDark = computed(() => document.documentElement.getAttribute('data-theme'
 const charCount = computed(() => store.liveContent.length || store.currentNote?.content.length || 0)
 
 let updateTimer: ReturnType<typeof setTimeout> | null = null
+/** 编辑器未就绪时暂存外部写入（如插入目录），初始化后自动应用 */
+let pendingEditorPush: string | null = null
+
+function applyEditorPush(content: string) {
+  if (!view) return
+  if (view.state.doc.toString() === content) return
+  view.dispatch({
+    changes: { from: 0, to: view.state.doc.length, insert: content },
+  })
+}
 /** 主题切换 Compartment：动态更新 oneDark 扩展，无需重建编辑器实例 */
 const themeCompartment = new Compartment()
 
@@ -103,6 +113,11 @@ function initEditor(content: string) {
   })
   view = new EditorView({ state, parent: editorEl.value })
   attachScrollListener()
+  if (pendingEditorPush !== null) {
+    const push = pendingEditorPush
+    pendingEditorPush = null
+    applyEditorPush(push)
+  }
 }
 
 watch(
@@ -113,6 +128,16 @@ watch(
     initEditor(content)
   }
 )
+
+watch(() => store.editorContentPush?.id, () => {
+  const push = store.editorContentPush
+  if (!push) return
+  if (!view) {
+    pendingEditorPush = push.content
+    return
+  }
+  applyEditorPush(push.content)
+})
 
 watch(() => store.tocJumpTarget?.id, () => {
   const target = store.tocJumpTarget

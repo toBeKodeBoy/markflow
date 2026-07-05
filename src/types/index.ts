@@ -33,6 +33,12 @@ export interface TocJumpTarget {
   id: number
 }
 
+/** 外部写入编辑器内容（如插入目录）时的同步令牌 */
+export interface EditorContentPush {
+  content: string
+  id: number
+}
+
 /** PDF 纸张尺寸 */
 export type PdfPageSize = 'A4' | 'A3' | 'Letter'
 

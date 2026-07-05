@@ -94,14 +94,15 @@ function normalizeFragmentHref(href: string): string {
   }
 }
 
-/** 链接渲染：页内锚点保持未编码，便于 PDF 内跳转 */
+/** 链接渲染：页内锚点保持未编码，便于 PDF / 预览内跳转 */
 const linkRenderer: RendererExtension = {
   name: 'link',
   renderer(token) {
     const href = normalizeFragmentHref(token.href ?? '')
     const text = this.parser.parseInline(token.tokens)
     const title = token.title ? ` title="${escapeHtml(token.title)}"` : ''
-    return `<a href="${href}"${title}>${text}</a>`
+    const fragmentClass = href.startsWith('#') ? ' class="md-fragment-link"' : ''
+    return `<a href="${href}"${fragmentClass}${title}>${text}</a>`
   },
 }
 

@@ -15,6 +15,7 @@ import { parseMarkdown } from '../utils/markedSetup'
 import { resolveMarkdownForDisplay } from '../utils/resolveMarkdownAssets'
 import { handleCodeCopyCaptureClick } from '../utils/codeCopy'
 import { handleImageLightboxDblClick } from '../utils/imageLightbox'
+import { handlePreviewFragmentClick } from '../utils/previewFragmentNav'
 import { writeClipboard } from '../utils/clipboard'
 import { useNoteStore } from '../stores/note'
 import { useScrollSync } from '../composables/useScrollSync'
@@ -79,15 +80,21 @@ watch(scrollRatio, (ratio) => {
 useTocJumpHandler(previewContentEl, store)
 
 onMounted(() => {
-  previewContentEl.value?.addEventListener('click', handleCodeCopyCaptureClick, true)
+  previewContentEl.value?.addEventListener('click', onPreviewClick, true)
   previewContentEl.value?.addEventListener('dblclick', handleImageLightboxDblClick, true)
 })
 
 onBeforeUnmount(() => {
   if (renderTimer) clearTimeout(renderTimer)
-  previewContentEl.value?.removeEventListener('click', handleCodeCopyCaptureClick, true)
+  previewContentEl.value?.removeEventListener('click', onPreviewClick, true)
   previewContentEl.value?.removeEventListener('dblclick', handleImageLightboxDblClick, true)
 })
+
+/** 预览区点击：代码复制 + 页内目录锚点跳转 */
+function onPreviewClick(e: MouseEvent) {
+  if (handlePreviewFragmentClick(e, previewContentEl.value)) return
+  handleCodeCopyCaptureClick(e)
+}
 
 /** 复制当前渲染 HTML 到剪贴板 */
 async function copyHtml() {
