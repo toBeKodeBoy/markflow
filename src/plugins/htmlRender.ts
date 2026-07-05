@@ -292,7 +292,7 @@ export const htmlInlineInputRule = $inputRule((ctx) => {
   return nodeRule(HTML_INLINE_INPUT_RE, htmlType, {
     updateCaptured: (captured) => {
       const m = (captured.fullMatch ?? '').match(HTML_INLINE_INPUT_RE)
-      if (!m || !isAllowedInlineHtml(m)) return { fullMatch: null }
+      if (!m || !isAllowedInlineHtml(m)) return { fullMatch: undefined }
       return captured
     },
     getAttr: (match) => ({ value: match[1] }),
@@ -305,7 +305,7 @@ export const htmlBlockInputRule = $inputRule((ctx) => {
   return nodeRule(HTML_BLOCK_INPUT_RE, htmlBlockType, {
     updateCaptured: (captured) => {
       const m = (captured.fullMatch ?? '').match(HTML_BLOCK_INPUT_RE)
-      if (!m || !isAllowedBlockHtml(m)) return { fullMatch: null }
+      if (!m || !isAllowedBlockHtml(m)) return { fullMatch: undefined }
       return captured
     },
     getAttr: (match) => ({ value: match[1] }),

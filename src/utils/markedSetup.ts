@@ -1,4 +1,4 @@
-import { marked, type TokenizerAndRendererExtension, type RendererExtension } from 'marked'
+import { marked, type Token, type TokenizerAndRendererExtension, type RendererExtension, type Tokens } from 'marked'
 import hljs from 'highlight.js'
 import { escapeHtml } from './escapeHtml'
 import { sanitizeRenderedHtml } from './sanitizeHtml'
@@ -99,7 +99,7 @@ const linkRenderer: RendererExtension = {
   name: 'link',
   renderer(token) {
     const href = normalizeFragmentHref(token.href ?? '')
-    const text = this.parser.parseInline(token.tokens)
+    const text = this.parser.parseInline(token.tokens ?? [])
     const title = token.title ? ` title="${escapeHtml(token.title)}"` : ''
     const fragmentClass = href.startsWith('#') ? ' class="md-fragment-link"' : ''
     return `<a href="${href}"${fragmentClass}${title}>${text}</a>`
@@ -110,7 +110,7 @@ const linkRenderer: RendererExtension = {
 const headingRenderer: RendererExtension = {
   name: 'heading',
   renderer(token) {
-    const text = this.parser.parseInline(token.tokens)
+    const text = this.parser.parseInline(token.tokens ?? [])
     const id = headingSlugger.slug(token.text)
     return `<h${token.depth} id="${escapeHtml(id)}">${text}</h${token.depth}>\n`
   },
@@ -145,14 +145,14 @@ const codeBlockRenderer: RendererExtension = {
 
 /** 任务项内容：loose list 时 marked 会包一层 paragraph token，直接渲染 inline 避免 <p> */
 export function renderListItemContent(
-  parse: (tokens: unknown[]) => string,
-  parseInline: (tokens: unknown[]) => string,
-  tokens: { type: string; tokens?: unknown[] }[],
+  parse: (tokens: Token[]) => string,
+  parseInline: (tokens: Token[]) => string,
+  tokens: Token[],
   isTask: boolean,
 ): string {
   if (!isTask) return parse(tokens)
   if (tokens.length === 1 && tokens[0].type === 'paragraph') {
-    return parseInline(tokens[0].tokens ?? [])
+    return parseInline((tokens[0] as Tokens.Paragraph).tokens ?? [])
   }
   return parse(tokens)
 }
@@ -163,7 +163,7 @@ const taskListRenderer: RendererExtension = {
   renderer(token) {
     const body = this.parser.parse(token.items)
     const tag = token.ordered ? 'ol' : 'ul'
-    const hasTask = token.items.some((item) => item.task)
+    const hasTask = token.items.some((item: Tokens.ListItem) => item.task)
     const cls = hasTask ? ' class="contains-task-list"' : ''
     const start = token.ordered && token.start !== 1 ? ` start="${token.start}"` : ''
     return `<${tag}${cls}${start}>\n${body}</${tag}>\n`
@@ -176,7 +176,7 @@ const taskListItemRenderer: RendererExtension = {
     const inner = renderListItemContent(
       (tokens) => this.parser.parse(tokens),
       (tokens) => this.parser.parseInline(tokens),
-      token.tokens,
+      token.tokens ?? [],
       Boolean(token.task),
     )
     if (token.task) {
