@@ -22,9 +22,10 @@ import { imageScalePlugin } from '../plugins/imageScale'
 import { plainTextFallback } from '../plugins/plainTextFallback'
 import { highlightMarkPlugins } from '../plugins/highlightMark'
 import { underlineMarkPlugins } from '../plugins/underlineMark'
+import { htmlRenderPlugins } from '../plugins/htmlRender'
 import { codeBlockLabelPlugin, codeBlockExitPlugin } from '../plugins/codeBlockLabel'
 import { autoCloseBracketsPlugin } from '../plugins/autoCloseBrackets'
-import { normalizeUnderlineMarkdown } from '../utils/markedSetup'
+import { normalizeMarkdownForParse } from '../utils/markedSetup'
 import {
   handleCodeCopyCaptureClick,
   handleCodeCopyCaptureMouseDown,
@@ -80,7 +81,7 @@ async function initEditor(content: string) {
     if (containerRef.value) containerRef.value.innerHTML = ''
     if (!containerRef.value) return
 
-    const displayContent = await resolveMarkdownForDisplay(normalizeUnderlineMarkdown(content))
+    const displayContent = await resolveMarkdownForDisplay(normalizeMarkdownForParse(content))
 
     editor = await Editor.make()
       .config((ctx) => {
@@ -108,6 +109,7 @@ async function initEditor(content: string) {
       .use(gfm)
       .use(highlightMarkPlugins)
       .use(underlineMarkPlugins)
+      .use(htmlRenderPlugins)
       .use(imagePaste)
       .use(imageScalePlugin)
       .use(markdownPaste)
@@ -119,11 +121,18 @@ async function initEditor(content: string) {
       .use(history)
       .create()
 
+    editor.action((ctx) => {
+      const md = getMarkdown()(ctx)
+      void persistMarkdownAssets(md).then((persisted) => {
+        store.setLiveContent(persisted)
+      })
+    })
+
     // 初始化完成后，应用初始化期间暂存的待切换内容
     if (pendingContent !== null) {
       const pc = pendingContent
       pendingContent = null
-      const displayPc = await resolveMarkdownForDisplay(normalizeUnderlineMarkdown(pc))
+      const displayPc = await resolveMarkdownForDisplay(normalizeMarkdownForParse(pc))
       editor.action((ctx) => {
         if (getMarkdown()(ctx) === displayPc) return
         replaceAll(displayPc)(ctx)
@@ -143,7 +152,7 @@ watch(
       pendingContent = content
       return
     }
-    void resolveMarkdownForDisplay(normalizeUnderlineMarkdown(content)).then((displayContent) => {
+    void resolveMarkdownForDisplay(normalizeMarkdownForParse(content)).then((displayContent) => {
       if (!editor) return
       editor.action((ctx) => {
         if (getMarkdown()(ctx) === displayContent) return

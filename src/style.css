@@ -988,6 +988,37 @@ input:focus { border-color: var(--primary); }
   text-decoration-thickness: 1px;
 }
 
+/* WYSIWYG 内联/块级 HTML 渲染（与分屏预览 marked 对齐） */
+.ProseMirror .markflow-html-inline {
+  display: contents;
+}
+
+.ProseMirror .markflow-html-block {
+  margin: 0.5em 0;
+}
+
+.ProseMirror b,
+.ProseMirror .markflow-html-block b,
+.ProseMirror .markflow-html-inline b {
+  font-weight: 700;
+}
+
+.ProseMirror .markflow-html-block table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5em 0;
+}
+
+.ProseMirror .markflow-html-block th,
+.ProseMirror .markflow-html-block td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+}
+
+.ProseMirror .markflow-html-block details {
+  margin: 0.5em 0;
+}
+
 /* ===== Layout visibility toggles ===== */
 .sidebar-hidden .sidebar { display: none; }
 .preview-hidden .preview-pane { display: none; }

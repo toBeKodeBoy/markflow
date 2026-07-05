@@ -1,7 +1,7 @@
 import { marked, type TokenizerAndRendererExtension, type RendererExtension } from 'marked'
 import hljs from 'highlight.js'
-import DOMPurify from 'dompurify'
 import { escapeHtml } from './escapeHtml'
+import { sanitizeRenderedHtml } from './sanitizeHtml'
 import { COPY_TEXT } from './codeCopy'
 import { renderImageHtml } from './imageScale'
 import { HeadingSlugger } from './headingSlug'
@@ -13,6 +13,16 @@ export function normalizeUnderlineMarkdown(md: string): string {
   return md
     .replace(/\\{1,2}<(u(?:\s[^>]*)?)>/gi, '<$1>')
     .replace(/\\{1,2}<\/u>/gi, '</u>')
+}
+
+/** 去掉 \<span> / \</span> 等被 remark-stringify 转义的 HTML 标签 */
+export function normalizeHtmlMarkdown(md: string): string {
+  return md.replace(/\\<(\/?[a-z][\w-]*(?:\s[^>]*)?)>/gi, '<$1>')
+}
+
+/** 编辑器 / 预览解析前统一规范化 */
+export function normalizeMarkdownForParse(md: string): string {
+  return normalizeHtmlMarkdown(normalizeUnderlineMarkdown(md))
 }
 
 /** marked 内联扩展：支持 ==高亮== 语法 */
@@ -204,10 +214,10 @@ marked.setOptions({
 
 export function parseMarkdown(content: string): string {
   headingSlugger.reset()
-  const normalized = normalizeUnderlineMarkdown(content)
+  const normalized = normalizeMarkdownForParse(content)
   const html = marked.parse(normalized, { async: false })
   const raw = typeof html === 'string' ? html : ''
-  return DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } })
+  return sanitizeRenderedHtml(raw)
 }
 
 export { marked }
