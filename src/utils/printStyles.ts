@@ -145,6 +145,23 @@ body.print-root,
 
 .markdown-body li { margin: 0.3em 0; }
 
+.markdown-body ul.contains-task-list {
+  padding-left: 1.5em;
+}
+
+.markdown-body li.task-list-item {
+  list-style-type: none;
+}
+
+.markdown-body li.task-list-item + li.task-list-item {
+  margin-top: 0.25em;
+}
+
+.markdown-body .task-list-item-checkbox {
+  margin: 0 0.35em 0.1em -1.4em;
+  vertical-align: middle;
+}
+
 .markdown-body table {
   width: 100%;
   border-collapse: collapse;

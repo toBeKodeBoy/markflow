@@ -132,6 +132,57 @@ const codeBlockRenderer: RendererExtension = {
   },
 }
 
+/** 任务项内容：loose list 时 marked 会包一层 paragraph token，直接渲染 inline 避免 <p> */
+export function renderListItemContent(
+  parse: (tokens: unknown[]) => string,
+  parseInline: (tokens: unknown[]) => string,
+  tokens: { type: string; tokens?: unknown[] }[],
+  isTask: boolean,
+): string {
+  if (!isTask) return parse(tokens)
+  if (tokens.length === 1 && tokens[0].type === 'paragraph') {
+    return parseInline(tokens[0].tokens ?? [])
+  }
+  return parse(tokens)
+}
+
+/** GFM 任务列表：输出 GitHub 风格 class，loose list 展平 paragraph token */
+const taskListRenderer: RendererExtension = {
+  name: 'list',
+  renderer(token) {
+    const body = this.parser.parse(token.items)
+    const tag = token.ordered ? 'ol' : 'ul'
+    const hasTask = token.items.some((item) => item.task)
+    const cls = hasTask ? ' class="contains-task-list"' : ''
+    const start = token.ordered && token.start !== 1 ? ` start="${token.start}"` : ''
+    return `<${tag}${cls}${start}>\n${body}</${tag}>\n`
+  },
+}
+
+const taskListItemRenderer: RendererExtension = {
+  name: 'list_item',
+  renderer(token) {
+    const inner = renderListItemContent(
+      (tokens) => this.parser.parse(tokens),
+      (tokens) => this.parser.parseInline(tokens),
+      token.tokens,
+      Boolean(token.task),
+    )
+    if (token.task) {
+      return `<li class="task-list-item">${inner.trim()}</li>\n`
+    }
+    return `<li>${inner}</li>\n`
+  },
+}
+
+const taskCheckboxRenderer: RendererExtension = {
+  name: 'checkbox',
+  renderer(token) {
+    const checked = token.checked ? ' checked=""' : ''
+    return `<input class="task-list-item-checkbox" disabled="" type="checkbox"${checked}> `
+  },
+}
+
 marked.use({
   extensions: [
     highlightMarkExtension,
@@ -140,6 +191,9 @@ marked.use({
     linkRenderer,
     codeBlockRenderer,
     imageRenderer,
+    taskListRenderer,
+    taskListItemRenderer,
+    taskCheckboxRenderer,
   ],
 })
 

@@ -757,6 +757,25 @@ input:focus { border-color: var(--primary); }
   margin: 0.3em 0;
 }
 
+/* GFM 任务列表（分屏预览 / 导出 HTML） */
+.markdown-body ul.contains-task-list {
+  padding-left: 1.5em;
+}
+
+.markdown-body li.task-list-item {
+  list-style-type: none;
+}
+
+.markdown-body li.task-list-item + li.task-list-item {
+  margin-top: 0.25em;
+}
+
+.markdown-body .task-list-item-checkbox {
+  margin: 0 0.35em 0.1em -1.4em;
+  vertical-align: middle;
+  accent-color: var(--primary);
+}
+
 .markdown-body table {
   width: 100%;
   border-collapse: collapse;
@@ -1292,24 +1311,45 @@ input:focus { border-color: var(--primary); }
   color: var(--text-muted);
 }
 
-/* GFM 任务列表：隐藏默认 marker，用 checkbox 字符替代 */
+/* GFM 任务列表（预览 / WYSIWYG） */
+.ProseMirror ul:has(li[data-item-type="task"]) {
+  list-style: none;
+  padding-left: 1.5em;
+}
+
 .ProseMirror li[data-item-type="task"] {
   list-style: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35em;
 }
 
 .ProseMirror li[data-item-type="task"]::before {
-  content: '□';
-  display: inline-block;
-  width: 1.2em;
-  margin-left: -1.2em;
-  text-align: center;
+  content: '';
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin-top: 0.35em;
+  border: 1.5px solid var(--text-muted);
+  border-radius: 3px;
+  background: var(--bg-editor);
+  box-sizing: border-box;
   user-select: none;
-  color: var(--text-muted);
 }
 
 .ProseMirror li[data-item-type="task"][data-checked="true"]::before {
-  content: '☑';
-  color: var(--primary);
+  content: '✓';
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  color: #fff;
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.ProseMirror li[data-item-type="task"] > p {
+  margin: 0;
+  flex: 1;
 }
 
 .ProseMirror hr {
