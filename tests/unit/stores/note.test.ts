@@ -342,6 +342,28 @@ describe('useNoteStore', () => {
       expect(store.filteredNoteList).toHaveLength(1)
       expect(store.filteredNoteList[0].title).toBe('A')
     })
+
+    it('filteredNoteList 应按标签过滤', () => {
+      const store = useNoteStore()
+      const a = store.createNoteWithContent('# A')
+      store.createNoteWithContent('# B')
+      store.setNoteTags(a.id, ['工作', '笔记'])
+      store.searchQuery = '工作'
+      expect(store.filteredNoteList).toHaveLength(1)
+      expect(store.filteredNoteList[0].title).toBe('A')
+    })
+
+    it('搜索 + 标签过滤 + 文件夹过滤可叠加', () => {
+      const store = useNoteStore()
+      const a = store.createNoteWithContent('# Alpha\n正文关键词', 'f1')
+      store.createNoteWithContent('# Beta\n正文关键词', 'f2')
+      store.setNoteTags(a.id, ['项目'])
+      store.searchQuery = '关键词'
+      store.setActiveTagFilter('项目')
+      store.activeFolderId = 'f1'
+      expect(store.filteredNoteList).toHaveLength(1)
+      expect(store.filteredNoteList[0].id).toBe(a.id)
+    })
   })
 
   // ===== TOC =====

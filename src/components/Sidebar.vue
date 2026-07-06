@@ -1,14 +1,10 @@
 <template>
   <aside class="sidebar" :style="{ width: sidebarWidth + 'px' }">
-    <div class="sidebar-search">
-      <input
-        v-model="store.searchQuery"
-        type="text"
-        placeholder="搜索标题、正文或标签..."
-        class="search-input"
-        aria-label="搜索笔记"
-      />
-    </div>
+    <SearchBar
+      ref="searchBarRef"
+      :show-count="isSearchMode"
+      :result-count="searchResultNotes.length"
+    />
 
     <div v-if="store.allTags.length" class="sidebar-tags">
       <button
@@ -25,7 +21,7 @@
       >{{ tag }}</button>
     </div>
 
-    <div class="sidebar-section">
+    <div v-if="!isSearchMode" class="sidebar-section">
       <div class="section-header" @click="clearActiveFolder">
         <span class="section-icon"><AppIcon name="file" :size="14" /></span>
         <span class="section-title">全部笔记</span>
@@ -33,7 +29,7 @@
       </div>
     </div>
 
-    <div class="sidebar-section folders-section">
+    <div v-if="!isSearchMode" class="sidebar-section folders-section">
       <div class="section-header folders-header">
         <span class="section-icon"><AppIcon name="folder" :size="14" /></span>
         <span class="section-title">文件夹</span>
@@ -135,6 +131,21 @@
           {{ emptyTip }}
         </div>
       </div>
+    </div>
+
+    <div v-else class="sidebar-section search-results-section">
+      <SearchResultsList
+        :notes="searchResultNotes"
+        :query="store.searchQuery"
+        :folders="store.folderList"
+        :current-note-id="store.currentNote?.id"
+        :active-tag-filter="store.activeTagFilter"
+        :folder-scope-label="searchFolderScopeLabel"
+        :live-content="store.liveContent"
+        :get-content="store.getNoteContentById"
+        @select="store.openNote"
+        @clear="onClearSearch"
+      />
     </div>
 
     <div class="sidebar-resizer" title="拖拽调整宽度" @mousedown="startResize" />
@@ -278,6 +289,8 @@ import {
 import { buildTreeIndex } from '../utils/treeIndex'
 import AppIcon from './AppIcon.vue'
 import SidebarTreeRowView from './SidebarTreeRow.vue'
+import SearchBar from './SearchBar.vue'
+import SearchResultsList from './SearchResultsList.vue'
 import { useAppSettings, clampSidebarWidth } from '../composables/useAppSettings'
 
 const SIDEBAR_ROW_HEIGHT = 42
@@ -286,6 +299,7 @@ const VIRTUAL_BUFFER = 8
 
 const store = useNoteStore()
 const appSettings = useAppSettings()
+const searchBarRef = ref<InstanceType<typeof SearchBar>>()
 
 const sidebarWidth = ref(clampSidebarWidth(appSettings.get().sidebarWidth ?? 240))
 const showNewFolder = ref(false)
@@ -313,7 +327,14 @@ const dragOverFolderId = ref<string | null>(null)
 const dragOverRoot = ref(false)
 
 const treeIndex = computed(() => buildTreeIndex(store.folderList, store.searchedNoteList))
-const isSearching = computed(() => store.searchQuery.trim().length > 0 || !!store.activeTagFilter)
+const isSearchMode = computed(() => store.searchQuery.trim().length > 0)
+const isSearching = computed(() => isSearchMode.value || !!store.activeTagFilter)
+const searchResultNotes = computed(() => store.filteredNoteList)
+
+const searchFolderScopeLabel = computed(() => {
+  if (!store.activeFolderId) return ''
+  return getFolderPathLabel(store.folderList, store.activeFolderId) || '未知文件夹'
+})
 
 const sidebarRows = computed(() =>
   flattenSidebarTree(store.folderList, store.searchedNoteList, expandedFolderIds.value, {
@@ -339,6 +360,7 @@ const visibleSidebarRows = computed(() =>
 )
 
 const showTreeEmpty = computed(() => {
+  if (isSearchMode.value) return false
   if (isSearching.value) return store.searchedNoteList.length === 0
   return store.noteList.length === 0 && store.folderList.length === 0
 })
@@ -374,6 +396,10 @@ function persistSidebarState() {
     sidebarExpandedFolderIds: [...expandedFolderIds.value],
     sidebarActiveFolderId: store.activeFolderId,
   })
+}
+
+function onClearSearch() {
+  searchBarRef.value?.clearSearch()
 }
 
 function clearActiveFolder() {

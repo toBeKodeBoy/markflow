@@ -504,6 +504,12 @@ export const useNoteStore = defineStore('note', () => {
     return result
   }
 
+  /** 读取笔记正文（供搜索摘要等 UI 使用） */
+  function getNoteContentById(id: string): string {
+    if (currentNote.value?.id === id) return liveContent.value
+    return storage.getNote(id)?.content ?? ''
+  }
+
   return {
     noteList, currentNote, liveContent, folderList, searchQuery, activeTagFilter, activeFolderId,
     searchedNoteList, filteredNoteList, allTags, sidebarStateRevision,
@@ -512,7 +518,7 @@ export const useNoteStore = defineStore('note', () => {
     updateCurrentContent, deleteNote, renameNote, moveNote, requestTocJump, insertAutoToc,
     clearPendingLargeFileSwitch,
     createFolder, deleteFolder, renameFolder, moveFolder, getDeleteFolderImpact,
-    setActiveTagFilter, setNoteTags, toggleNotePinned,
+    setActiveTagFilter, setNoteTags, toggleNotePinned, getNoteContentById,
     exportLibraryBackup, downloadLibraryBackup, restoreLibraryBackup, notifySidebarStateChanged,
     batchImportFromFolder, clearAllLibraryData
   }
