@@ -227,6 +227,95 @@ window.markflow = {
       return require('fs').readFileSync(paths[0], 'utf-8');
     }
     return null;
+  },
+
+  selectBackupDirectory: function () {
+    var paths = utools.showOpenDialog({
+      title: '选择自动备份目录',
+      properties: ['openDirectory']
+    });
+    if (!paths || !paths.length) return null;
+    return paths[0];
+  },
+
+  writeBackupFileSilent: function (dirPath, filename, content) {
+    try {
+      var fs = require('fs');
+      var path = require('path');
+      if (!dirPath || !path.isAbsolute(dirPath)) {
+        return { ok: false, reason: 'error' };
+      }
+      if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+      }
+      var fullPath = path.join(dirPath, filename);
+      fs.writeFileSync(fullPath, content, 'utf-8');
+      return { ok: true, path: fullPath };
+    } catch (e) {
+      return { ok: false, reason: 'error' };
+    }
+  },
+
+  cleanOldBackupFiles: function (dirPath, maxCopies) {
+    try {
+      var fs = require('fs');
+      var path = require('path');
+      if (!dirPath || !path.isAbsolute(dirPath)) {
+        return { ok: false, reason: 'error' };
+      }
+      if (!fs.existsSync(dirPath)) return { ok: true, deleted: 0 };
+      if (maxCopies <= 0) return { ok: true, deleted: 0 };
+      var entries = fs.readdirSync(dirPath)
+        .filter(function (f) { return /^markflow-backup-\d{8}T\d{6}\.json$/.test(f); })
+        .map(function (f) {
+          var full = path.join(dirPath, f);
+          return { full: full, mtime: fs.statSync(full).mtimeMs };
+        })
+        .sort(function (a, b) { return b.mtime - a.mtime; });
+      var toDelete = entries.slice(maxCopies);
+      for (var i = 0; i < toDelete.length; i++) {
+        fs.unlinkSync(toDelete[i].full);
+      }
+      return { ok: true, deleted: toDelete.length };
+    } catch (e) {
+      return { ok: false, reason: 'error' };
+    }
+  },
+
+  getDefaultBackupDirectory: function () {
+    try {
+      var fs = require('fs');
+      var path = require('path');
+      var base = utools.getPath('appData');
+      var dir = path.join(base, 'markflow-backups');
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      return dir;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  getAutoBackupCapabilities: function () {
+    return {
+      version: 1,
+      available: typeof this.selectBackupDirectory === 'function' &&
+        typeof this.writeBackupFileSilent === 'function' &&
+        typeof this.cleanOldBackupFiles === 'function' &&
+        typeof this.getDefaultBackupDirectory === 'function',
+      isDev: typeof utools.isDev === 'function' ? utools.isDev() : false
+    };
+  },
+
+  openBackupDirectory: function (dirPath) {
+    try {
+      if (!dirPath) return false;
+      utools.shellOpenPath(dirPath);
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 };
 
