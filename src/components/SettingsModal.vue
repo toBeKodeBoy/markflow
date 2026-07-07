@@ -61,6 +61,15 @@
           @change="onBackupFileSelected"
         />
         <p class="settings-tip">备份包含全部笔记、文件夹、侧栏状态与图片资源。</p>
+        <button
+          type="button"
+          class="settings-action-btn danger"
+          data-testid="clear-library-btn"
+          @click="clearAllLibraryData"
+        >
+          清空全部数据…
+        </button>
+        <p class="settings-tip settings-tip-danger">删除全部笔记、文件夹与图片资源，不可恢复。</p>
       </div>
 
       <div class="modal-actions">
@@ -89,6 +98,7 @@ const emit = defineEmits<{
   cancel: []
   'import-folder': []
   'backup-restored': []
+  'library-cleared': []
 }>()
 
 const storage = useStorage()
@@ -174,5 +184,18 @@ function onBackupFileSelected(e: Event) {
     await restoreFromText(text)
   }
   reader.readAsText(file)
+}
+
+async function clearAllLibraryData() {
+  if (!window.confirm('将清空全部笔记、文件夹与图片资源，此操作不可恢复，是否继续？')) return
+  if (!window.confirm('再次确认：确定要清空全部数据吗？')) return
+  try {
+    await store.clearAllLibraryData()
+    await refreshStorageStats()
+    showAppNotification('已清空全部数据')
+    emit('library-cleared')
+  } catch (err) {
+    showAppNotification(err instanceof Error ? err.message : '清空数据失败')
+  }
 }
 </script>

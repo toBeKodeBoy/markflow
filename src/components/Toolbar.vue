@@ -226,6 +226,8 @@
 
     @backup-restored="onBackupRestored"
 
+    @library-cleared="onLibraryCleared"
+
   />
 
 
@@ -549,6 +551,10 @@ function onSettingsImportFolder() {
 }
 
 function onBackupRestored() {
+  settingsModalVisible.value = false
+}
+
+function onLibraryCleared() {
   settingsModalVisible.value = false
 }
 
