@@ -1888,6 +1888,40 @@ input:focus { border-color: var(--primary); }
   color: var(--text);
 }
 
+.markdown-body .mermaid-diagram-wrapper,
+.ProseMirror .mermaid-code-block {
+  margin: 1em 0;
+}
+
+.markdown-body .mermaid-diagram-wrapper pre.mermaid,
+.ProseMirror .mermaid-preview {
+  overflow-x: auto;
+  margin: 0.5em 0;
+  text-align: center;
+}
+
+.markdown-body .mermaid-diagram-wrapper svg,
+.ProseMirror .mermaid-preview svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.markdown-body .mermaid-error,
+.ProseMirror .mermaid-error {
+  color: var(--danger, #c62828);
+  font-size: 0.9em;
+  padding: 0.5em 0.75em;
+  border: 1px solid color-mix(in srgb, var(--danger, #c62828) 35%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--danger, #c62828) 8%, transparent);
+}
+
+.ProseMirror .mermaid-code-block .mermaid-preview {
+  border-top: 1px solid var(--border);
+  padding-top: 0.75em;
+  margin-top: 0.5em;
+}
+
 .markdown-body u,
 .ProseMirror u {
   text-decoration: underline;

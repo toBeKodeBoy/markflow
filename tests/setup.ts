@@ -97,6 +97,23 @@ Object.defineProperty(window, 'localStorage', { value: new LocalStorageMock() })
 
 vi.spyOn(console, 'warn').mockImplementation(() => {})
 
+/** jsdom 下 mermaid 依赖 SVG getBBox */
+if (typeof SVGElement !== 'undefined') {
+  Object.defineProperty(SVGElement.prototype, 'getBBox', {
+    configurable: true,
+    value() {
+      return { x: 0, y: 0, width: 100, height: 20 }
+    },
+  })
+}
+if (typeof Element !== 'undefined' && !Element.prototype.getBoundingClientRect) {
+  Element.prototype.getBoundingClientRect = () => ({
+    x: 0, y: 0, width: 100, height: 20,
+    top: 0, left: 0, bottom: 20, right: 100,
+    width: 100, height: 20, toJSON: () => ({}),
+  })
+}
+
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: vi.fn().mockImplementation((query: string) => ({
