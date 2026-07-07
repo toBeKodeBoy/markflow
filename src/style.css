@@ -986,6 +986,19 @@ input:focus { border-color: var(--primary); }
   background: var(--bg-hover);
 }
 
+.settings-action-btn.danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+}
+
+.settings-action-btn.danger:hover {
+  background: color-mix(in srgb, var(--danger) 12%, var(--bg-hover));
+}
+
+.settings-tip-danger {
+  color: var(--danger);
+}
+
 .import-menu-wrap {
   position: relative;
 }
