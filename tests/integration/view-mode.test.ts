@@ -1,14 +1,40 @@
 /**
  * 四视图模式集成测试 — 组件树与 DOM 类名
  */
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { computed } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import App from '@/App.vue'
 import { useNoteStore } from '@/stores/note'
+import FocusFormatToolbar from '@/components/FocusFormatToolbar.vue'
+import { useFocusToolbarVisibility } from '@/composables/useFocusToolbarVisibility'
+
+const WysiwygEditorStub = {
+  props: {
+    focusMode: { type: Boolean, default: false },
+  },
+  components: { FocusFormatToolbar },
+  setup(props: { focusMode: boolean }) {
+    const enabled = computed(() => props.focusMode)
+    const { visible, onToolbarEnter, onToolbarLeave } = useFocusToolbarVisibility(enabled)
+    return { visible, onToolbarEnter, onToolbarLeave, focusMode: props.focusMode }
+  },
+  template: `
+    <div class="wysiwyg-pane stub-wysiwyg">
+      <div v-if="!focusMode" class="editor-toolbar"></div>
+      <FocusFormatToolbar
+        v-if="focusMode"
+        :visible="visible"
+        @mouseenter="onToolbarEnter"
+        @mouseleave="onToolbarLeave"
+      />
+    </div>
+  `,
+}
 
 const stubs = {
-  WysiwygEditor: { template: '<div class="wysiwyg-pane stub-wysiwyg" />' },
+  WysiwygEditor: WysiwygEditorStub,
   Editor: { template: '<div class="editor-pane stub-editor" />' },
   Preview: { template: '<div class="preview-pane stub-preview" />' },
   Sidebar: { template: '<aside class="sidebar stub-sidebar" />' },
@@ -83,6 +109,25 @@ describe('四视图模式切换', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     await flushPromises()
     expect(wrapper.find('.app').classes()).toContain('mode-split')
+  })
+
+  it('专注模式隐藏常规工具栏并挂载浮动格式化栏', async () => {
+    const wrapper = mountApp()
+    await clickMode(wrapper, '专注')
+    expect(wrapper.find('.stub-wysiwyg .editor-toolbar').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="focus-format-toolbar"]').exists()).toBe(true)
+  })
+
+  it('专注模式鼠标靠近底部时显示浮动工具栏', async () => {
+    const wrapper = mountApp()
+    await clickMode(wrapper, '专注')
+    const toolbar = wrapper.get('[data-testid="focus-format-toolbar"]')
+    expect(toolbar.classes()).toContain('is-hidden')
+
+    vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(800)
+    window.dispatchEvent(new MouseEvent('mousemove', { clientY: 760 }))
+    await flushPromises()
+    expect(toolbar.classes()).not.toContain('is-hidden')
   })
 
   it('大文件打开时 live 模式自动切分屏', async () => {

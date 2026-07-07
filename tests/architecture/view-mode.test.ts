@@ -31,6 +31,7 @@ describe('App.vue 视图调度', () => {
 
   it('WYSIWYG 用于 live 与 focus', () => {
     expect(appSrc).toMatch(/WysiwygEditor v-if="viewMode === 'live' \|\| viewMode === 'focus'"/)
+    expect(appSrc).toMatch(/:focus-mode="viewMode === 'focus'"/)
   })
 
   it('CodeMirror 用于 split 与 source，Preview 仅 split', () => {
@@ -89,5 +90,15 @@ describe('视图模式样式', () => {
 
   it('专注模式样式作用于 wysiwyg-pane', () => {
     expect(css).toMatch(/\.mode-focus \.wysiwyg-pane/)
+  })
+
+  it('专注模式浮动工具栏样式', () => {
+    expect(css).toMatch(/\.focus-format-toolbar/)
+    expect(css).toMatch(/\.focus-format-toolbar\.is-hidden/)
+  })
+
+  it('退出专注按钮仅在 focus 模式可见', () => {
+    expect(css).toMatch(/\.mode-live \.focus-exit-btn,\s*\n\.mode-split \.focus-exit-btn,\s*\n\.mode-source \.focus-exit-btn/)
+    expect(css).not.toMatch(/\.mode-focus \.focus-exit-btn,\s*\n\.mode-source \.focus-exit-btn/)
   })
 })
