@@ -6,6 +6,7 @@ import type { Node as ProseNode } from '@milkdown/prose/model'
 import hljs from 'highlight.js'
 import { hideCodeLanguageDropdown, showCodeLanguageDropdown } from '../utils/codeLanguageDropdown'
 import { COPY_TEXT } from '../utils/codeCopy'
+import { isMermaidLanguage, renderMermaidToSvg } from '../utils/mermaidRender'
 
 type CodeBlockHandle = {
   view: EditorView
@@ -196,6 +197,8 @@ class CodeBlockNodeView implements NodeView {
   private getPos: () => number | undefined
   private trailingObserver: MutationObserver
   private highlightTimer: ReturnType<typeof setTimeout> | null = null
+  private mermaidTimer: ReturnType<typeof setTimeout> | null = null
+  private mermaidPreview: HTMLDivElement
   private actionsMouseDownHandler: ((e: MouseEvent) => void) | null = null
 
   constructor(node: ProseNode, view: EditorView, getPos: () => number | undefined) {
@@ -222,6 +225,10 @@ class CodeBlockNodeView implements NodeView {
     this.label = label
     this.contentDOM = code
 
+    this.mermaidPreview = document.createElement('div')
+    this.mermaidPreview.className = 'mermaid-preview'
+    wrapper.appendChild(this.mermaidPreview)
+
     // 复制交互由 WysiwygEditor 容器捕获阶段委托处理（见 handleCodeCopyCapture*）
     // 棣栨楂樹寒
     this.highlightContent(node.textContent, lang)
@@ -229,6 +236,32 @@ class CodeBlockNodeView implements NodeView {
 
     this.trailingObserver = new MutationObserver(() => this.syncTrailingBreak())
     this.trailingObserver.observe(this.code, { childList: true, subtree: true })
+    this.scheduleMermaidPreview(node.textContent, lang)
+  }
+
+  private scheduleMermaidPreview(text: string, lang: string) {
+    if (this.mermaidTimer) clearTimeout(this.mermaidTimer)
+    if (!isMermaidLanguage(lang)) {
+      this.mermaidPreview.innerHTML = ''
+      this.mermaidPreview.style.display = 'none'
+      this.dom.classList.remove('mermaid-code-block')
+      return
+    }
+    this.mermaidPreview.style.display = ''
+    this.dom.classList.add('mermaid-code-block')
+    this.mermaidTimer = setTimeout(() => {
+      this.mermaidTimer = null
+      void this.renderMermaidPreview(text)
+    }, 120)
+  }
+
+  private async renderMermaidPreview(text: string) {
+    const trimmed = text.trim()
+    if (!trimmed) {
+      this.mermaidPreview.innerHTML = ''
+      return
+    }
+    this.mermaidPreview.innerHTML = await renderMermaidToSvg(trimmed)
   }
 
   /** 鍚屾 ProseMirror 灏鹃儴 <br>锛屼娇楂樹寒灞傝鏁颁笌鍏夋爣灞備竴鑷?*/
@@ -291,6 +324,12 @@ class CodeBlockNodeView implements NodeView {
       code.classList.add(`language-${lang}`)
     }
 
+    if (isMermaidLanguage(lang)) {
+      code.innerHTML = ''
+      this.syncTrailingBreak()
+      return
+    }
+
     if (!text.trim()) {
       code.innerHTML = ''
       this.syncTrailingBreak()
@@ -325,6 +364,7 @@ class CodeBlockNodeView implements NodeView {
 
     // 閲嶆柊楂樹寒锛堥槻鎶栵級
     this.scheduleHighlight(text, lang)
+    this.scheduleMermaidPreview(text, lang)
 
     // Sync data-language and code class for linkage
     if (lang) {
@@ -361,6 +401,7 @@ class CodeBlockNodeView implements NodeView {
 
   destroy() {
     if (this.highlightTimer) clearTimeout(this.highlightTimer)
+    if (this.mermaidTimer) clearTimeout(this.mermaidTimer)
     if (this.layerSyncTimer) cancelAnimationFrame(this.layerSyncTimer)
     this.trailingObserver.disconnect()
     if (this.actionsMouseDownHandler) {

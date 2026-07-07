@@ -10,13 +10,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { parseMarkdown } from '../utils/markedSetup'
 import { resolveMarkdownForDisplay } from '../utils/resolveMarkdownAssets'
 import { handleCodeCopyCaptureClick } from '../utils/codeCopy'
 import { handleImageLightboxDblClick } from '../utils/imageLightbox'
 import { handlePreviewFragmentClick } from '../utils/previewFragmentNav'
 import { writeClipboard } from '../utils/clipboard'
+import { hydrateMermaidBlocks } from '../utils/mermaidRender'
 import { useNoteStore } from '../stores/note'
 import { useScrollSync } from '../composables/useScrollSync'
 import { useTocJumpHandler } from '../composables/useTocJumpHandler'
@@ -33,6 +34,17 @@ const previewContentEl = ref<HTMLElement>()
 const renderedHtml = ref('<p class="empty-preview">开始输入 Markdown...</p>')
 const previewLoading = ref(false)
 let renderTimer: ReturnType<typeof setTimeout> | null = null
+
+async function hydratePreviewMermaid() {
+  await nextTick()
+  const el = previewContentEl.value
+  if (!el) return
+  try {
+    await hydrateMermaidBlocks(el)
+  } catch {
+    // 图示渲染失败时不阻断预览
+  }
+}
 
 /** 调度 Markdown 渲染：空内容显示占位，非空按文件大小选择防抖延迟 */
 function scheduleRender(content: string) {
@@ -51,6 +63,7 @@ function scheduleRender(content: string) {
       .then((resolved) => {
         try {
           renderedHtml.value = parseMarkdown(resolved) || '<p class="empty-preview">预览渲染失败</p>'
+          void hydratePreviewMermaid()
         } catch {
           renderedHtml.value = '<p class="empty-preview">预览渲染失败</p>'
         }

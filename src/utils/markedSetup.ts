@@ -6,6 +6,7 @@ import { COPY_TEXT } from './codeCopy'
 import { renderImageHtml } from './imageScale'
 import { HeadingSlugger } from './headingSlug'
 import { renderBlockMath, renderInlineMath } from './mathRender'
+import { isMermaidLanguage, renderMermaidBlock } from './mermaidBlock'
 
 const headingSlugger = new HeadingSlugger()
 
@@ -125,6 +126,11 @@ const codeBlockRenderer: RendererExtension = {
   renderer(token) {
     const code = token.text
     const lang = token.lang || ''
+
+    if (isMermaidLanguage(lang)) {
+      return renderMermaidBlock(code)
+    }
+
     const langLabel = lang ? `<span class="code-lang-label">${escapeHtml(lang)}</span>` : ''
 
     let highlighted: string

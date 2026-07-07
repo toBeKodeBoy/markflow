@@ -4,7 +4,7 @@ const POPULAR_LANGUAGES = [
   'javascript', 'typescript', 'python', 'java', 'c', 'cpp', 'csharp',
   'go', 'rust', 'ruby', 'php', 'swift', 'kotlin',
   'bash', 'shell', 'sql',
-  'html', 'css', 'json', 'xml', 'yaml', 'markdown',
+  'html', 'css', 'json', 'xml', 'yaml', 'markdown', 'mermaid',
   'plaintext',
 ]
 
