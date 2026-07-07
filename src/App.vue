@@ -98,6 +98,8 @@ import { useImageLightbox } from './composables/useImageLightbox'
 
 import { showAppNotification } from './utils/notify'
 
+import { useAutoBackup } from './composables/useAutoBackup'
+
 import type { ViewMode } from './types'
 
 
@@ -117,6 +119,8 @@ const viewMode = ref<ViewMode>('live')
 const prevMode = ref<ViewMode>('live')
 
 const appSettings = useAppSettings()
+
+const { startScheduler, stopScheduler } = useAutoBackup()
 
 const sidebarVisible = ref(appSettings.get().sidebarVisible ?? true)
 
@@ -306,6 +310,8 @@ onMounted(() => {
 
   window.addEventListener('keydown', onKeydown)
 
+  startScheduler()
+
 })
 
 
@@ -313,6 +319,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
 
   window.removeEventListener('keydown', onKeydown)
+
+  stopScheduler()
 
 })
 

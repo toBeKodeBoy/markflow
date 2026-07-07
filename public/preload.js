@@ -227,6 +227,49 @@ window.markflow = {
       return require('fs').readFileSync(paths[0], 'utf-8');
     }
     return null;
+  },
+
+  selectBackupDirectory: function () {
+    var paths = utools.showOpenDialog({
+      title: '选择自动备份目录',
+      properties: ['openDirectory']
+    });
+    if (!paths || !paths.length) return null;
+    return paths[0];
+  },
+
+  writeBackupFileSilent: function (dirPath, filename, content) {
+    try {
+      var fs = require('fs');
+      var path = require('path');
+      var fullPath = path.join(dirPath, filename);
+      fs.writeFileSync(fullPath, content, 'utf-8');
+      return { ok: true, path: fullPath };
+    } catch (e) {
+      return { ok: false, reason: 'error' };
+    }
+  },
+
+  cleanOldBackupFiles: function (dirPath, maxCopies) {
+    try {
+      var fs = require('fs');
+      var path = require('path');
+      if (maxCopies <= 0) return { ok: true, deleted: 0 };
+      var entries = fs.readdirSync(dirPath)
+        .filter(function (f) { return /^markflow-backup-\d{8}T\d{6}\.json$/.test(f); })
+        .map(function (f) {
+          var full = path.join(dirPath, f);
+          return { full: full, mtime: fs.statSync(full).mtimeMs };
+        })
+        .sort(function (a, b) { return b.mtime - a.mtime; });
+      var toDelete = entries.slice(maxCopies);
+      for (var i = 0; i < toDelete.length; i++) {
+        fs.unlinkSync(toDelete[i].full);
+      }
+      return { ok: true, deleted: toDelete.length };
+    } catch (e) {
+      return { ok: false, reason: 'error' };
+    }
   }
 };
 

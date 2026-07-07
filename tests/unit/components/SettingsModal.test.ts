@@ -89,4 +89,71 @@ describe('SettingsModal', () => {
       expect(storage.getSettings().fontSize).toBe(18)
     })
   })
+
+  describe('auto backup settings', () => {
+    beforeEach(() => {
+      vi.stubGlobal('markflow', {
+        getNoteList: () => [],
+        saveNoteList: vi.fn(),
+        getNote: () => null,
+        saveNote: vi.fn(),
+        removeNote: vi.fn(),
+        getFolderList: () => [],
+        saveFolderList: vi.fn(),
+        getSettings: () =>
+          JSON.parse(localStorage.getItem('markflow_settings') || 'null') || {
+            theme: 'system',
+            fontSize: 14,
+            editorFontFamily: 'monospace',
+            previewVisible: true,
+            sidebarVisible: true,
+          },
+        saveSettings: (settings: unknown) => {
+          localStorage.setItem('markflow_settings', JSON.stringify(settings))
+        },
+        showNotification: vi.fn(),
+        selectBackupDirectory: vi.fn(() => 'D:\\Backup\\MarkFlow'),
+        writeBackupFileSilent: vi.fn(() => ({ ok: true, path: 'D:\\Backup\\MarkFlow\\markflow-backup.json' })),
+        cleanOldBackupFiles: vi.fn(() => ({ ok: true, deleted: 0 })),
+        getAssetIndex: () => [],
+        getAsset: () => null,
+        saveAssetIndex: vi.fn(),
+        saveAsset: vi.fn(),
+        removeAsset: vi.fn(),
+      })
+    })
+
+    it('reverts auto backup settings when cancel is clicked', async () => {
+      const { useStorage } = await import('../../../src/composables/useStorage')
+      const storage = useStorage()
+      storage.saveSettings({
+        ...storage.getSettings(),
+        autoBackup: {
+          enabled: true,
+          intervalHours: 24,
+          maxCopies: 10,
+          directoryPath: 'D:\\Backup\\MarkFlow',
+        },
+      })
+
+      const wrapper = mountSettings(true)
+      await flushPromises()
+
+      const intervalSelect = wrapper
+        .findAll('.settings-option-select')
+        .find((el) => el.find('option[value="6"]').exists())
+      expect(intervalSelect).toBeTruthy()
+      await intervalSelect!.setValue('6')
+      await intervalSelect!.trigger('change')
+      await flushPromises()
+
+      expect(storage.getSettings().autoBackup?.intervalHours).toBe(6)
+
+      await wrapper.findAll('button').find((btn) => btn.text() === '取消')!.trigger('click')
+      await flushPromises()
+
+      expect(storage.getSettings().autoBackup?.intervalHours).toBe(24)
+      expect(wrapper.emitted('cancel')).toHaveLength(1)
+    })
+  })
 })

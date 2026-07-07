@@ -79,6 +79,23 @@ export interface PdfExportOptions {
   printBackground: boolean
 }
 
+/** 自动备份间隔（小时） */
+export type AutoBackupInterval = 6 | 12 | 24 | 168
+
+/** 自动备份设置（持久化到 AppSettings） */
+export interface AutoBackupSettings {
+  enabled: boolean
+  intervalHours: AutoBackupInterval
+  /** uTools 本地目录绝对路径 */
+  directoryPath?: string
+  /** 保留份数，0 表示不限制 */
+  maxCopies: number
+  lastBackupAt?: number
+  lastBackupStatus?: 'success' | 'error' | 'running'
+  lastBackupPath?: string
+  lastBackupError?: string
+}
+
 export interface AppSettings {
   theme: 'light' | 'dark' | 'system'
   fontSize: number
@@ -95,6 +112,8 @@ export interface AppSettings {
   pdfExport?: PdfExportOptions
   /** 侧栏标签云折叠（未设置时：标签 ≤3 默认折叠） */
   sidebarTagCloudCollapsed?: boolean
+  /** 自动备份配置 */
+  autoBackup?: AutoBackupSettings
 }
 
 // uTools preload bridge type
@@ -126,6 +145,16 @@ export interface MarkFlowBridge {
     defaultName: string
   ) => { ok: true; path: string } | { ok: false; reason: 'cancel' | 'error' }
   openBackupFile: () => string | null
+  selectBackupDirectory: () => string | null
+  writeBackupFileSilent: (
+    dirPath: string,
+    filename: string,
+    content: string
+  ) => { ok: true; path: string } | { ok: false; reason: 'error' }
+  cleanOldBackupFiles: (
+    dirPath: string,
+    maxCopies: number
+  ) => { ok: true; deleted: number } | { ok: false; reason: 'error' }
   getAssetIndex: () => AssetIndexItem[]
   saveAssetIndex: (index: AssetIndexItem[]) => void
   getAsset: (id: string) => AssetRecord | null
