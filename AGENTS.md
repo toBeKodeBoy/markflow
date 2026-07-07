@@ -10,7 +10,7 @@
 - 编辑器技术栈：
   - 所见即所得编辑：`Milkdown`
   - 源码编辑：`CodeMirror 6`
-  - Markdown 预览：`marked` + `highlight.js`
+  - Markdown 预览：`marked` + `highlight.js` + `KaTeX` + `Mermaid`
 - 运行模式：
   - 本地开发时直接运行 Vite 应用
   - uTools 生产环境通过 `public/preload.js` 暴露 `window.markflow` 桥接能力
@@ -40,6 +40,8 @@ npm run test:watch
   - 视图模式切换：`tests/architecture/view-mode.test.ts`、`tests/integration/view-mode.test.ts`
   - WYSIWYG 行为：`tests/integration/wysiwyg-*.test.ts`、`tests/unit/plugins/*.test.ts`
   - Markdown 渲染与代码块：`tests/unit/utils/markedSetup.test.ts`、`tests/markedSetup.taskList.test.ts`、`tests/unit/utils/updateFenceLanguage.test.ts`
+  - 数学公式：`tests/unit/utils/mathRender.test.ts`、`tests/unit/utils/markedSetup.math.test.ts`、`tests/integration/wysiwyg-math.test.ts`
+  - Mermaid 图示：`tests/unit/utils/mermaidRender.test.ts`、`tests/unit/utils/markedSetup.mermaid.test.ts`、`tests/integration/wysiwyg-mermaid.test.ts`
   - 文件夹导入：`tests/importFolder*.test.ts`、`tests/utils/folderTree.test.ts`
 
 ## 仓库结构
@@ -80,7 +82,8 @@ npm run test:watch
 
 - 文件夹导入逻辑同时分布在应用层和 preload 桥接层，两边的扩展名规则和导入行为要保持一致。
 - 相对图片路径和 `markflow-asset://` 资源链路很容易被改坏；修改相关逻辑后要同时验证渲染和持久化。
-- 预览输出必须继续保持安全、可控和已清洗。
+- 预览 HTML 经 `sanitizeRenderedHtml`（DOMPurify）清洗；**Mermaid hydrate 后的 SVG 不再二次 DOMPurify**，以免剥离 `foreignObject` 节点标签，安全依赖 mermaid `securityLevel: 'strict'`。
+- 修改数学（`src/plugins/math.ts`、`src/utils/mathRender.ts`）或 Mermaid（`src/utils/mermaidBlock.ts`、`src/utils/mermaidRender.ts`）时，须同时验证 WYSIWYG 与分屏预览一致。
 
 ### 5. 构建产物
 
