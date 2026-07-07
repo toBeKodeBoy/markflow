@@ -5,6 +5,15 @@ export function isMermaidLanguage(lang: string): boolean {
   return lang.trim().toLowerCase() === 'mermaid'
 }
 
+/** 将 mermaid 源码编码进 data 属性，供 hydrate 后复制与主题刷新 */
+export function encodeMermaidSource(source: string): string {
+  return btoa(unescape(encodeURIComponent(source)))
+}
+
+export function decodeMermaidSource(encoded: string): string {
+  return decodeURIComponent(escape(atob(encoded)))
+}
+
 /** marked 预览：输出待客户端 hydrate 的 mermaid 占位结构 */
 export function renderMermaidBlock(source: string): string {
   const trimmed = source.replace(/\n$/, '')

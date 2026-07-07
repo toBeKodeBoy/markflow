@@ -6,9 +6,12 @@ import {
   renderMermaidBlock,
   renderMermaidToSvg,
   hydrateMermaidBlocks,
+  refreshMermaidBlocks,
   resetMermaidStateForTests,
   isMermaidLanguage,
+  decodeMermaidSource,
 } from '../../../src/utils/mermaidRender'
+import { sanitizeMermaidSvg } from '../../../src/utils/sanitizeHtml'
 
 describe('mermaidRender', () => {
   beforeEach(() => {
@@ -57,5 +60,43 @@ describe('mermaidRender', () => {
       await hydrateMermaidBlocks(root)
       expect(root.querySelector('svg')).toBeTruthy()
     }, 30000)
+
+    it('hydrate 后应保留 data-mermaid-source 供复制与刷新', async () => {
+      const root = document.createElement('div')
+      const source = 'graph TD;\n  A-->B'
+      root.innerHTML = renderMermaidBlock(source)
+      await hydrateMermaidBlocks(root)
+      const rendered = root.querySelector('.mermaid-rendered') as HTMLElement
+      expect(rendered?.dataset.mermaidSource).toBeTruthy()
+      expect(decodeMermaidSource(rendered.dataset.mermaidSource!)).toBe(source)
+    }, 30000)
+  })
+
+  describe('refreshMermaidBlocks', () => {
+    it('应重渲染已 hydrate 的图示', async () => {
+      const root = document.createElement('div')
+      root.innerHTML = renderMermaidBlock('graph TD;\n  A-->B')
+      await hydrateMermaidBlocks(root)
+      const before = root.innerHTML
+      await refreshMermaidBlocks(root)
+      expect(root.querySelector('svg')).toBeTruthy()
+      expect(root.querySelector('.mermaid-rendered[data-mermaid-source]')).toBeTruthy()
+      expect(root.innerHTML).not.toBe('')
+      expect(before).not.toBe('')
+    }, 30000)
+  })
+
+  describe('sanitizeMermaidSvg', () => {
+    it('应原样保留 mermaid SVG（含 foreignObject 标签）', () => {
+      const svg = '<svg xmlns="http://www.w3.org/2000/svg"><foreignObject><span>开始</span></foreignObject></svg>'
+      const clean = sanitizeMermaidSvg(svg)
+      expect(clean).toContain('foreignObject')
+      expect(clean).toContain('开始')
+    })
+
+    it('非 SVG 错误块应原样返回', () => {
+      const err = '<div class="mermaid-error">syntax error</div>'
+      expect(sanitizeMermaidSvg(err)).toBe(err)
+    })
   })
 })

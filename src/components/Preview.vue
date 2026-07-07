@@ -17,7 +17,7 @@ import { handleCodeCopyCaptureClick } from '../utils/codeCopy'
 import { handleImageLightboxDblClick } from '../utils/imageLightbox'
 import { handlePreviewFragmentClick } from '../utils/previewFragmentNav'
 import { writeClipboard } from '../utils/clipboard'
-import { hydrateMermaidBlocks } from '../utils/mermaidRender'
+import { hydrateMermaidBlocks, refreshMermaidBlocks } from '../utils/mermaidRender'
 import { useNoteStore } from '../stores/note'
 import { useScrollSync } from '../composables/useScrollSync'
 import { useTocJumpHandler } from '../composables/useTocJumpHandler'
@@ -34,13 +34,15 @@ const previewContentEl = ref<HTMLElement>()
 const renderedHtml = ref('<p class="empty-preview">开始输入 Markdown...</p>')
 const previewLoading = ref(false)
 let renderTimer: ReturnType<typeof setTimeout> | null = null
+let themeObserver: MutationObserver | null = null
 
-async function hydratePreviewMermaid() {
+async function hydratePreviewMermaid(refresh = false) {
   await nextTick()
   const el = previewContentEl.value
   if (!el) return
   try {
-    await hydrateMermaidBlocks(el)
+    if (refresh) await refreshMermaidBlocks(el)
+    else await hydrateMermaidBlocks(el)
   } catch {
     // 图示渲染失败时不阻断预览
   }
@@ -95,10 +97,19 @@ useTocJumpHandler(previewContentEl, store)
 onMounted(() => {
   previewContentEl.value?.addEventListener('click', onPreviewClick, true)
   previewContentEl.value?.addEventListener('dblclick', handleImageLightboxDblClick, true)
+  themeObserver = new MutationObserver(() => {
+    void hydratePreviewMermaid(true)
+  })
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme'],
+  })
 })
 
 onBeforeUnmount(() => {
   if (renderTimer) clearTimeout(renderTimer)
+  themeObserver?.disconnect()
+  themeObserver = null
   previewContentEl.value?.removeEventListener('click', onPreviewClick, true)
   previewContentEl.value?.removeEventListener('dblclick', handleImageLightboxDblClick, true)
 })
