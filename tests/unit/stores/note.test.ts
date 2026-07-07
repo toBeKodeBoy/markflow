@@ -290,6 +290,65 @@ describe('useNoteStore', () => {
       expect(store.noteList.find((n) => n.id === note.id)?.pinned).toBe(true)
     })
 
+    it('addTag 应添加规范化后的标签', () => {
+      const store = useNoteStore()
+      const note = store.createNote()
+      expect(store.addTag(note.id, '  API  ')).toBe(true)
+      expect(store.currentNote?.tags).toEqual(['API'])
+      expect(store.allTags).toEqual(['API'])
+    })
+
+    it('addTag 拒绝重复与超长标签', () => {
+      const store = useNoteStore()
+      const note = store.createNote()
+      store.addTag(note.id, 'work')
+      expect(store.addTag(note.id, 'WORK')).toBe(false)
+      expect(store.addTag(note.id, 'x'.repeat(21))).toBe(false)
+    })
+
+    it('removeTag 应删除标签（大小写不敏感）', () => {
+      const store = useNoteStore()
+      const note = store.createNote()
+      store.setNoteTags(note.id, ['Draft', 'API'])
+      store.removeTag(note.id, 'draft')
+      expect(store.currentNote?.tags).toEqual(['API'])
+    })
+
+    it('reorderNotes 应更新同级 sortOrder', () => {
+      const store = useNoteStore()
+      const folder = store.createFolder('工作')
+      const a = store.createNoteWithContent('# A', folder.id)
+      const b = store.createNoteWithContent('# B', folder.id)
+      const c = store.createNoteWithContent('# C', folder.id)
+      store.reorderNotes(folder.id, [c.id, a.id, b.id])
+      const inFolder = store.noteList
+        .filter((n) => n.folderId === folder.id)
+        .sort((x, y) => (x.sortOrder ?? 0) - (y.sortOrder ?? 0))
+      expect(inFolder.map((n) => n.id)).toEqual([c.id, a.id, b.id])
+    })
+
+    it('reorderNotes 置顶笔记应通过 updatedAt 保持拖拽顺序', () => {
+      const store = useNoteStore()
+      const folder = store.createFolder('工作')
+      const a = store.createNoteWithContent('# A', folder.id)
+      const b = store.createNoteWithContent('# B', folder.id)
+      store.toggleNotePinned(a.id)
+      store.toggleNotePinned(b.id)
+      store.reorderNotes(folder.id, [b.id, a.id])
+      const pinned = store.noteList
+        .filter((n) => n.folderId === folder.id && n.pinned)
+        .sort((x, y) => y.updatedAt - x.updatedAt)
+      expect(pinned.map((n) => n.id)).toEqual([b.id, a.id])
+    })
+
+    it('setNoteTags 遇超长标签应拒绝并保留原标签', () => {
+      const store = useNoteStore()
+      const note = store.createNote()
+      store.setNoteTags(note.id, ['ok'])
+      expect(store.setNoteTags(note.id, ['ok', 'x'.repeat(21)])).toBe(false)
+      expect(store.currentNote?.tags).toEqual(['ok'])
+    })
+
     it('renameFolder 应更新名称', () => {
       const store = useNoteStore()
       const f = store.createFolder('旧名')
@@ -341,6 +400,41 @@ describe('useNoteStore', () => {
       store.activeFolderId = 'f1'
       expect(store.filteredNoteList).toHaveLength(1)
       expect(store.filteredNoteList[0].title).toBe('A')
+    })
+
+    it('filteredNoteList 应按标签过滤', () => {
+      const store = useNoteStore()
+      const a = store.createNoteWithContent('# Alpha')
+      store.createNoteWithContent('# Beta')
+      store.setNoteTags(a.id, ['API'])
+      store.searchQuery = 'api'
+      expect(store.filteredNoteList).toHaveLength(1)
+      expect(store.filteredNoteList[0].title).toBe('Alpha')
+    })
+
+    it('searchedNoteList 应叠加 activeTagFilter 与 searchQuery', () => {
+      const store = useNoteStore()
+      const a = store.createNoteWithContent('# Alpha\nshared body')
+      const b = store.createNoteWithContent('# Beta\nshared body')
+      store.setNoteTags(a.id, ['work'])
+      store.setNoteTags(b.id, ['work'])
+      store.activeTagFilter = 'work'
+      store.searchQuery = 'alpha'
+      expect(store.filteredNoteList).toHaveLength(1)
+      expect(store.filteredNoteList[0].title).toBe('Alpha')
+    })
+
+    it('标签、搜索与文件夹三者应叠加过滤', () => {
+      const store = useNoteStore()
+      const match = store.createNoteWithContent('# Match', 'f1')
+      const otherFolder = store.createNoteWithContent('# Match too', 'f2')
+      store.setNoteTags(match.id, ['API'])
+      store.setNoteTags(otherFolder.id, ['API'])
+      store.activeTagFilter = 'API'
+      store.searchQuery = 'match'
+      store.activeFolderId = 'f1'
+      expect(store.filteredNoteList).toHaveLength(1)
+      expect(store.filteredNoteList[0].title).toBe('Match')
     })
   })
 

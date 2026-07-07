@@ -6,7 +6,11 @@ import { collectAllNoteContents } from '../utils/resolveMarkdownAssets'
 import { LARGE_FILE_THRESHOLD } from '../constants'
 import { applyTocToContent } from '../utils/generateTocMarkdown'
 import { migrateLegacyPathFolders, collectDescendantFolderIds, nextSiblingOrder, wouldCreateFolderCycle, getFolderDeleteImpact } from '../utils/folderTree'
-import { buildBackup, applyBackup, parseBackup, downloadBackupJson, type MarkFlowBackup } from '../utils/backup'
+import { buildBackupAsync, applyBackup, parseBackup, downloadBackupJson, type MarkFlowBackup } from '../utils/backup'
+import { normalizeTagInput, normalizeTags } from '../utils/tagNormalize'
+import { buildTagStats } from '../utils/tagStats'
+import { planSortOrderMigration } from '../utils/migrateNoteSortOrder'
+import { sortNotes } from '../utils/noteSort'
 import { runFolderImport, saveImportImageAsAsset } from '../utils/importFolderService'
 import type { ImportFolderOptions, ImportFolderProgress, ImportFolderResult, ImportFolderScanResult } from '../types/import'
 import type { Note, NoteListItem, Folder, TocJumpTarget, EditorContentPush } from '../types'
@@ -92,13 +96,16 @@ export const useNoteStore = defineStore('note', () => {
     return [...set].sort((a, b) => a.localeCompare(b, 'zh'))
   })
 
+  /** 标签云：按使用频率降序（全局统计） */
+  const tagStats = computed(() => buildTagStats(noteList.value))
+
   /** 根据 activeFolderId 和 searchQuery 过滤后的笔记列表 */
   const filteredNoteList = computed(() => {
     let list = searchedNoteList.value
     if (activeFolderId.value) {
       list = list.filter(n => n.folderId === activeFolderId.value)
     }
-    return list
+    return sortNotes(list)
   })
 
   /** 大文件策略：内容长度超过阈值时标记 pendingLargeFileSwitch */
@@ -139,6 +146,16 @@ export const useNoteStore = defineStore('note', () => {
   /** 从存储加载笔记列表和文件夹列表 */
   function loadNoteList() {
     noteList.value = storage.getNoteList()
+    const sortMigration = planSortOrderMigration(noteList.value)
+    if (sortMigration.length > 0) {
+      for (const { id, sortOrder } of sortMigration) {
+        const note = storage.getNote(id)
+        if (!note) continue
+        note.sortOrder = sortOrder
+        storage.saveNote(note)
+      }
+      noteList.value = storage.getNoteList()
+    }
     const rawFolders = storage.getFolderList()
     const { folders, changed } = migrateLegacyPathFolders(rawFolders)
     folderList.value = folders
@@ -378,15 +395,67 @@ export const useNoteStore = defineStore('note', () => {
     activeTagFilter.value = tag
   }
 
-  /** 更新笔记标签 */
-  function setNoteTags(id: string, tags: string[]) {
+  /** 更新笔记标签；含无效标签时拒绝写入并返回 false */
+  function setNoteTags(id: string, tags: string[]): boolean {
+    const { tags: normalized, rejected } = normalizeTags(tags)
+    if (rejected) return false
     const note = storage.getNote(id)
-    if (!note) return
-    note.tags = tags
+    if (!note) return false
+    note.tags = normalized
     note.updatedAt = Date.now()
     storage.saveNote(note)
     noteList.value = storage.getNoteList()
-    if (currentNote.value?.id === id) currentNote.value.tags = tags
+    if (currentNote.value?.id === id) currentNote.value.tags = normalized
+    return true
+  }
+
+  function addTag(id: string, tag: string): boolean {
+    const normalized = normalizeTagInput(tag)
+    if (!normalized) return false
+    const note = storage.getNote(id)
+    if (!note) return false
+    const { tags, rejected } = normalizeTags([...(note.tags ?? []), normalized])
+    if (rejected) return false
+    if (tags.length === (note.tags ?? []).length) return false
+    setNoteTags(id, tags)
+    return true
+  }
+
+  function removeTag(id: string, tag: string): void {
+    const note = storage.getNote(id)
+    if (!note) return
+    const key = tag.toLowerCase()
+    setNoteTags(id, (note.tags ?? []).filter((t) => t.toLowerCase() !== key))
+  }
+
+  function reorderNotes(folderId: string | undefined, orderedIds: string[]): void {
+    const baseTime = Date.now()
+    const pinnedIds = orderedIds.filter((id) => {
+      const note = storage.getNote(id)
+      return note != null && note.folderId === folderId && note.pinned
+    })
+    const unpinnedIds = orderedIds.filter((id) => {
+      const note = storage.getNote(id)
+      return note != null && note.folderId === folderId && !note.pinned
+    })
+
+    pinnedIds.forEach((id, index) => {
+      const note = storage.getNote(id)
+      if (!note) return
+      // pinned 组内按 updatedAt 倒序；越靠前 updatedAt 越大
+      note.updatedAt = baseTime - index
+      storage.saveNote(note)
+    })
+
+    unpinnedIds.forEach((id, index) => {
+      const note = storage.getNote(id)
+      if (!note) return
+      note.sortOrder = (index + 1) * 100
+      note.updatedAt = baseTime
+      storage.saveNote(note)
+    })
+
+    noteList.value = storage.getNoteList()
   }
 
   /** 切换笔记置顶 */
@@ -400,14 +469,18 @@ export const useNoteStore = defineStore('note', () => {
     if (currentNote.value?.id === id) currentNote.value.pinned = note.pinned
   }
 
-  /** 导出全量备份 JSON */
-  function exportLibraryBackup(): MarkFlowBackup {
-    return buildBackup(storage)
+  /** 导出全量备份 JSON（含 IndexedDB / uTools 图片资源） */
+  async function exportLibraryBackup(): Promise<MarkFlowBackup> {
+    const assetStorage = getAssetStorage()
+    return buildBackupAsync(storage, {
+      getIndex: () => assetStorage.getAssetIndex(),
+      getAssetAsync: (id) => assetStorage.getAssetAsync(id),
+    })
   }
 
   /** 下载备份文件 */
-  function downloadLibraryBackup() {
-    downloadBackupJson(buildBackup(storage))
+  async function downloadLibraryBackup() {
+    downloadBackupJson(await exportLibraryBackup())
   }
 
   /** 从备份 JSON 恢复（清空旧图片资源） */
@@ -416,6 +489,10 @@ export const useNoteStore = defineStore('note', () => {
     const assetStorage = getAssetStorage()
     await assetStorage.clearAllAssets()
     applyBackup(backup, storage)
+    for (const item of backup.assets.index) {
+      const record = backup.assets.records[item.id]
+      if (record) await assetStorage.saveAssetAsync(item.id, record)
+    }
     loadNoteList()
     activeFolderId.value = storage.getSettings().sidebarActiveFolderId ?? null
     activeTagFilter.value = null
@@ -504,15 +581,20 @@ export const useNoteStore = defineStore('note', () => {
     return result
   }
 
+  function getNoteContentById(id: string): string {
+    if (currentNote.value?.id === id) return liveContent.value
+    return storage.getNote(id)?.content ?? ''
+  }
+
   return {
     noteList, currentNote, liveContent, folderList, searchQuery, activeTagFilter, activeFolderId,
-    searchedNoteList, filteredNoteList, allTags, sidebarStateRevision,
+    searchedNoteList, filteredNoteList, allTags, tagStats, sidebarStateRevision,
     tocVisible, tocJumpTarget, editorContentPush, pendingLargeFileSwitch,
     loadNoteList, openNote, createNote, createNoteWithContent, setLiveContent, setTocVisible,
     updateCurrentContent, deleteNote, renameNote, moveNote, requestTocJump, insertAutoToc,
     clearPendingLargeFileSwitch,
     createFolder, deleteFolder, renameFolder, moveFolder, getDeleteFolderImpact,
-    setActiveTagFilter, setNoteTags, toggleNotePinned,
+    setActiveTagFilter, setNoteTags, addTag, removeTag, toggleNotePinned, reorderNotes, getNoteContentById,
     exportLibraryBackup, downloadLibraryBackup, restoreLibraryBackup, notifySidebarStateChanged,
     batchImportFromFolder, clearAllLibraryData
   }

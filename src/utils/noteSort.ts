@@ -6,9 +6,14 @@ export function compareNotes(a: NoteListItem, b: NoteListItem): number {
   const pinB = b.pinned ? 1 : 0
   if (pinA !== pinB) return pinB - pinA
 
-  const orderA = a.sortOrder ?? 0
-  const orderB = b.sortOrder ?? 0
-  if (orderA !== orderB) return orderA - orderB
+  if (pinA === 1) return b.updatedAt - a.updatedAt
+
+  const hasOrderA = a.sortOrder != null
+  const hasOrderB = b.sortOrder != null
+  if (hasOrderA && hasOrderB && a.sortOrder !== b.sortOrder) {
+    return a.sortOrder! - b.sortOrder!
+  }
+  if (hasOrderA !== hasOrderB) return hasOrderA ? -1 : 1
 
   return b.updatedAt - a.updatedAt
 }
