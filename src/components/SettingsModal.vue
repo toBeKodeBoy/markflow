@@ -3,6 +3,7 @@
     <div class="modal settings-modal" role="dialog" aria-labelledby="settings-title">
       <div id="settings-title" class="modal-title">设置</div>
 
+      <div class="settings-modal-scroll">
       <label class="settings-option-row">
         <span class="settings-option-label">主题</span>
         <select v-model="draft.theme" class="settings-option-select">
@@ -84,6 +85,24 @@
             >
               选择目录…
             </button>
+            <button
+              v-if="autoBackupUtoolsMode"
+              type="button"
+              class="settings-path-btn"
+              data-testid="auto-backup-use-default-dir"
+              @click="useDefaultAutoBackupDirectory"
+            >
+              使用默认目录
+            </button>
+            <button
+              v-if="autoBackupUtoolsMode && autoBackupDraft.directoryPath"
+              type="button"
+              class="settings-path-btn"
+              data-testid="auto-backup-open-dir"
+              @click="openAutoBackupDirectory"
+            >
+              打开目录
+            </button>
           </div>
         </div>
         <label class="settings-option-row">
@@ -120,8 +139,14 @@
         >
           {{ autoBackupBusy ? '备份中…' : '立即备份' }}
         </button>
-        <p v-if="!autoBackupAvailable" class="settings-tip">
-          自动备份仅在 uTools 中可用，浏览器开发环境请使用下方手动导出。
+        <p v-if="autoBackupUnavailableReason" class="settings-tip">
+          {{ autoBackupUnavailableReason }}
+        </p>
+        <p v-else-if="autoBackupBrowserMode" class="settings-tip">
+          浏览器模式需授权备份目录；刷新页面后若备份失败，请重新选择目录。
+        </p>
+        <p v-else-if="autoBackupUtoolsMode" class="settings-tip">
+          uTools 模式默认备份到插件数据目录；启用后也可自定义目录，每次成功都会通知。
         </p>
         <p v-else class="settings-tip">启用后按设定间隔自动备份，每次成功都会通知。</p>
       </div>
@@ -157,10 +182,11 @@
         </button>
         <p class="settings-tip settings-tip-danger">删除全部笔记、文件夹与图片资源，不可恢复。</p>
       </div>
+      </div>
 
-      <div class="modal-actions">
-        <button class="btn-primary" @click="saveSettings">保存</button>
-        <button @click="onCancel">取消</button>
+      <div class="modal-actions settings-modal-actions">
+        <button type="button" class="btn-primary" @click="saveSettings">保存</button>
+        <button type="button" @click="onCancel">取消</button>
       </div>
     </div>
   </div>
@@ -175,7 +201,7 @@ import { useNoteStore } from '../stores/note'
 import { getAssetStorage } from '../composables/useAssetStorage'
 import { estimateStorageUsage } from '../utils/storageStats'
 import { exportBackupToFile, importBackupFromFile } from '../composables/useBackup'
-import { isAutoBackupAvailable, useAutoBackup } from '../composables/useAutoBackup'
+import { isAutoBackupAvailable, useAutoBackup, getAutoBackupUnavailableReason } from '../composables/useAutoBackup'
 import {
   AUTO_BACKUP_INTERVAL_OPTIONS,
   AUTO_BACKUP_MAX_COPIES_OPTIONS,
@@ -198,7 +224,10 @@ const store = useNoteStore()
 const autoBackup = useAutoBackup()
 const backupInputRef = ref<HTMLInputElement>()
 const storageStatsLabel = ref('')
-const autoBackupAvailable = isAutoBackupAvailable()
+const autoBackupAvailable = ref(isAutoBackupAvailable())
+const autoBackupUnavailableReason = ref(getAutoBackupUnavailableReason())
+const autoBackupBrowserMode = ref(false)
+const autoBackupUtoolsMode = ref(false)
 const autoBackupSnapshot = ref<AutoBackupSettings>(normalizeAutoBackupSettings())
 const draft = reactive<AppSettings>(storage.getSettings())
 const autoBackupDraft = reactive<AutoBackupSettings>(normalizeAutoBackupSettings(draft.autoBackup))
@@ -254,6 +283,10 @@ watch(
   () => props.visible,
   (open) => {
     if (!open) return
+    autoBackupAvailable.value = isAutoBackupAvailable()
+    autoBackupUnavailableReason.value = getAutoBackupUnavailableReason()
+    autoBackupBrowserMode.value = autoBackup.isBrowserMode()
+    autoBackupUtoolsMode.value = autoBackup.isUtoolsMode()
     const loaded = storage.getSettings()
     autoBackupSnapshot.value = normalizeAutoBackupSettings(loaded.autoBackup)
     draft.theme = loaded.theme
@@ -279,22 +312,34 @@ async function onAutoBackupEnabledChange() {
     persistAutoBackup()
     return
   }
-  if (!autoBackupDraft.directoryPath) {
-    const dir = autoBackup.selectDirectory()
-    if (!dir) {
-      autoBackupDraft.enabled = false
-      return
-    }
-    autoBackupDraft.directoryPath = dir
+  const dir = await autoBackup.ensureBackupDirectory({ prompt: false })
+  if (!dir) {
+    autoBackupDraft.enabled = false
+    showAppNotification('无法设置备份目录，请先选择目录或使用默认目录')
+    return
   }
+  autoBackupDraft.directoryPath = dir
   persistAutoBackup()
 }
 
-function selectAutoBackupDirectory() {
-  const dir = autoBackup.selectDirectory()
+async function selectAutoBackupDirectory() {
+  const dir = await autoBackup.selectDirectory()
   if (!dir) return
   autoBackupDraft.directoryPath = dir
   persistAutoBackup()
+}
+
+async function useDefaultAutoBackupDirectory() {
+  const dir = await autoBackup.useDefaultDirectory()
+  if (!dir) return
+  autoBackupDraft.directoryPath = dir
+  persistAutoBackup()
+}
+
+function openAutoBackupDirectory() {
+  if (!autoBackup.openBackupDirectory()) {
+    showAppNotification('无法打开备份目录')
+  }
 }
 
 async function runAutoBackupNow() {

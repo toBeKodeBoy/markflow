@@ -155,6 +155,16 @@ export interface MarkFlowBridge {
     dirPath: string,
     maxCopies: number
   ) => { ok: true; deleted: number } | { ok: false; reason: 'error' }
+  /** uTools 默认自动备份目录（appData/markflow-backups） */
+  getDefaultBackupDirectory?: () => string | null
+  /** 自动备份桥接能力探测 */
+  getAutoBackupCapabilities?: () => {
+    version: number
+    available: boolean
+    isDev: boolean
+  }
+  /** 在文件管理器中打开目录 */
+  openBackupDirectory?: (dirPath: string) => boolean
   getAssetIndex: () => AssetIndexItem[]
   saveAssetIndex: (index: AssetIndexItem[]) => void
   getAsset: (id: string) => AssetRecord | null

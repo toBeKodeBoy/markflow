@@ -242,6 +242,12 @@ window.markflow = {
     try {
       var fs = require('fs');
       var path = require('path');
+      if (!dirPath || !path.isAbsolute(dirPath)) {
+        return { ok: false, reason: 'error' };
+      }
+      if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+      }
       var fullPath = path.join(dirPath, filename);
       fs.writeFileSync(fullPath, content, 'utf-8');
       return { ok: true, path: fullPath };
@@ -254,6 +260,10 @@ window.markflow = {
     try {
       var fs = require('fs');
       var path = require('path');
+      if (!dirPath || !path.isAbsolute(dirPath)) {
+        return { ok: false, reason: 'error' };
+      }
+      if (!fs.existsSync(dirPath)) return { ok: true, deleted: 0 };
       if (maxCopies <= 0) return { ok: true, deleted: 0 };
       var entries = fs.readdirSync(dirPath)
         .filter(function (f) { return /^markflow-backup-\d{8}T\d{6}\.json$/.test(f); })
@@ -269,6 +279,42 @@ window.markflow = {
       return { ok: true, deleted: toDelete.length };
     } catch (e) {
       return { ok: false, reason: 'error' };
+    }
+  },
+
+  getDefaultBackupDirectory: function () {
+    try {
+      var fs = require('fs');
+      var path = require('path');
+      var base = utools.getPath('appData');
+      var dir = path.join(base, 'markflow-backups');
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      return dir;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  getAutoBackupCapabilities: function () {
+    return {
+      version: 1,
+      available: typeof this.selectBackupDirectory === 'function' &&
+        typeof this.writeBackupFileSilent === 'function' &&
+        typeof this.cleanOldBackupFiles === 'function' &&
+        typeof this.getDefaultBackupDirectory === 'function',
+      isDev: typeof utools.isDev === 'function' ? utools.isDev() : false
+    };
+  },
+
+  openBackupDirectory: function (dirPath) {
+    try {
+      if (!dirPath) return false;
+      utools.shellOpenPath(dirPath);
+      return true;
+    } catch (e) {
+      return false;
     }
   }
 };

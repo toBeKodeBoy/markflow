@@ -77,3 +77,12 @@ export function pickBackupFilesToDelete(filenames: string[], maxCopies: number):
   const sorted = [...backupFiles].sort((a, b) => b.localeCompare(a))
   return sorted.slice(maxCopies)
 }
+
+/** uTools 自动备份目录必须是可写盘的绝对路径 */
+export function isValidUtoolsBackupDirectory(dirPath?: string | null): boolean {
+  if (!dirPath) return false
+  if (/^[a-zA-Z]:[\\/]/.test(dirPath)) return true
+  if (dirPath.startsWith('\\\\')) return true
+  if (dirPath.startsWith('/')) return true
+  return false
+}

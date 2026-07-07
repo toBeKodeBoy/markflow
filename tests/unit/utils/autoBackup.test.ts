@@ -4,6 +4,7 @@ import {
   DEFAULT_AUTO_BACKUP_SETTINGS,
   formatAutoBackupFilename,
   isAutoBackupDue,
+  isValidUtoolsBackupDirectory,
   normalizeAutoBackupSettings,
   pickBackupFilesToDelete,
 } from '../../../src/utils/autoBackup'
@@ -73,5 +74,11 @@ describe('autoBackup utils', () => {
 
   it('exposes 24h as default interval option', () => {
     expect(AUTO_BACKUP_INTERVAL_OPTIONS.some((item) => item.value === 24)).toBe(true)
+  })
+
+  it('validates uTools absolute backup directory', () => {
+    expect(isValidUtoolsBackupDirectory('D:\\Backup\\MarkFlow')).toBe(true)
+    expect(isValidUtoolsBackupDirectory('downloads')).toBe(false)
+    expect(isValidUtoolsBackupDirectory('/var/backups')).toBe(true)
   })
 })

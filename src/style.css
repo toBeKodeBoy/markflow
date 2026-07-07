@@ -839,6 +839,8 @@ input:focus { border-color: var(--primary); }
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  padding: 24px 16px;
+  overflow-y: auto;
 }
 
 .modal {
@@ -904,7 +906,32 @@ input:focus { border-color: var(--primary); }
   border-radius: var(--radius);
 }
 
-.settings-modal { min-width: 340px; }
+.settings-modal {
+  min-width: 340px;
+  max-width: min(420px, 100%);
+  max-height: min(92vh, 760px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin: auto;
+}
+
+.settings-modal-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.settings-modal-actions {
+  flex-shrink: 0;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  position: relative;
+  z-index: 1;
+  background: var(--bg-editor);
+}
 
 .settings-option-row {
   display: flex;

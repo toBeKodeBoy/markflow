@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { isAutoBackupAvailable, useAutoBackup } from '../../../src/composables/useAutoBackup'
+import { isAutoBackupAvailable, useAutoBackup, isUtoolsEnvironment, hasUtoolsAutoBackupBridge } from '../../../src/composables/useAutoBackup'
 
 describe('useAutoBackup', () => {
   beforeEach(() => {
@@ -27,6 +27,9 @@ describe('useAutoBackup', () => {
       },
       showNotification: vi.fn(),
       selectBackupDirectory: vi.fn(() => 'D:\\Backup\\MarkFlow'),
+      getDefaultBackupDirectory: vi.fn(() => 'C:\\Users\\Tester\\AppData\\Roaming\\markflow-backups'),
+      getAutoBackupCapabilities: vi.fn(() => ({ version: 1, available: true, isDev: false })),
+      openBackupDirectory: vi.fn(() => true),
       writeBackupFileSilent: vi.fn(() => ({ ok: true, path: 'D:\\Backup\\MarkFlow\\markflow-backup.json' })),
       cleanOldBackupFiles: vi.fn(() => ({ ok: true, deleted: 0 })),
       getAssetIndex: () => [],
@@ -82,5 +85,39 @@ describe('useAutoBackup', () => {
     expect(saved.lastBackupStatus).toBe('success')
     expect(saved.lastBackupAt).toBeTypeOf('number')
     expect(saved.lastBackupError).toBe('清理旧备份失败')
+  })
+
+  it('does not use browser fallback when uTools bridge exists without backup APIs', () => {
+    vi.stubGlobal('showDirectoryPicker', vi.fn())
+    vi.stubGlobal('markflow', {
+      getSettings: () => ({}),
+      saveSettings: vi.fn(),
+    })
+    expect(isUtoolsEnvironment()).toBe(true)
+    expect(hasUtoolsAutoBackupBridge()).toBe(false)
+    expect(isAutoBackupAvailable()).toBe(false)
+  })
+
+  it('rejects invalid uTools directory path saved from browser mode', async () => {
+    const autoBackup = useAutoBackup()
+    autoBackup.saveSettings({
+      enabled: true,
+      intervalHours: 24,
+      maxCopies: 10,
+      directoryPath: 'downloads',
+    })
+
+    expect(autoBackup.getSettings().directoryPath).toBeUndefined()
+
+    const ok = await autoBackup.runBackup({ force: true })
+    expect(ok).toBe(true)
+    expect(window.markflow.getDefaultBackupDirectory).toHaveBeenCalled()
+    expect(window.markflow.writeBackupFileSilent).toHaveBeenCalled()
+  })
+
+  it('uses default uTools directory when enabled without custom path', async () => {
+    const autoBackup = useAutoBackup()
+    const dir = await autoBackup.ensureBackupDirectory({ prompt: false })
+    expect(dir).toBe('C:\\Users\\Tester\\AppData\\Roaming\\markflow-backups')
   })
 })
