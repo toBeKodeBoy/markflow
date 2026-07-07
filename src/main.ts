@@ -2,11 +2,11 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import './style.css'
+import 'katex/dist/katex.min.css'
 
 // 静态 ?inline 导入 —— 在构建时内联为字符串，同步可用，无异步时序问题
 import lightHljsCss from 'highlight.js/styles/github.css?inline'
 import darkHljsCss from 'highlight.js/styles/github-dark.css?inline'
-import katexCss from 'katex/dist/katex.min.css?inline'
 
 /** 根据 data-theme 注入对应 highlight.js 语法高亮主题 */
 function loadHljsTheme(theme: string) {
@@ -23,14 +23,6 @@ function loadHljsTheme(theme: string) {
 // 初始加载（在 app.mount 之前同步执行）
 const currentTheme = document.documentElement.getAttribute('data-theme') || 'light'
 loadHljsTheme(currentTheme)
-
-const katexStyleId = 'katex-theme'
-if (!document.getElementById(katexStyleId)) {
-  const katexStyle = document.createElement('style')
-  katexStyle.id = katexStyleId
-  katexStyle.textContent = katexCss
-  document.head.appendChild(katexStyle)
-}
 
 // 监听 data-theme 变化自动切换
 const observer = new MutationObserver(() => {
