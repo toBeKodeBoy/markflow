@@ -1,6 +1,7 @@
 <template>
   <div class="editor-pane wysiwyg-pane">
     <FormatToolbar
+      v-if="!focusMode"
       :char-count="charCount"
       @bold="onToolbarBold"
       @italic="onToolbarItalic"
@@ -17,8 +18,20 @@
       @table="onToolbarTable"
       @link="onToolbarLink"
     />
-    <NoteTagsBar />
+    <NoteTagsBar v-if="!focusMode" />
     <div ref="containerRef" :class="['milkdown-host', { 'milkdown-dark': isDark }]"></div>
+    <FocusFormatToolbar
+      v-if="focusMode"
+      :visible="focusToolbarVisible"
+      @mouseenter="onFocusToolbarEnter"
+      @mouseleave="onFocusToolbarLeave"
+      @bold="onToolbarBold"
+      @italic="onToolbarItalic"
+      @h1="onToolbarH1"
+      @h2="onToolbarH2"
+      @bullet-list="onToolbarBulletList"
+      @ordered-list="onToolbarOrderedList"
+    />
   </div>
 </template>
 
@@ -54,7 +67,9 @@ import { handleImageLightboxDblClick } from '../utils/imageLightbox'
 import { handlePreviewFragmentClick } from '../utils/previewFragmentNav'
 import { resolveMarkdownForDisplay, persistMarkdownAssets } from '../utils/resolveMarkdownAssets'
 import FormatToolbar from './FormatToolbar.vue'
+import FocusFormatToolbar from './FocusFormatToolbar.vue'
 import NoteTagsBar from './NoteTagsBar.vue'
+import { useFocusToolbarVisibility } from '../composables/useFocusToolbarVisibility'
 import {
   wysiwygToggleBold,
   wysiwygToggleItalic,
@@ -96,11 +111,17 @@ function sanitizePastedHTML(html: string): string {
   return body.innerHTML
 }
 
+const props = defineProps<{ focusMode?: boolean }>()
+
 const store = useNoteStore()
 const containerRef = ref<HTMLDivElement>()
 let editor: Editor | null = null
 
 const charCount = computed(() => store.liveContent.length || store.currentNote?.content.length || 0)
+
+const focusModeEnabled = computed(() => props.focusMode === true)
+const { visible: focusToolbarVisible, onToolbarEnter: onFocusToolbarEnter, onToolbarLeave: onFocusToolbarLeave } =
+  useFocusToolbarVisibility(focusModeEnabled)
 
 function onToolbarBold() { wysiwygToggleBold(editor) }
 function onToolbarItalic() { wysiwygToggleItalic(editor) }

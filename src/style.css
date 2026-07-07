@@ -2002,6 +2002,59 @@ input:focus { border-color: var(--primary); }
   display: none;
 }
 
+.focus-format-toolbar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: var(--bg-toolbar);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  z-index: 100;
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.focus-format-toolbar.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(12px);
+}
+
+.focus-format-toolbar button {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.focus-format-toolbar button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.focus-format-toolbar .sep {
+  color: var(--border);
+  padding: 0 2px;
+  user-select: none;
+}
+
+.mode-focus .editor-toolbar,
+.mode-focus .note-tags-bar {
+  display: none;
+}
+
 .mode-split .editor-pane {
   flex: 1;
   min-width: 0;

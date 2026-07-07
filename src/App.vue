@@ -38,7 +38,7 @@
 
       <Sidebar v-if="showSidebar" />
 
-      <WysiwygEditor v-if="viewMode === 'live' || viewMode === 'focus'" :key="'wysiwyg-' + viewMode" />
+      <WysiwygEditor v-if="viewMode === 'live' || viewMode === 'focus'" :key="'wysiwyg-' + viewMode" :focus-mode="viewMode === 'focus'" />
 
       <template v-else>
 
