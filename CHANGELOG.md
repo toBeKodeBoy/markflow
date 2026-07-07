@@ -12,28 +12,31 @@
 
 ---
 
-## [1.1.0] — 2026-07-05
+## [1.1.0] — 2026-07-07
 
-> 组织与检索：文件夹导入、侧栏树、备份恢复、标签过滤与置顶排序。
+> 组织与检索：搜索增强、标签、排序置顶、数据备份 v2 与清空入口。
 
 ### Added
 
-- 导入文件夹：批量导入 Markdown / 文本 / 代码文件，可选保留目录结构、导入图片、导入选项记忆
-- 侧栏文件夹树：多级目录、右键菜单、拖拽移动、笔记数量角标、展开状态持久化
-- 侧栏虚拟列表（>150 行）与搜索/标签过滤时自动展开匹配路径
-- 标签过滤 chips（搜索亦匹配标签）；笔记置顶与 `sortOrder` 排序
-- 数据备份导出 / 从 JSON 恢复（含侧栏展开与选中状态；不含图片资源）
+- **全文搜索增强**：标题 + 正文 + 标签联合搜索；匹配摘要高亮；300ms 防抖；搜索模式 UI（`SearchBar` / `SearchResultsList`）
+- **标签系统**：`TagInput` 编辑（Enter/逗号添加、自动补全）；编辑器顶栏 `NoteTagsBar`；侧栏标签过滤与标签云；`tagNormalize` 规范化（去重、最长 20 字符）
+- **笔记排序**：置顶/取消置顶；同文件夹内拖拽重排；`sortOrder` 懒迁移（`migrateNoteSortOrder`）
+- **导入文件夹**：批量导入 Markdown / 文本 / 代码文件，可选保留目录结构、导入图片、导入选项记忆
+- **侧栏文件夹树**：多级目录、右键菜单、拖拽移动、笔记数量角标、展开状态持久化；虚拟列表（>150 行）
+- **数据备份 v2**：JSON 导出/恢复含笔记、文件夹、设置与**图片资产**；uTools 原生保存/打开对话框；设置页存储用量估算
+- **清空全部数据**：设置 → 数据管理 → 二次确认后清空笔记/文件夹/图片（保留应用设置）
+- Store API：`addTag` / `removeTag` / `reorderNotes` / `toggleNotePinned` / `clearAllLibraryData`
 - 导入笔记标题默认使用文件名；`importSourcePath` 防止编辑时被正文标题覆盖
 
 ### Changed
 
+- 笔记列表排序：置顶 > `sortOrder` > `updatedAt`（置顶组内按 `updatedAt` 倒序）
 - 删除文件夹时笔记移至父文件夹（根级文件夹则移回根目录）
-- 笔记列表排序：置顶 > sortOrder > updatedAt
 - TOC 滚动高亮按视图模式绑定正确容器（预览 / 分屏）
+- 备份恢复前清空旧图片资源，恢复后重建搜索索引
 
 ### Fixed
 
-- 备份恢复前清空旧图片资源，避免残留与链接失效
 - 导入到「当前文件夹 / 新建文件夹」的目标路径误选
 - 备份恢复后侧栏展开状态不刷新
 - 导入失败回滚时在浏览器环境正确删除 IndexedDB 图片
@@ -93,8 +96,7 @@
 
 ---
 
-<!-- 链接定义：发版后将 TBD 替换为实际日期，并保留比较链接 -->
-[Unreleased]: https://github.com/toBeKodeBoy/markflow/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/toBeKodeBoy/markflow/compare/v1.1.0...HEAD
 [1.1.0]: https://github.com/toBeKodeBoy/markflow/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/toBeKodeBoy/markflow/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/toBeKodeBoy/markflow/compare/v0.0.1...v1.0.0
