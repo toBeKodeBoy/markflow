@@ -6,9 +6,14 @@
 
 ### Added
 
-### Changed
+- **LaTeX 数学公式**：行内 `$...$` 与块级 `$$...$$`，预览与 WYSIWYG 使用 KaTeX 渲染
+- **专注模式浮动格式工具栏**：专注写作时在编辑区上方显示快捷格式按钮
+- **Mermaid 图示**：` ```mermaid ` 围栏代码块，分屏预览 hydrate 为 SVG，WYSIWYG 实时代码块预览
 
 ### Fixed
+
+- Mermaid 流程图节点标签被 DOMPurify 剥离导致文字不显示
+- Mermaid 块复制（hydrate 前后）、主题切换后图示刷新、WYSIWYG 异步预览竞态
 
 ---
 
