@@ -39,6 +39,7 @@ import { imagePaste } from '../plugins/imagePaste'
 import { imageScalePlugin } from '../plugins/imageScale'
 import { plainTextFallback } from '../plugins/plainTextFallback'
 import { highlightMarkPlugins } from '../plugins/highlightMark'
+import { mathPlugins } from '../plugins/math'
 import { underlineMarkPlugins } from '../plugins/underlineMark'
 import { htmlRenderPlugins } from '../plugins/htmlRender'
 import { codeBlockLabelPlugin, codeBlockExitPlugin } from '../plugins/codeBlockLabel'
@@ -176,6 +177,7 @@ async function initEditor(content: string) {
       .use(codeBlockExitPlugin)
       .use(commonmark)
       .use(gfm)
+      .use(mathPlugins)
       .use(highlightMarkPlugins)
       .use(underlineMarkPlugins)
       .use(htmlRenderPlugins)

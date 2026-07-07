@@ -1,7 +1,7 @@
 {
   "pluginName": "MarkFlow - Markdown笔记",
   "description": "随叫随到的本地Markdown编辑器，支持实时预览、多文档管理和导出",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "logo": "logo.png",
   "main": "index.html",
   "preload": "preload.js",

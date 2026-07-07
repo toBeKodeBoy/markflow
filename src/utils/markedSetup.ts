@@ -5,6 +5,7 @@ import { sanitizeRenderedHtml } from './sanitizeHtml'
 import { COPY_TEXT } from './codeCopy'
 import { renderImageHtml } from './imageScale'
 import { HeadingSlugger } from './headingSlug'
+import { renderBlockMath, renderInlineMath } from './mathRender'
 
 const headingSlugger = new HeadingSlugger()
 
@@ -20,9 +21,11 @@ export function normalizeHtmlMarkdown(md: string): string {
   return md.replace(/\\<(\/?[a-z][\w-]*(?:\s[^>]*)?)>/gi, '<$1>')
 }
 
+import { normalizeBlockMathMarkdown } from './normalizeBlockMath'
+
 /** 编辑器 / 预览解析前统一规范化 */
 export function normalizeMarkdownForParse(md: string): string {
-  return normalizeHtmlMarkdown(normalizeUnderlineMarkdown(md))
+  return normalizeBlockMathMarkdown(normalizeHtmlMarkdown(normalizeUnderlineMarkdown(md)))
 }
 
 /** marked 内联扩展：支持 ==高亮== 语法 */
@@ -194,8 +197,51 @@ const taskCheckboxRenderer: RendererExtension = {
   },
 }
 
+/** 块级公式：$$...$$ */
+const mathBlockExtension: TokenizerAndRendererExtension = {
+  name: 'mathBlock',
+  level: 'block',
+  start(src) {
+    const idx = src.indexOf('$$')
+    return idx >= 0 ? idx : undefined
+  },
+  tokenizer(src) {
+    const match = /^\$\$([\s\S]+?)\$\$/.exec(src)
+    if (!match) return undefined
+    const text = match[1].trim()
+    if (!text) return undefined
+    return { type: 'mathBlock', raw: match[0], text }
+  },
+  renderer(token) {
+    return `<div class="math-block">${renderBlockMath(token.text)}</div>\n`
+  },
+}
+
+/** 行内公式：$...$（跳过货币 $5） */
+const mathInlineExtension: TokenizerAndRendererExtension = {
+  name: 'mathInline',
+  level: 'inline',
+  start(src) {
+    if (src.startsWith('$$')) return undefined
+    const idx = src.indexOf('$')
+    return idx >= 0 ? idx : undefined
+  },
+  tokenizer(src) {
+    if (src.startsWith('$$')) return undefined
+    const match = /^\$([^$\n]+?)\$/.exec(src)
+    if (!match) return undefined
+    if (/^\d/.test(match[1])) return undefined
+    return { type: 'mathInline', raw: match[0], text: match[1] }
+  },
+  renderer(token) {
+    return renderInlineMath(token.text)
+  },
+}
+
 marked.use({
   extensions: [
+    mathBlockExtension,
+    mathInlineExtension,
     highlightMarkExtension,
     underlineHtmlExtension,
     headingRenderer,
