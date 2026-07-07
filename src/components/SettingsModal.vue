@@ -42,6 +42,7 @@
 
       <div class="settings-section">
         <div class="settings-section-title">数据管理</div>
+        <p v-if="storageStatsLabel" class="settings-storage-stats">{{ storageStatsLabel }}</p>
         <button type="button" class="settings-action-btn" @click="emit('import-folder')">
           导入文件夹…
         </button>
@@ -59,7 +60,7 @@
           class="settings-hidden-input"
           @change="onBackupFileSelected"
         />
-        <p class="settings-tip">备份包含全部笔记、文件夹与侧栏展开状态（不含图片资源）。</p>
+        <p class="settings-tip">备份包含全部笔记、文件夹、侧栏状态与图片资源。</p>
       </div>
 
       <div class="modal-actions">
@@ -76,6 +77,9 @@ import type { AppSettings } from '../types'
 import { clampFontSize, EDITOR_FONT_OPTIONS } from '../composables/useAppSettings'
 import { useStorage } from '../composables/useStorage'
 import { useNoteStore } from '../stores/note'
+import { getAssetStorage } from '../composables/useAssetStorage'
+import { estimateStorageUsage } from '../utils/storageStats'
+import { exportBackupToFile, importBackupFromFile } from '../composables/useBackup'
 import { showAppNotification } from '../utils/notify'
 
 const props = defineProps<{ visible: boolean }>()
@@ -90,7 +94,16 @@ const emit = defineEmits<{
 const storage = useStorage()
 const store = useNoteStore()
 const backupInputRef = ref<HTMLInputElement>()
+const storageStatsLabel = ref('')
 const draft = reactive<AppSettings>(storage.getSettings())
+
+async function refreshStorageStats() {
+  const stats = await estimateStorageUsage(storage, {
+    getIndex: () => getAssetStorage().getAssetIndex(),
+    getAsset: (id) => getAssetStorage().getAssetAsync(id),
+  })
+  storageStatsLabel.value = `共 ${stats.noteCount} 篇笔记 · ${stats.assetCount} 张图片 · 约 ${stats.estimatedLabel}`
+}
 
 watch(
   () => props.visible,
@@ -103,6 +116,7 @@ watch(
     draft.previewVisible = loaded.previewVisible
     draft.sidebarVisible = loaded.sidebarVisible
     draft.pdfExport = loaded.pdfExport
+    void refreshStorageStats()
   }
 )
 
@@ -115,13 +129,38 @@ function saveSettings() {
   })
 }
 
-function exportBackup() {
-  store.downloadLibraryBackup()
-  showAppNotification('备份已开始下载')
+async function exportBackup() {
+  const backup = await store.exportLibraryBackup()
+  const json = JSON.stringify(backup, null, 2)
+  const name = `markflow-backup-${new Date(backup.exportedAt).toISOString().slice(0, 10)}.json`
+  const result = exportBackupToFile(json, name)
+  if (result.ok) {
+    showAppNotification(result.path ? `备份已保存：${result.path}` : '备份已开始下载')
+  } else if (result.reason !== 'cancel') {
+    showAppNotification('备份导出失败')
+  }
 }
 
 function triggerImportBackup() {
-  backupInputRef.value?.click()
+  const result = importBackupFromFile()
+  if (result.ok) {
+    void restoreFromText(result.content)
+    return
+  }
+  if (result.reason === 'fallback') {
+    backupInputRef.value?.click()
+  }
+}
+
+async function restoreFromText(text: string) {
+  try {
+    if (!window.confirm('从备份恢复将替换当前全部笔记与文件夹，并清除本地图片资源，是否继续？')) return
+    await store.restoreLibraryBackup(text)
+    showAppNotification('备份已恢复')
+    emit('backup-restored')
+  } catch (err) {
+    showAppNotification(err instanceof Error ? err.message : '备份恢复失败')
+  }
 }
 
 function onBackupFileSelected(e: Event) {
@@ -131,15 +170,8 @@ function onBackupFileSelected(e: Event) {
   if (!file) return
   const reader = new FileReader()
   reader.onload = async () => {
-    try {
-      const text = String(reader.result ?? '')
-      if (!window.confirm('从备份恢复将替换当前全部笔记与文件夹，并清除本地图片资源，是否继续？')) return
-      await store.restoreLibraryBackup(text)
-      showAppNotification('备份已恢复（图片需重新粘贴或导入）')
-      emit('backup-restored')
-    } catch (err) {
-      showAppNotification(err instanceof Error ? err.message : '备份恢复失败')
-    }
+    const text = String(reader.result ?? '')
+    await restoreFromText(text)
   }
   reader.readAsText(file)
 }

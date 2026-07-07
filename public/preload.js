@@ -200,6 +200,33 @@ window.markflow = {
 
   removeAsset: function (id) {
     utools.dbStorage.removeItem('markflow_asset_' + id);
+  },
+
+  saveBackupFile: function (jsonString, defaultName) {
+    var path = utools.showSaveDialog({
+      title: '导出 MarkFlow 备份',
+      defaultPath: defaultName,
+      filters: [{ name: 'MarkFlow Backup', extensions: ['json'] }]
+    });
+    if (!path) return { ok: false, reason: 'cancel' };
+    try {
+      require('fs').writeFileSync(path, jsonString, 'utf-8');
+      return { ok: true, path: path };
+    } catch (e) {
+      return { ok: false, reason: 'error' };
+    }
+  },
+
+  openBackupFile: function () {
+    var paths = utools.showOpenDialog({
+      title: '从备份恢复',
+      filters: [{ name: 'MarkFlow Backup', extensions: ['json'] }],
+      properties: ['openFile']
+    });
+    if (paths && paths.length > 0) {
+      return require('fs').readFileSync(paths[0], 'utf-8');
+    }
+    return null;
   }
 };
 

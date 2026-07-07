@@ -45,6 +45,14 @@ export interface NoteListItem {
   sortOrder?: number
 }
 
+/** 标签云统计项（全局频率，非搜索结果内） */
+export interface TagStat {
+  tag: string
+  count: number
+  /** 0–1，相对最大 count */
+  weight: number
+}
+
 export interface TocJumpTarget {
   line: number
   index: number
@@ -85,6 +93,8 @@ export interface AppSettings {
   sidebarActiveFolderId?: string | null
   /** PDF 导出选项（可选，缺省用默认值） */
   pdfExport?: PdfExportOptions
+  /** 侧栏标签云折叠（未设置时：标签 ≤3 默认折叠） */
+  sidebarTagCloudCollapsed?: boolean
 }
 
 // uTools preload bridge type
@@ -111,6 +121,11 @@ export interface MarkFlowBridge {
   isDarkTheme: () => boolean
   hideMainWindow: () => void
   copyText: (text: string) => boolean
+  saveBackupFile: (
+    jsonString: string,
+    defaultName: string
+  ) => { ok: true; path: string } | { ok: false; reason: 'cancel' | 'error' }
+  openBackupFile: () => string | null
   getAssetIndex: () => AssetIndexItem[]
   saveAssetIndex: (index: AssetIndexItem[]) => void
   getAsset: (id: string) => AssetRecord | null

@@ -1,14 +1,10 @@
 <template>
   <aside class="sidebar" :style="{ width: sidebarWidth + 'px' }">
-    <div class="sidebar-search">
-      <input
-        v-model="store.searchQuery"
-        type="text"
-        placeholder="搜索标题、正文或标签..."
-        class="search-input"
-        aria-label="搜索笔记"
-      />
-    </div>
+    <SearchBar
+      ref="searchBarRef"
+      :show-count="isSearchMode"
+      :result-count="searchResultNotes.length"
+    />
 
     <div v-if="store.allTags.length" class="sidebar-tags">
       <button
@@ -20,12 +16,12 @@
         v-for="tag in store.allTags"
         :key="tag"
         class="sidebar-tag"
-        :class="{ active: store.activeTagFilter === tag }"
-        @click="store.setActiveTagFilter(store.activeTagFilter === tag ? null : tag)"
+        :class="{ active: isTagFilterActive(tag) }"
+        @click="onTagClick(tag)"
       >{{ tag }}</button>
     </div>
 
-    <div class="sidebar-section">
+    <div v-if="!isSearchMode" class="sidebar-section">
       <div class="section-header" @click="clearActiveFolder">
         <span class="section-icon"><AppIcon name="file" :size="14" /></span>
         <span class="section-title">全部笔记</span>
@@ -33,7 +29,7 @@
       </div>
     </div>
 
-    <div class="sidebar-section folders-section">
+    <div v-if="!isSearchMode" class="sidebar-section folders-section">
       <div class="section-header folders-header">
         <span class="section-icon"><AppIcon name="folder" :size="14" /></span>
         <span class="section-title">文件夹</span>
@@ -87,6 +83,8 @@
               :renaming-folder-id="renamingFolderId"
               v-model:renaming-folder-name="renamingFolderName"
               :drag-over-folder-id="dragOverFolderId"
+              :drag-over-note-id="dragOverNoteId"
+              :drag-over-note-position="dragOverNotePosition"
               virtual
               :virtual-style="{ top: (virtualStart + i) * SIDEBAR_ROW_HEIGHT + 'px' }"
               @folder-click="onFolderClick"
@@ -96,11 +94,15 @@
               @cancel-rename-folder="renamingFolderId = null"
               @start-rename-folder="startRenameFolder"
               @note-click="store.openNote"
+              @tag-click="onTagClick"
               @note-context="openNoteContextMenu"
               @drag-start="onDragStart"
               @drag-over-folder="onFolderDragOver"
               @drag-leave-folder="dragOverFolderId = null"
               @drop-on-folder="onDropOnFolder"
+              @drag-over-note="onNoteDragOver"
+              @drag-leave-note="onNoteDragLeave"
+              @drop-on-note="onDropOnNote"
             />
           </template>
         </div>
@@ -116,6 +118,8 @@
             :renaming-folder-id="renamingFolderId"
             v-model:renaming-folder-name="renamingFolderName"
             :drag-over-folder-id="dragOverFolderId"
+            :drag-over-note-id="dragOverNoteId"
+            :drag-over-note-position="dragOverNotePosition"
             @folder-click="onFolderClick"
             @toggle-expand="toggleExpand"
             @folder-context="openFolderContextMenu"
@@ -123,11 +127,15 @@
             @cancel-rename-folder="renamingFolderId = null"
             @start-rename-folder="startRenameFolder"
             @note-click="store.openNote"
+            @tag-click="onTagClick"
             @note-context="openNoteContextMenu"
             @drag-start="onDragStart"
             @drag-over-folder="onFolderDragOver"
             @drag-leave-folder="dragOverFolderId = null"
             @drop-on-folder="onDropOnFolder"
+            @drag-over-note="onNoteDragOver"
+            @drag-leave-note="onNoteDragLeave"
+            @drop-on-note="onDropOnNote"
           />
         </template>
 
@@ -136,6 +144,28 @@
         </div>
       </div>
     </div>
+
+    <div v-else class="sidebar-section search-results-section">
+      <SearchResultsList
+        :notes="searchResultNotes"
+        :query="store.searchQuery"
+        :folders="store.folderList"
+        :current-note-id="store.currentNote?.id"
+        :folder-scope-label="searchFolderScopeLabel"
+        :get-content="store.getNoteContentById"
+        @select="store.openNote"
+        @clear="onClearSearch"
+      />
+    </div>
+
+    <TagCloudPanel
+      v-if="store.tagStats.length"
+      :tags="store.tagStats"
+      :active-tag="store.activeTagFilter"
+      :collapsed="tagCloudCollapsed"
+      @select="onTagClick"
+      @toggle-collapse="toggleTagCloudCollapsed"
+    />
 
     <div class="sidebar-resizer" title="拖拽调整宽度" @mousedown="startResize" />
 
@@ -278,7 +308,12 @@ import {
 import { buildTreeIndex } from '../utils/treeIndex'
 import AppIcon from './AppIcon.vue'
 import SidebarTreeRowView from './SidebarTreeRow.vue'
+import SearchBar from './SearchBar.vue'
+import SearchResultsList from './SearchResultsList.vue'
+import TagCloudPanel from './TagCloudPanel.vue'
 import { useAppSettings, clampSidebarWidth } from '../composables/useAppSettings'
+import { useNoteSort } from '../composables/useNoteSort'
+import { sortNotes } from '../utils/noteSort'
 
 const SIDEBAR_ROW_HEIGHT = 42
 const VIRTUAL_THRESHOLD = 150
@@ -293,6 +328,7 @@ const newFolderName = ref('')
 const newFolderParentId = ref<string | undefined>(undefined)
 const folderInputRef = ref<HTMLInputElement>()
 const treeRef = ref<HTMLElement>()
+const searchBarRef = ref<InstanceType<typeof SearchBar>>()
 const scrollTop = ref(0)
 
 const renamingFolderId = ref<string | null>(null)
@@ -308,12 +344,42 @@ const movingFolderParentId = ref<string | undefined>(undefined)
 const deleteFolderTarget = ref<{ id: string; impact: FolderDeleteImpact } | null>(null)
 const expandedFolderIds = ref(new Set<string>())
 
+const TAG_CLOUD_AUTO_COLLAPSE_THRESHOLD = 3
+
+function resolveTagCloudCollapsed(tagCount: number): boolean {
+  const saved = appSettings.get().sidebarTagCloudCollapsed
+  if (saved !== undefined) return saved
+  return tagCount <= TAG_CLOUD_AUTO_COLLAPSE_THRESHOLD
+}
+
+const tagCloudCollapsed = ref(resolveTagCloudCollapsed(store.tagStats.length))
+
 const dragPayload = ref<{ kind: 'note' | 'folder'; id: string } | null>(null)
 const dragOverFolderId = ref<string | null>(null)
+const dragOverNoteId = ref<string | null>(null)
+const dragOverNotePosition = ref<'before' | 'after' | null>(null)
 const dragOverRoot = ref(false)
 
+const noteSort = useNoteSort({
+  getSiblings: (noteId) => {
+    const note = store.noteList.find((n) => n.id === noteId)
+    const folderId = note?.folderId
+    return sortNotes(store.noteList.filter((n) => n.folderId === folderId))
+  },
+  onReorder: (folderId, orderedIds) => store.reorderNotes(folderId, orderedIds),
+})
+
 const treeIndex = computed(() => buildTreeIndex(store.folderList, store.searchedNoteList))
-const isSearching = computed(() => store.searchQuery.trim().length > 0 || !!store.activeTagFilter)
+const isSearchMode = computed(() => store.searchQuery.trim().length > 0)
+const isSearching = computed(() => isSearchMode.value || !!store.activeTagFilter)
+
+const searchResultNotes = computed(() => store.filteredNoteList)
+
+const searchFolderScopeLabel = computed(() => {
+  if (!store.activeFolderId) return ''
+  const label = getFolderPathLabel(store.folderList, store.activeFolderId)
+  return label ? `文件夹：${label}` : ''
+})
 
 const sidebarRows = computed(() =>
   flattenSidebarTree(store.folderList, store.searchedNoteList, expandedFolderIds.value, {
@@ -379,6 +445,27 @@ function persistSidebarState() {
 function clearActiveFolder() {
   store.activeFolderId = null
   persistSidebarState()
+}
+
+function onClearSearch() {
+  searchBarRef.value?.clearSearch()
+}
+
+function isTagFilterActive(tag: string): boolean {
+  return store.activeTagFilter?.toLowerCase() === tag.toLowerCase()
+}
+
+function onTagClick(tag: string) {
+  if (isTagFilterActive(tag)) {
+    store.setActiveTagFilter(null)
+  } else {
+    store.setActiveTagFilter(tag)
+  }
+}
+
+function toggleTagCloudCollapsed() {
+  tagCloudCollapsed.value = !tagCloudCollapsed.value
+  appSettings.save({ sidebarTagCloudCollapsed: tagCloudCollapsed.value })
 }
 
 function onTreeScroll(e: Event) {
@@ -569,6 +656,32 @@ function deleteNote(id: string) {
 
 function onDragStart(payload: { kind: 'note' | 'folder'; id: string }) {
   dragPayload.value = payload
+}
+
+function onNoteDragOver(noteId: string, position: 'before' | 'after') {
+  if (dragPayload.value?.kind !== 'note') return
+  if (dragPayload.value.id === noteId) return
+  dragOverNoteId.value = noteId
+  dragOverNotePosition.value = position
+}
+
+function onNoteDragLeave() {
+  dragOverNoteId.value = null
+  dragOverNotePosition.value = null
+}
+
+function onDropOnNote(targetId: string, position: 'before' | 'after') {
+  dragOverNoteId.value = null
+  dragOverNotePosition.value = null
+  const payload = dragPayload.value
+  dragPayload.value = null
+  if (!payload || payload.kind !== 'note' || payload.id === targetId) return
+
+  const dragged = store.noteList.find((n) => n.id === payload.id)
+  const target = store.noteList.find((n) => n.id === targetId)
+  if (!dragged || !target || dragged.folderId !== target.folderId) return
+
+  noteSort.handleNoteDrop(payload.id, targetId, position, dragged.folderId)
 }
 
 function onFolderDragOver(folderId: string) {

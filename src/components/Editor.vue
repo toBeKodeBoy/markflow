@@ -17,6 +17,7 @@
       @table="insertTable()"
       @link="insertMarkdown('[', '](url)', '链接文字')"
     />
+    <NoteTagsBar />
     <div ref="editorEl" class="cm-host"></div>
   </div>
 </template>
@@ -34,6 +35,7 @@ import { getImageFileFromDataTransfer, handleImageInsert } from '../utils/imageI
 import { useNoteStore } from '../stores/note'
 import { useScrollSync } from '../composables/useScrollSync'
 import FormatToolbar from './FormatToolbar.vue'
+import NoteTagsBar from './NoteTagsBar.vue'
 
 const store = useNoteStore()
 const { setRatio } = useScrollSync()

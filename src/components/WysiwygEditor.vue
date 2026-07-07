@@ -17,6 +17,7 @@
       @table="onToolbarTable"
       @link="onToolbarLink"
     />
+    <NoteTagsBar />
     <div ref="containerRef" :class="['milkdown-host', { 'milkdown-dark': isDark }]"></div>
   </div>
 </template>
@@ -52,6 +53,7 @@ import { handleImageLightboxDblClick } from '../utils/imageLightbox'
 import { handlePreviewFragmentClick } from '../utils/previewFragmentNav'
 import { resolveMarkdownForDisplay, persistMarkdownAssets } from '../utils/resolveMarkdownAssets'
 import FormatToolbar from './FormatToolbar.vue'
+import NoteTagsBar from './NoteTagsBar.vue'
 import {
   wysiwygToggleBold,
   wysiwygToggleItalic,

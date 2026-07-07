@@ -44,15 +44,32 @@
   <div
     v-else
     class="note-item tree-note-item"
-    :class="{ active: currentNoteId === row.note!.id, pinned: row.note!.pinned }"
+    :class="{
+      active: currentNoteId === row.note!.id,
+      pinned: row.note!.pinned,
+      'drag-over-top': dragOverNoteId === row.note!.id && dragOverNotePosition === 'before',
+      'drag-over-bottom': dragOverNoteId === row.note!.id && dragOverNotePosition === 'after',
+    }"
     :style="rowStyle"
     draggable="true"
     @click="$emit('note-click', row.note!.id)"
     @contextmenu.prevent="$emit('note-context', $event, row.note!.id)"
     @dragstart.stop="onDragStart('note', row.note!.id, $event)"
+    @dragover.prevent.stop="onNoteDragOver($event, row.note!.id)"
+    @dragleave.stop="$emit('drag-leave-note')"
+    @drop.prevent.stop="onNoteDrop($event, row.note!.id)"
   >
     <span v-if="row.note!.pinned" class="note-pin-icon" title="已置顶">📌</span>
     <div class="note-title">{{ row.note!.title }}</div>
+    <div v-if="row.note!.tags?.length" class="note-item-tags">
+      <button
+        v-for="tag in row.note!.tags"
+        :key="tag"
+        type="button"
+        class="note-item-tag"
+        @click.stop="$emit('tag-click', tag)"
+      >{{ tag }}</button>
+    </div>
     <div class="note-meta">{{ formatDate(row.note!.updatedAt) }}</div>
   </div>
 </template>
@@ -70,6 +87,8 @@ const props = defineProps<{
   renamingFolderId: string | null
   renamingFolderName: string
   dragOverFolderId: string | null
+  dragOverNoteId?: string | null
+  dragOverNotePosition?: 'before' | 'after' | null
   virtual?: boolean
   virtualStyle?: Record<string, string>
 }>()
@@ -82,11 +101,15 @@ const emit = defineEmits<{
   'cancel-rename-folder': []
   'start-rename-folder': [folder: { id: string; name: string }]
   'note-click': [noteId: string]
+  'tag-click': [tag: string]
   'note-context': [event: MouseEvent, noteId: string]
   'drag-start': [payload: { kind: 'note' | 'folder'; id: string }]
   'drag-over-folder': [folderId: string]
   'drag-leave-folder': []
   'drop-on-folder': [folderId: string]
+  'drag-over-note': [noteId: string, position: 'before' | 'after']
+  'drag-leave-note': []
+  'drop-on-note': [noteId: string, position: 'before' | 'after']
   'update:renamingFolderName': [value: string]
 }>()
 
@@ -103,6 +126,20 @@ function onDragStart(kind: 'note' | 'folder', id: string, e: DragEvent) {
   e.dataTransfer?.setData('text/plain', `${kind}:${id}`)
   if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
   emit('drag-start', { kind, id })
+}
+
+function noteDropPosition(e: DragEvent): 'before' | 'after' {
+  const el = e.currentTarget as HTMLElement
+  const rect = el.getBoundingClientRect()
+  return e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+}
+
+function onNoteDragOver(e: DragEvent, noteId: string) {
+  emit('drag-over-note', noteId, noteDropPosition(e))
+}
+
+function onNoteDrop(e: DragEvent, noteId: string) {
+  emit('drop-on-note', noteId, noteDropPosition(e))
 }
 
 function formatDate(ts: number) {
