@@ -2,19 +2,10 @@
  * 预览模式（WysiwygEditor）HTML 语法渲染集成验证
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import WysiwygEditor from '@/components/WysiwygEditor.vue'
 import { useNoteStore } from '@/stores/note'
-
-async function mountWysiwygWith(content: string) {
-  const wrapper = mount(WysiwygEditor)
-  await flushPromises()
-  await new Promise((r) => setTimeout(r, 600))
-  const prose = wrapper.element.querySelector('.ProseMirror')
-  expect(prose).toBeTruthy()
-  return { wrapper, prose: prose! }
-}
+import { mountWysiwygEditor } from '../helpers/mountWysiwygEditor'
 
 function pastePlainText(prose: Element, text: string) {
   const event = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent
@@ -36,10 +27,7 @@ describe('WysiwygEditor HTML 渲染', () => {
   })
 
   it('内联 <b> 应渲染为粗体而非纯文本', async () => {
-    const store = useNoteStore()
-    store.createNoteWithContent('text <b>bold</b> end')
-
-    const { wrapper, prose } = await mountWysiwygWith('text <b>bold</b> end')
+    const { wrapper, prose } = await mountWysiwygEditor('text <b>bold</b> end')
 
     expect(prose.querySelector('b')?.textContent).toBe('bold')
     expect(prose.textContent).toContain('text')
@@ -50,10 +38,7 @@ describe('WysiwygEditor HTML 渲染', () => {
   }, 15000)
 
   it('块级 <div> 应渲染为实际元素', async () => {
-    const store = useNoteStore()
-    store.createNoteWithContent('<div class="html-block">block</div>')
-
-    const { wrapper, prose } = await mountWysiwygWith('<div class="html-block">block</div>')
+    const { wrapper, prose } = await mountWysiwygEditor('<div class="html-block">block</div>')
 
     expect(prose.querySelector('.html-block')?.textContent).toBe('block')
     expect(prose.textContent).not.toContain('<div')
@@ -62,10 +47,7 @@ describe('WysiwygEditor HTML 渲染', () => {
   }, 15000)
 
   it('带属性的 <span> 应保留样式渲染', async () => {
-    const store = useNoteStore()
-    store.createNoteWithContent('<span style="color:red">red</span>')
-
-    const { wrapper, prose } = await mountWysiwygWith('<span style="color:red">red</span>')
+    const { wrapper, prose } = await mountWysiwygEditor('<span style="color:red">red</span>')
 
     const span = prose.querySelector('span[style*="color"]')
     expect(span?.textContent).toBe('red')
@@ -75,10 +57,7 @@ describe('WysiwygEditor HTML 渲染', () => {
   }, 15000)
 
   it('粘贴 <span> 后应即时渲染，无需刷新', async () => {
-    const store = useNoteStore()
-    store.createNoteWithContent('')
-
-    const { wrapper, prose } = await mountWysiwygWith('')
+    const { wrapper, prose } = await mountWysiwygEditor('')
     ;(prose as HTMLElement).focus()
     pastePlainText(prose, '<span>live</span>')
 

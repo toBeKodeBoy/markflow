@@ -96,6 +96,18 @@ export interface AutoBackupSettings {
   lastBackupError?: string
 }
 
+/** 持久化的编辑器 Tab 状态 */
+export interface EditorTabsSettings {
+  openNoteIds: string[]
+  activeNoteId: string | null
+}
+
+export interface EditorTab {
+  noteId: string
+  liveContent: string
+  savedContent: string
+}
+
 export interface AppSettings {
   theme: 'light' | 'dark' | 'system'
   fontSize: number
@@ -114,6 +126,8 @@ export interface AppSettings {
   sidebarTagCloudCollapsed?: boolean
   /** 自动备份配置 */
   autoBackup?: AutoBackupSettings
+  /** 上次打开的编辑器 Tab（启动时恢复） */
+  editorTabs?: EditorTabsSettings
 }
 
 // uTools preload bridge type

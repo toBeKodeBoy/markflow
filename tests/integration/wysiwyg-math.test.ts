@@ -2,19 +2,8 @@
  * WYSIWYG 数学公式渲染与序列化
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import WysiwygEditor from '@/components/WysiwygEditor.vue'
-import { useNoteStore } from '@/stores/note'
-
-async function mountWysiwyg() {
-  const wrapper = mount(WysiwygEditor)
-  await flushPromises()
-  await new Promise((r) => setTimeout(r, 800))
-  const prose = wrapper.element.querySelector('.ProseMirror')
-  expect(prose).toBeTruthy()
-  return { wrapper, prose: prose! }
-}
+import { mountWysiwygEditor } from '../helpers/mountWysiwygEditor'
 
 describe('WysiwygEditor math', () => {
   beforeEach(() => {
@@ -23,10 +12,7 @@ describe('WysiwygEditor math', () => {
   })
 
   it('行内 $...$ 应渲染 katex 而非纯文本', async () => {
-    const store = useNoteStore()
-    store.createNoteWithContent('公式 $E=mc^2$ 结束')
-
-    const { wrapper, prose } = await mountWysiwyg()
+    const { wrapper, prose } = await mountWysiwygEditor('公式 $E=mc^2$ 结束')
 
     expect(prose.querySelector('.katex')).toBeTruthy()
     expect(prose.textContent).toContain('公式')
@@ -36,10 +22,7 @@ describe('WysiwygEditor math', () => {
   }, 15000)
 
   it('块级 $$...$$ 应渲染 katex-display', async () => {
-    const store = useNoteStore()
-    store.createNoteWithContent('$$\n\\int_0^1 x\\,dx\n$$')
-
-    const { wrapper, prose } = await mountWysiwyg()
+    const { wrapper, prose } = await mountWysiwygEditor('$$\n\\int_0^1 x\\,dx\n$$')
 
     expect(prose.querySelector('.katex-display')).toBeTruthy()
 
@@ -47,10 +30,7 @@ describe('WysiwygEditor math', () => {
   }, 15000)
 
   it('单行块级 $$...$$ 应渲染 katex-display', async () => {
-    const store = useNoteStore()
-    store.createNoteWithContent('$$\\int_0^1 x\\,dx$$')
-
-    const { wrapper, prose } = await mountWysiwyg()
+    const { wrapper, prose } = await mountWysiwygEditor('$$\\int_0^1 x\\,dx$$')
 
     expect(prose.querySelector('.katex-display')).toBeTruthy()
     expect(prose.textContent).not.toContain('$$')
@@ -59,10 +39,7 @@ describe('WysiwygEditor math', () => {
   }, 15000)
 
   it('保存时应保留 $...$ 分隔符', async () => {
-    const store = useNoteStore()
-    store.createNoteWithContent('公式 $E=mc^2$ 结束')
-
-    const { wrapper } = await mountWysiwyg()
+    const { wrapper, store } = await mountWysiwygEditor('公式 $E=mc^2$ 结束')
 
     expect(store.liveContent).toMatch(/\$E=mc\^2\$/)
     expect(store.liveContent).not.toMatch(/\\$/)
@@ -71,10 +48,7 @@ describe('WysiwygEditor math', () => {
   }, 15000)
 
   it('行内代码 `$x$` 不应渲染为 katex', async () => {
-    const store = useNoteStore()
-    store.createNoteWithContent('使用 `$x$` 变量')
-
-    const { wrapper, prose } = await mountWysiwyg()
+    const { wrapper, prose, store } = await mountWysiwygEditor('使用 `$x$` 变量')
 
     expect(prose.querySelector('.katex')).toBeFalsy()
     expect(prose.querySelector('code')?.textContent).toBe('$x$')

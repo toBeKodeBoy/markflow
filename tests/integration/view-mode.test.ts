@@ -12,13 +12,14 @@ import { useFocusToolbarVisibility } from '@/composables/useFocusToolbarVisibili
 
 const WysiwygEditorStub = {
   props: {
+    noteId: { type: String, required: true },
     focusMode: { type: Boolean, default: false },
   },
   components: { FocusFormatToolbar },
   setup(props: { focusMode: boolean }) {
     const enabled = computed(() => props.focusMode)
     const { visible, onToolbarEnter, onToolbarLeave } = useFocusToolbarVisibility(enabled)
-    return { visible, onToolbarEnter, onToolbarLeave, focusMode: props.focusMode }
+    return { visible, onToolbarEnter, onToolbarLeave, focusMode: enabled }
   },
   template: `
     <div class="wysiwyg-pane stub-wysiwyg">
@@ -34,6 +35,7 @@ const WysiwygEditorStub = {
 }
 
 const stubs = {
+  EditorTabBar: { template: '<div class="editor-tab-bar-stub" />' },
   WysiwygEditor: WysiwygEditorStub,
   Editor: { template: '<div class="editor-pane stub-editor" />' },
   Preview: { template: '<div class="preview-pane stub-preview" />' },

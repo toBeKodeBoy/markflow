@@ -17,7 +17,7 @@
       @table="insertTable()"
       @link="insertMarkdown('[', '](url)', '链接文字')"
     />
-    <NoteTagsBar />
+    <NoteTagsBar v-if="isActive" />
     <div ref="editorEl" class="cm-host"></div>
   </div>
 </template>
@@ -33,18 +33,27 @@ import { autoCloseBracketsExtensions } from '../extensions/autoCloseBrackets'
 import { buildInlineCodeInsert } from '../utils/inlineCode'
 import { getImageFileFromDataTransfer, handleImageInsert } from '../utils/imageInsert'
 import { useNoteStore } from '../stores/note'
+import { useEditorTabsStore } from '../stores/editorTabs'
 import { useScrollSync } from '../composables/useScrollSync'
 import FormatToolbar from './FormatToolbar.vue'
 import NoteTagsBar from './NoteTagsBar.vue'
 
+const props = defineProps<{ noteId: string }>()
+
 const store = useNoteStore()
+const tabsStore = useEditorTabsStore()
 const { setRatio } = useScrollSync()
 const editorEl = ref<HTMLElement>()
 let view: EditorView | null = null
 
+const isActive = computed(() => tabsStore.activeTabId === props.noteId)
+
 const isDark = computed(() => document.documentElement.getAttribute('data-theme') === 'dark')
 
-const charCount = computed(() => store.liveContent.length || store.currentNote?.content.length || 0)
+const charCount = computed(() => {
+  const tab = tabsStore.tabs.find((t) => t.noteId === props.noteId)
+  return tab?.liveContent.length ?? 0
+})
 
 let updateTimer: ReturnType<typeof setTimeout> | null = null
 /** 编辑器未就绪时暂存外部写入（如插入目录），初始化后自动应用 */
@@ -83,10 +92,12 @@ function buildExtensions() {
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         const content = update.state.doc.toString()
-        store.setLiveContent(content)
+        tabsStore.setTabLiveContent(props.noteId, content)
         if (updateTimer) clearTimeout(updateTimer)
         updateTimer = setTimeout(() => {
-          store.updateCurrentContent(content)
+          store.updateNoteContent(props.noteId, content)
+          const tab = tabsStore.tabs.find((t) => t.noteId === props.noteId)
+          if (tab) tab.savedContent = content
         }, 300)
       }
     }),
@@ -120,34 +131,33 @@ function initEditor(content: string) {
 }
 
 watch(
-  () => store.currentNote?.id,
+  () => store.editorContentPush?.id,
   () => {
-    const content = store.currentNote?.content ?? ''
-    if (view?.state.doc.toString() === content) return
-    initEditor(content)
+    if (!isActive.value) return
+    const push = store.editorContentPush
+    if (!push) return
+    if (!view) {
+      pendingEditorPush = push.content
+      return
+    }
+    applyEditorPush(push.content)
   }
 )
 
-watch(() => store.editorContentPush?.id, () => {
-  const push = store.editorContentPush
-  if (!push) return
-  if (!view) {
-    pendingEditorPush = push.content
-    return
+watch(
+  () => store.tocJumpTarget?.id,
+  () => {
+    if (!isActive.value) return
+    const target = store.tocJumpTarget
+    if (!target || !view) return
+    const docLine = target.line + 1
+    if (docLine < 1 || docLine > view.state.doc.lines) return
+    const line = view.state.doc.line(docLine)
+    view.dispatch({
+      effects: EditorView.scrollIntoView(line.from, { y: 'start', yMargin: 16 })
+    })
   }
-  applyEditorPush(push.content)
-})
-
-watch(() => store.tocJumpTarget?.id, () => {
-  const target = store.tocJumpTarget
-  if (!target || !view) return
-  const docLine = target.line + 1
-  if (docLine < 1 || docLine > view.state.doc.lines) return
-  const line = view.state.doc.line(docLine)
-  view.dispatch({
-    effects: EditorView.scrollIntoView(line.from, { y: 'start', yMargin: 16 })
-  })
-})
+)
 
 watch(isDark, () => {
   if (!view) return
@@ -165,16 +175,17 @@ function attachScrollListener() {
   scrollerEl.addEventListener('scroll', onEditorScroll)
 }
 
-/** 编辑器滚动回调：计算滚动比例并同步到 useScrollSync */
+/** 编辑器滚动回调：计算滚动比例并同步到 useScrollSync（仅激活 Tab） */
 function onEditorScroll() {
-  if (!scrollerEl) return
+  if (!isActive.value || !scrollerEl) return
   const { scrollTop, scrollHeight, clientHeight } = scrollerEl
   const max = scrollHeight - clientHeight
   setRatio(max > 0 ? scrollTop / max : 0)
 }
 
 onMounted(() => {
-  initEditor(store.liveContent || store.currentNote?.content || '')
+  const tab = tabsStore.tabs.find((t) => t.noteId === props.noteId)
+  initEditor(tab?.liveContent ?? '')
   attachScrollListener()
   const host = editorEl.value
   if (host) {
@@ -197,8 +208,10 @@ onBeforeUnmount(() => {
   }
   if (view) {
     const content = view.state.doc.toString()
-    store.setLiveContent(content)
-    store.updateCurrentContent(content)
+    tabsStore.setTabLiveContent(props.noteId, content)
+    store.updateNoteContent(props.noteId, content)
+    const tab = tabsStore.tabs.find((t) => t.noteId === props.noteId)
+    if (tab) tab.savedContent = content
   }
   scrollerEl?.removeEventListener('scroll', onEditorScroll)
   view?.destroy()

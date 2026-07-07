@@ -16,6 +16,8 @@
 
     />
 
+    <EditorTabBar v-if="viewMode !== 'focus'" />
+
     <button
 
       class="focus-exit-btn btn-icon"
@@ -38,14 +40,27 @@
 
       <Sidebar v-if="showSidebar" />
 
-      <WysiwygEditor v-if="viewMode === 'live' || viewMode === 'focus'" :key="'wysiwyg-' + viewMode" :focus-mode="viewMode === 'focus'" />
+      <template v-if="viewMode === 'live' || viewMode === 'focus'">
+        <WysiwygEditor
+          v-for="tab in tabsStore.tabs"
+          :key="'wysiwyg-' + tab.noteId"
+          v-show="tab.noteId === tabsStore.activeTabId"
+          :note-id="tab.noteId"
+          :focusMode="viewMode === 'focus'"
+          class="editor-tab-pane"
+        />
+      </template>
 
       <template v-else>
-
-        <Editor :key="'editor-' + viewMode" />
+        <Editor
+          v-for="tab in tabsStore.tabs"
+          :key="'editor-' + tab.noteId"
+          v-show="tab.noteId === tabsStore.activeTabId"
+          :note-id="tab.noteId"
+          class="editor-tab-pane"
+        />
 
         <Preview v-if="viewMode === 'split'" key="preview" />
-
       </template>
 
       <Toc v-if="tocVisible && viewMode !== 'focus'" :view-mode="viewMode" />
@@ -88,7 +103,11 @@ import ImageLightbox from './components/ImageLightbox.vue'
 
 import AppIcon from './components/AppIcon.vue'
 
+import EditorTabBar from './components/EditorTabBar.vue'
+
 import { useNoteStore } from './stores/note'
+
+import { useEditorTabsStore } from './stores/editorTabs'
 
 import { useTheme } from './composables/useTheme'
 
@@ -105,6 +124,8 @@ import type { ViewMode } from './types'
 
 
 const store = useNoteStore()
+
+const tabsStore = useEditorTabsStore()
 
 useTheme()
 
@@ -138,9 +159,11 @@ const charCount = computed(() => store.liveContent.length || store.currentNote?.
 
 const saveStatusText = computed(() => {
 
-  if (!store.currentNote) return ''
+  const tab = tabsStore.activeTab
 
-  return store.liveContent !== store.currentNote.content ? '未保存' : '已保存'
+  if (!tab) return ''
+
+  return tabsStore.isTabDirtyForTab(tab) ? '未保存' : '已保存'
 
 })
 
@@ -148,75 +171,9 @@ const saveStatusText = computed(() => {
 
 store.loadNoteList()
 
-if (store.noteList.length > 0) {
+tabsStore.restoreFromSettings()
 
-  store.openNote(store.noteList[0].id)
-
-} else {
-
-  store.createNote()
-
-  store.updateCurrentContent(`# 欢迎使用 MarkFlow 👋
-
-
-
-> **MarkFlow** 是一款基于 uTools 的本地 Markdown 编辑器，随叫随到，专注写作。
-
-
-
-## 快速开始
-
-
-
-- 在左侧点击 **+ 新建** 创建笔记
-
-- 左侧为编辑区，右侧为实时预览
-
-- 支持 **加粗**、*斜体*、\`代码\` 等 Markdown 语法
-
-- 点击顶部 **文件 → 导出 Markdown** 导出 .md 文件
-
-
-
-## 快捷键
-
-
-
-| 操作 | 快捷键 |
-
-| --- | --- |
-
-| 撤销 | Ctrl+Z |
-
-| 重做 | Ctrl+Y |
-
-| 缩进 | Tab |
-
-| 反缩进 | Shift+Tab |
-
-
-
-## 代码示例
-
-
-
-\`\`\`javascript
-
-console.log('Hello, MarkFlow!')
-
-\`\`\`
-
-
-
----
-
-
-
-_开始你的创作之旅吧！_
-
-`)
-
-}
+tabsStore.bootstrapAfterLoad()
 
 
 
@@ -224,11 +181,7 @@ _开始你的创作之旅吧！_
 
 function setViewMode(mode: ViewMode) {
 
-  if (store.liveContent !== (store.currentNote?.content ?? '')) {
-
-    store.updateCurrentContent(store.liveContent)
-
-  }
+  tabsStore.flushActiveTab()
 
   if (mode === 'focus') prevMode.value = viewMode.value
 
