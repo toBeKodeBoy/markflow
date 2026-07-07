@@ -1862,6 +1862,32 @@ input:focus { border-color: var(--primary); }
   color: #f5e6a3;
 }
 
+.markdown-body .math-block,
+.ProseMirror .math-block,
+.ProseMirror .markflow-math-block {
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+.markdown-body .katex-display,
+.ProseMirror .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 0.5em 0;
+  text-align: left;
+}
+
+.markdown-body .math-inline,
+.ProseMirror .math-inline,
+.ProseMirror .markflow-math-inline {
+  display: inline-block;
+  vertical-align: baseline;
+}
+
+[data-theme="dark"] .katex {
+  color: var(--text);
+}
+
 .markdown-body u,
 .ProseMirror u {
   text-decoration: underline;
