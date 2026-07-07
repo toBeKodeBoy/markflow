@@ -1,4 +1,6 @@
 import { escapeHtml } from './escapeHtml'
+import { sanitizeMermaidSvg } from './sanitizeHtml'
+import { encodeMermaidSource, decodeMermaidSource } from './mermaidBlock'
 
 type MermaidApi = typeof import('mermaid').default
 
@@ -42,16 +44,30 @@ export function nextMermaidId(): string {
   return `markflow-mermaid-${mermaidCounter}`
 }
 
+function applyMermaidSvg(container: HTMLElement, source: string, svgHtml: string) {
+  container.className = 'mermaid-rendered'
+  container.dataset.mermaidSource = encodeMermaidSource(source.trim())
+  container.innerHTML = sanitizeMermaidSvg(svgHtml)
+}
+
 export async function renderMermaidToSvg(source: string, id?: string): Promise<string> {
   const mermaid = await initMermaid()
   const renderId = id ?? nextMermaidId()
   try {
     const { svg } = await mermaid.render(renderId, source.trim())
-    return svg
+    return sanitizeMermaidSvg(svg)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     return `<div class="mermaid-error">${escapeHtml(msg)}</div>`
   }
+}
+
+async function mountMermaidNode(node: HTMLElement, source: string) {
+  if (!source.trim()) return
+  const svg = await renderMermaidToSvg(source)
+  const container = document.createElement('div')
+  applyMermaidSvg(container, source, svg)
+  node.replaceWith(container)
 }
 
 export async function hydrateMermaidBlocks(root: ParentNode): Promise<void> {
@@ -59,14 +75,29 @@ export async function hydrateMermaidBlocks(root: ParentNode): Promise<void> {
   if (nodes.length === 0) return
   if (!initialized) await initMermaid()
   for (const node of nodes) {
-    const source = node.textContent ?? ''
-    if (!source.trim()) continue
-    const svg = await renderMermaidToSvg(source)
-    const container = document.createElement('div')
-    container.className = 'mermaid-rendered'
-    container.innerHTML = svg
-    node.replaceWith(container)
+    await mountMermaidNode(node, node.textContent ?? '')
   }
 }
 
-export { renderMermaidBlock, isMermaidLanguage } from './mermaidBlock'
+/** 主题切换等场景：重渲染已 hydrate 的图示并处理未 hydrate 占位 */
+export async function refreshMermaidBlocks(root: ParentNode): Promise<void> {
+  await initMermaid()
+
+  const pending = Array.from(root.querySelectorAll('pre.mermaid')) as HTMLElement[]
+  for (const node of pending) {
+    await mountMermaidNode(node, node.textContent ?? '')
+  }
+
+  const rendered = Array.from(
+    root.querySelectorAll('.mermaid-rendered[data-mermaid-source]'),
+  ) as HTMLElement[]
+  for (const container of rendered) {
+    const encoded = container.dataset.mermaidSource
+    if (!encoded) continue
+    const source = decodeMermaidSource(encoded)
+    const svg = await renderMermaidToSvg(source)
+    applyMermaidSvg(container, source, svg)
+  }
+}
+
+export { renderMermaidBlock, isMermaidLanguage, decodeMermaidSource, encodeMermaidSource } from './mermaidBlock'

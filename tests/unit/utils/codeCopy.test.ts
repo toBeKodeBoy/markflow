@@ -7,6 +7,7 @@ import {
   handleCodeCopyCaptureClick,
   handleCodeCopyCaptureMouseDown,
 } from '../../../src/utils/codeCopy'
+import { encodeMermaidSource } from '../../../src/utils/mermaidBlock'
 
 describe('handleCodeCopy', () => {
   beforeEach(() => {
@@ -67,5 +68,33 @@ describe('handleCodeCopy', () => {
     const btn = document.querySelector('.code-copy-btn') as HTMLButtonElement
     handleCodeCopy(btn)
     expect(window.markflow.copyText).not.toHaveBeenCalled()
+  })
+
+  it('应从 mermaid 占位块复制源码', () => {
+    window.markflow.copyText = vi.fn(() => true)
+    document.body.innerHTML = `
+      <div class="mermaid-diagram-wrapper">
+        <button class="code-copy-btn">复制</button>
+        <pre class="mermaid">graph TD;
+  A-->B</pre>
+      </div>
+    `
+    const btn = document.querySelector('.code-copy-btn') as HTMLButtonElement
+    handleCodeCopy(btn)
+    expect(window.markflow.copyText).toHaveBeenCalledWith('graph TD;\n  A-->B')
+  })
+
+  it('应从 hydrate 后的 mermaid 块复制源码', () => {
+    window.markflow.copyText = vi.fn(() => true)
+    const encoded = encodeMermaidSource('graph LR;\n  X-->Y')
+    document.body.innerHTML = `
+      <div class="mermaid-diagram-wrapper">
+        <button class="code-copy-btn">复制</button>
+        <div class="mermaid-rendered" data-mermaid-source="${encoded}"><svg></svg></div>
+      </div>
+    `
+    const btn = document.querySelector('.code-copy-btn') as HTMLButtonElement
+    handleCodeCopy(btn)
+    expect(window.markflow.copyText).toHaveBeenCalledWith('graph LR;\n  X-->Y')
   })
 })

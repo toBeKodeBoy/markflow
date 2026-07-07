@@ -4,3 +4,10 @@ import DOMPurify from 'dompurify'
 export function sanitizeRenderedHtml(html: string): string {
   return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } })
 }
+
+/** mermaid hydrate 输出：由 mermaid securityLevel:strict 约束，不再走 DOMPurify（会破坏 foreignObject 节点标签） */
+export function sanitizeMermaidSvg(html: string): string {
+  const trimmed = html.trim()
+  if (!trimmed.startsWith('<svg')) return html
+  return trimmed
+}

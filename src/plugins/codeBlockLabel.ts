@@ -198,6 +198,7 @@ class CodeBlockNodeView implements NodeView {
   private trailingObserver: MutationObserver
   private highlightTimer: ReturnType<typeof setTimeout> | null = null
   private mermaidTimer: ReturnType<typeof setTimeout> | null = null
+  private mermaidRenderGen = 0
   private mermaidPreview: HTMLDivElement
   private actionsMouseDownHandler: ((e: MouseEvent) => void) | null = null
 
@@ -242,6 +243,7 @@ class CodeBlockNodeView implements NodeView {
   private scheduleMermaidPreview(text: string, lang: string) {
     if (this.mermaidTimer) clearTimeout(this.mermaidTimer)
     if (!isMermaidLanguage(lang)) {
+      this.mermaidRenderGen += 1
       this.mermaidPreview.innerHTML = ''
       this.mermaidPreview.style.display = 'none'
       this.dom.classList.remove('mermaid-code-block')
@@ -249,19 +251,31 @@ class CodeBlockNodeView implements NodeView {
     }
     this.mermaidPreview.style.display = ''
     this.dom.classList.add('mermaid-code-block')
+    const gen = ++this.mermaidRenderGen
     this.mermaidTimer = setTimeout(() => {
       this.mermaidTimer = null
-      void this.renderMermaidPreview(text)
+      void this.renderMermaidPreview(text, gen)
     }, 120)
   }
 
-  private async renderMermaidPreview(text: string) {
+  private async renderMermaidPreview(text: string, gen: number) {
+    if (gen !== this.mermaidRenderGen) return
+    if (!this.dom.classList.contains('mermaid-code-block')) return
+
+    const currentText = this.code.textContent ?? ''
+    if (currentText.trim() !== text.trim()) return
+
     const trimmed = text.trim()
     if (!trimmed) {
       this.mermaidPreview.innerHTML = ''
       return
     }
-    this.mermaidPreview.innerHTML = await renderMermaidToSvg(trimmed)
+
+    const svg = await renderMermaidToSvg(trimmed)
+    if (gen !== this.mermaidRenderGen) return
+    if ((this.code.textContent ?? '').trim() !== trimmed) return
+
+    this.mermaidPreview.innerHTML = svg
   }
 
   /** 鍚屾 ProseMirror 灏鹃儴 <br>锛屼娇楂樹寒灞傝鏁颁笌鍏夋爣灞備竴鑷?*/

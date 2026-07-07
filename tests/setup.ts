@@ -113,6 +113,21 @@ if (typeof Element !== 'undefined' && !Element.prototype.getBoundingClientRect) 
     width: 100, height: 20, toJSON: () => ({}),
   })
 }
+/** jsdom 下 mermaid htmlLabels:false 依赖 SVG 文本度量 */
+const svgTextProto =
+  typeof SVGTextElement !== 'undefined'
+    ? SVGTextElement.prototype
+    : typeof SVGElement !== 'undefined'
+      ? SVGElement.prototype
+      : null
+if (svgTextProto && !('getComputedTextLength' in svgTextProto)) {
+  Object.defineProperty(svgTextProto, 'getComputedTextLength', {
+    configurable: true,
+    value(this: { textContent: string | null }) {
+      return (this.textContent?.length ?? 1) * 8
+    },
+  })
+}
 
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

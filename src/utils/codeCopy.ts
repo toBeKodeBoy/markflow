@@ -5,6 +5,7 @@
 
 import { writeClipboard, writeClipboardSync } from './clipboard'
 import { showAppNotification } from './notify'
+import { decodeMermaidSource } from './mermaidBlock'
 
 export const COPY_TEXT = '复制'
 export const COPIED_TEXT = '已复制!'
@@ -60,7 +61,22 @@ export function handleCodeCopyCaptureClick(e: MouseEvent): void {
   handleCodeCopy(btn)
 }
 
+function getMermaidSourceText(wrapper: Element): string | null {
+  const rendered = wrapper.querySelector('.mermaid-rendered[data-mermaid-source]') as HTMLElement | null
+  if (rendered?.dataset.mermaidSource) {
+    return decodeMermaidSource(rendered.dataset.mermaidSource)
+  }
+  const pre = wrapper.querySelector('pre.mermaid')
+  if (pre) return pre.textContent
+  return null
+}
+
 function getCodeText(btn: HTMLButtonElement): string | null {
+  const mermaidWrapper = btn.closest('.mermaid-diagram-wrapper')
+  if (mermaidWrapper) {
+    return getMermaidSourceText(mermaidWrapper)
+  }
+
   const wrapper = btn.closest('.code-block-wrapper')
   if (!wrapper) return null
   // WYSIWYG 代码块有两层 code：高亮层(.code-block-highlight)有 80ms 防抖，

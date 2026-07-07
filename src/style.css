@@ -1891,11 +1891,15 @@ input:focus { border-color: var(--primary); }
 .markdown-body .mermaid-diagram-wrapper,
 .ProseMirror .mermaid-code-block {
   margin: 1em 0;
+  overflow: visible;
 }
 
 .markdown-body .mermaid-diagram-wrapper pre.mermaid,
-.ProseMirror .mermaid-preview {
+.ProseMirror .mermaid-preview,
+.markdown-body .mermaid-rendered,
+.ProseMirror .mermaid-rendered {
   overflow-x: auto;
+  overflow-y: visible;
   margin: 0.5em 0;
   text-align: center;
 }
