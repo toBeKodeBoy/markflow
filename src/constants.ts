@@ -15,3 +15,6 @@ export const ASSET_MAX_DIMENSION = 1920
 
 /** Max size (bytes) for a single stored image asset. */
 export const ASSET_MAX_BYTES = 2 * 1024 * 1024
+
+/** 同时打开的最大编辑器 Tab 数 */
+export const MAX_EDITOR_TABS = 10

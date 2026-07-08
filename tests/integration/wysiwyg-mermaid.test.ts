@@ -2,19 +2,9 @@
  * WYSIWYG mermaid 代码块预览
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import WysiwygEditor from '@/components/WysiwygEditor.vue'
 import { useNoteStore } from '@/stores/note'
-
-async function mountWysiwyg() {
-  const wrapper = mount(WysiwygEditor)
-  await flushPromises()
-  await new Promise((r) => setTimeout(r, 1200))
-  const prose = wrapper.element.querySelector('.ProseMirror')
-  expect(prose).toBeTruthy()
-  return { wrapper, prose: prose! }
-}
+import { mountWysiwygEditor } from '../helpers/mountWysiwygEditor'
 
 describe('WysiwygEditor mermaid', () => {
   beforeEach(() => {
@@ -23,10 +13,7 @@ describe('WysiwygEditor mermaid', () => {
   })
 
   it('```mermaid 代码块应渲染 SVG 预览', async () => {
-    const store = useNoteStore()
-    store.createNoteWithContent('```mermaid\ngraph TD;\n  A-->B\n```')
-
-    const { wrapper, prose } = await mountWysiwyg()
+    const { wrapper, prose } = await mountWysiwygEditor('```mermaid\ngraph TD;\n  A-->B\n```')
 
     expect(prose.querySelector('.mermaid-preview svg, svg')).toBeTruthy()
 
@@ -34,10 +21,7 @@ describe('WysiwygEditor mermaid', () => {
   }, 20000)
 
   it('保存时应保留 mermaid 围栏与源码', async () => {
-    const store = useNoteStore()
-    store.createNoteWithContent('```mermaid\ngraph TD;\n  A-->B\n```')
-
-    const { wrapper } = await mountWysiwyg()
+    const { wrapper, store } = await mountWysiwygEditor('```mermaid\ngraph TD;\n  A-->B\n```')
 
     expect(store.liveContent).toContain('```mermaid')
     expect(store.liveContent).toContain('A-->B')

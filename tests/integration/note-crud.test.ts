@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useNoteStore } from '../../src/stores/note'
+import { useEditorTabsStore } from '../../src/stores/editorTabs'
 
 describe('笔记 CRUD 集成', () => {
   let store: ReturnType<typeof useNoteStore>
@@ -19,6 +20,7 @@ describe('笔记 CRUD 集成', () => {
   it('完整的笔记生命周期：创建 → 编辑 → 改名 → 删除', () => {
     // 1. 创建
     const note = store.createNoteWithContent('# 我的文章\n\n正文内容')
+    useEditorTabsStore().openTab(note.id)
     expect(note.title).toBe('我的文章')
     expect(store.noteList).toHaveLength(1)
 
@@ -31,25 +33,22 @@ describe('笔记 CRUD 集成', () => {
     store.renameNote(note.id, '新标题')
     expect(store.currentNote!.title).toBe('新标题')
 
-    // 4. 删除
+    // 4. 删除（最后一个笔记会创建 welcome 笔记）
     store.deleteNote(note.id)
-    expect(store.noteList).toHaveLength(0)
-    expect(store.currentNote).toBeNull()
-    expect(store.liveContent).toBe('')
+    expect(store.noteList).toHaveLength(1)
+    expect(store.currentNote?.content).toContain('欢迎使用 MarkFlow')
   })
 
   it('多笔记切换应保持各自内容', () => {
+    const tabsStore = useEditorTabsStore()
     const n1 = store.createNoteWithContent('# 笔记一')
     const n2 = store.createNoteWithContent('# 笔记二')
-    const n3 = store.createNoteWithContent('# 笔记三')
+    store.createNoteWithContent('# 笔记三')
 
-    // 当前是 n3
-    expect(store.currentNote!.title).toBe('笔记三')
-
-    store.openNote(n1.id)
+    tabsStore.openTab(n1.id)
     expect(store.currentNote!.title).toBe('笔记一')
 
-    store.openNote(n2.id)
+    tabsStore.openTab(n2.id)
     expect(store.currentNote!.title).toBe('笔记二')
   })
 

@@ -14,8 +14,9 @@ import { sortNotes } from '../utils/noteSort'
 import { runFolderImport, saveImportImageAsAsset } from '../utils/importFolderService'
 import type { ImportFolderOptions, ImportFolderProgress, ImportFolderResult, ImportFolderScanResult } from '../types/import'
 import type { Note, NoteListItem, Folder, TocJumpTarget, EditorContentPush } from '../types'
-
-const TITLE_SCAN_LINES = 50
+import { extractNoteTitle } from '../utils/noteTitle'
+import { getTabContentCache, setTabContentCache } from './tabContentCache'
+import { notifyNoteDeleted, notifyLibraryReset } from './editorTabsBridge'
 
 /** 将笔记正文规范化为可搜索文本（小写） */
 function normalizeForSearch(text: string): string {
@@ -27,23 +28,7 @@ function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2)
 }
 
-/** 从内容中提取标题：优先取首个 # 标题，其次取首个非空行(限30字)，均无则返回"无标题" */
-function extractTitle(content: string): string {
-  let line = 0
-  let start = 0
-  while (line < TITLE_SCAN_LINES && start <= content.length) {
-    const end = content.indexOf('\n', start)
-    const lineEnd = end === -1 ? content.length : end
-    const chunk = content.slice(start, lineEnd)
-    const heading = chunk.match(/^#+\s+(.+)/)
-    if (heading) return heading[1].trim()
-    if (chunk.trim()) return chunk.trim().slice(0, 30)
-    line++
-    if (end === -1) break
-    start = end + 1
-  }
-  return '无标题'
-}
+const extractTitle = extractNoteTitle
 
 export const useNoteStore = defineStore('note', () => {
   const storage = useStorage()
@@ -167,15 +152,45 @@ export const useNoteStore = defineStore('note', () => {
   function openNote(id: string) {
     const note = storage.getNote(id)
     if (note) {
-      currentNote.value = note
-      liveContent.value = note.content
+      setActiveNote(note, note.content)
       applyLargeFilePolicy(note.content)
     }
+  }
+
+  /** 激活指定笔记到编辑器（不改变 Tab 列表，由 editorTabs 调用） */
+  function setActiveNote(note: Note | null, content: string) {
+    currentNote.value = note
+    liveContent.value = content
   }
 
   /** 设置实时编辑内容（不持久化） */
   function setLiveContent(content: string) {
     liveContent.value = content
+    if (currentNote.value) setTabContentCache(currentNote.value.id, content)
+  }
+
+  /** 持久化指定笔记正文（支持非当前 Tab） */
+  function updateNoteContent(noteId: string, content: string) {
+    const note = storage.getNote(noteId)
+    if (!note) return
+    const keepImportedTitle = !!note.importSourcePath
+    const title = keepImportedTitle ? note.title : extractTitle(content)
+    note.content = content
+    note.title = title
+    note.updatedAt = Date.now()
+    storage.saveNote(note)
+    updateSearchIndex(noteId, content)
+    const idx = noteList.value.findIndex((n) => n.id === noteId)
+    if (idx >= 0) {
+      noteList.value[idx].title = title
+      noteList.value[idx].updatedAt = note.updatedAt
+    }
+    if (currentNote.value?.id === noteId) {
+      currentNote.value.content = content
+      currentNote.value.title = title
+      currentNote.value.updatedAt = note.updatedAt
+      liveContent.value = content
+    }
   }
 
   /** 创建空白笔记，保存到存储，设为当前 */
@@ -223,19 +238,7 @@ export const useNoteStore = defineStore('note', () => {
   /** 保存当前笔记内容变更（title/content/updatedAt），同步更新 noteList */
   function updateCurrentContent(content: string) {
     if (!currentNote.value) return
-    liveContent.value = content
-    const keepImportedTitle = !!currentNote.value.importSourcePath
-    const title = keepImportedTitle ? currentNote.value.title : extractTitle(content)
-    currentNote.value.content = content
-    currentNote.value.title = title
-    currentNote.value.updatedAt = Date.now()
-    storage.saveNote(currentNote.value)
-    updateSearchIndex(currentNote.value.id, content)
-    const idx = noteList.value.findIndex(n => n.id === currentNote.value!.id)
-    if (idx >= 0) {
-      noteList.value[idx].title = title
-      noteList.value[idx].updatedAt = currentNote.value.updatedAt
-    }
+    updateNoteContent(currentNote.value.id, content)
   }
 
   /** 删除笔记：移除存储，若为当前笔记则导航到列表首项或清空 */
@@ -250,14 +253,7 @@ export const useNoteStore = defineStore('note', () => {
       (noteId) => storage.getNote(noteId)
     )
     void getAssetStorage().gcOrphans(contents)
-    if (currentNote.value?.id === id) {
-      if (noteList.value.length > 0) {
-        openNote(noteList.value[0].id)
-      } else {
-        currentNote.value = null
-        liveContent.value = ''
-      }
-    }
+    notifyNoteDeleted(id)
   }
 
   /** 重命名笔记并更新存储 */
@@ -498,12 +494,7 @@ export const useNoteStore = defineStore('note', () => {
     activeTagFilter.value = null
     searchQuery.value = ''
     sidebarStateRevision.value++
-    if (noteList.value.length > 0) {
-      openNote(noteList.value[0].id)
-    } else {
-      currentNote.value = null
-      liveContent.value = ''
-    }
+    notifyLibraryReset(noteList.value.length > 0 ? noteList.value[0].id : null)
     return backup
   }
 
@@ -533,6 +524,7 @@ export const useNoteStore = defineStore('note', () => {
     activeFolderId.value = null
     searchQuery.value = ''
     activeTagFilter.value = null
+    notifyLibraryReset(null)
   }
 
   /** 批量导入文件夹扫描结果 */
@@ -571,7 +563,7 @@ export const useNoteStore = defineStore('note', () => {
     folderList.value = storage.getFolderList()
 
     if (result.firstImportedNoteId) {
-      openNote(result.firstImportedNoteId)
+      notifyLibraryReset(result.firstImportedNoteId)
       const imported = storage.getNote(result.firstImportedNoteId)
       if (imported?.folderId) {
         activeFolderId.value = imported.folderId
@@ -583,6 +575,8 @@ export const useNoteStore = defineStore('note', () => {
 
   function getNoteContentById(id: string): string {
     if (currentNote.value?.id === id) return liveContent.value
+    const cached = getTabContentCache(id)
+    if (cached !== undefined) return cached
     return storage.getNote(id)?.content ?? ''
   }
 
@@ -590,9 +584,9 @@ export const useNoteStore = defineStore('note', () => {
     noteList, currentNote, liveContent, folderList, searchQuery, activeTagFilter, activeFolderId,
     searchedNoteList, filteredNoteList, allTags, tagStats, sidebarStateRevision,
     tocVisible, tocJumpTarget, editorContentPush, pendingLargeFileSwitch,
-    loadNoteList, openNote, createNote, createNoteWithContent, setLiveContent, setTocVisible,
-    updateCurrentContent, deleteNote, renameNote, moveNote, requestTocJump, insertAutoToc,
-    clearPendingLargeFileSwitch,
+    loadNoteList, openNote, createNote, createNoteWithContent, setLiveContent, setActiveNote, setTocVisible,
+    updateCurrentContent, updateNoteContent, deleteNote, renameNote, moveNote, requestTocJump, insertAutoToc,
+    clearPendingLargeFileSwitch, applyLargeFilePolicy,
     createFolder, deleteFolder, renameFolder, moveFolder, getDeleteFolderImpact,
     setActiveTagFilter, setNoteTags, addTag, removeTag, toggleNotePinned, reorderNotes, getNoteContentById,
     exportLibraryBackup, downloadLibraryBackup, restoreLibraryBackup, notifySidebarStateChanged,

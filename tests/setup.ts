@@ -3,6 +3,7 @@
  * Runs before every test file.
  */
 import { vi, beforeEach } from 'vitest'
+import '@/stores/editorTabs'
 
 const mockStorage = {
   getItem(key: string) { return localStorage.getItem(key) },

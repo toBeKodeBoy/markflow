@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useNoteStore } from '../../../src/stores/note'
+import { useEditorTabsStore } from '../../../src/stores/editorTabs'
 
 function makeNote(overrides = {}) {
   return {
@@ -118,18 +119,23 @@ describe('useNoteStore', () => {
   describe('deleteNote', () => {
     it('删除当前笔记后应自动切换到第一个笔记', () => {
       const store = useNoteStore()
+      const tabsStore = useEditorTabsStore()
       const n1 = store.createNoteWithContent('# A')
       const n2 = store.createNoteWithContent('# B')
+      tabsStore.openTab(n1.id)
+      tabsStore.openTab(n2.id)
       store.deleteNote(n1.id)
       expect(store.currentNote?.id).toBe(n2.id)
     })
 
-    it('删除最后一个笔记后 currentNote 应为 null', () => {
+    it('删除最后一个笔记后应自动创建 welcome 笔记', () => {
       const store = useNoteStore()
+      const tabsStore = useEditorTabsStore()
       store.createNote()
+      tabsStore.openTab(store.currentNote!.id)
       store.deleteNote(store.currentNote!.id)
-      expect(store.currentNote).toBeNull()
-      expect(store.liveContent).toBe('')
+      expect(store.currentNote).not.toBeNull()
+      expect(store.currentNote?.content).toContain('欢迎使用 MarkFlow')
     })
   })
 

@@ -8,9 +8,11 @@ const MAX_ATTEMPTS = 120
 /** 监听 tocJumpTarget 变更，在预览容器中查找并滚动到对应标题（带重试机制，最多 120 帧） */
 export function useTocJumpHandler(
   containerRef: Ref<HTMLElement | undefined>,
-  store: ReturnType<typeof useNoteStore>
+  store: ReturnType<typeof useNoteStore>,
+  isActive?: () => boolean
 ) {
   watch(() => store.tocJumpTarget?.id, () => {
+    if (isActive && !isActive()) return
     const target = store.tocJumpTarget
     const container = containerRef.value
     if (!target || !container) return

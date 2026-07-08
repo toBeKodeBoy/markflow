@@ -93,7 +93,7 @@
               @commit-rename-folder="commitRenameFolder"
               @cancel-rename-folder="renamingFolderId = null"
               @start-rename-folder="startRenameFolder"
-              @note-click="store.openNote"
+              @note-click="openNoteTab"
               @tag-click="onTagClick"
               @note-context="openNoteContextMenu"
               @drag-start="onDragStart"
@@ -126,7 +126,7 @@
             @commit-rename-folder="commitRenameFolder"
             @cancel-rename-folder="renamingFolderId = null"
             @start-rename-folder="startRenameFolder"
-            @note-click="store.openNote"
+            @note-click="openNoteTab"
             @tag-click="onTagClick"
             @note-context="openNoteContextMenu"
             @drag-start="onDragStart"
@@ -153,7 +153,7 @@
         :current-note-id="store.currentNote?.id"
         :folder-scope-label="searchFolderScopeLabel"
         :get-content="store.getNoteContentById"
-        @select="store.openNote"
+        @select="openNoteTab"
         @clear="onClearSearch"
       />
     </div>
@@ -291,6 +291,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useNoteStore } from '../stores/note'
+import { useEditorTabsStore } from '../stores/editorTabs'
 import { showAppNotification } from '../utils/notify'
 import {
   flattenFolderTree,
@@ -320,6 +321,11 @@ const VIRTUAL_THRESHOLD = 150
 const VIRTUAL_BUFFER = 8
 
 const store = useNoteStore()
+const tabsStore = useEditorTabsStore()
+
+function openNoteTab(noteId: string) {
+  tabsStore.openTab(noteId)
+}
 const appSettings = useAppSettings()
 
 const sidebarWidth = ref(clampSidebarWidth(appSettings.get().sidebarWidth ?? 240))
@@ -502,7 +508,8 @@ function createFolder() {
 function createNoteInFolder(folderId: string) {
   folderContextMenu.value = null
   store.activeFolderId = folderId
-  store.createNote(folderId)
+  const note = store.createNote(folderId)
+  tabsStore.openTabForNewNote(note.id)
   persistSidebarState()
 }
 

@@ -29,16 +29,17 @@ describe('ViewMode 类型', () => {
 describe('App.vue 视图调度', () => {
   const appSrc = readSrc('src/App.vue')
 
-  it('WYSIWYG 用于 live 与 focus', () => {
-    expect(appSrc).toMatch(/WysiwygEditor v-if="viewMode === 'live' \|\| viewMode === 'focus'"/)
-    expect(appSrc).toMatch(/:focus-mode="viewMode === 'focus'"/)
+  it('WYSIWYG 用于 live 与 focus（多 Tab v-for）', () => {
+    expect(appSrc).toMatch(/viewMode === 'live' \|\| viewMode === 'focus'/)
+    expect(appSrc).toMatch(/<WysiwygEditor/)
+    expect(appSrc).toMatch(/:focusMode="viewMode === 'focus'"/)
+    expect(appSrc).toMatch(/:note-id="tab\.noteId"/)
   })
 
   it('CodeMirror 用于 split 与 source，Preview 仅 split', () => {
     expect(appSrc).toMatch(/<template v-else>/)
-    expect(appSrc).toMatch(/<Editor[^>]*\/>/)
+    expect(appSrc).toMatch(/<Editor[^>]*:note-id="tab\.noteId"/)
     expect(appSrc).toMatch(/<Preview v-if="viewMode === 'split'"[^>]*\/>/)
-    expect(appSrc).not.toMatch(/<Editor v-else \/>/)
   })
 
   it('专注模式隐藏侧边栏与目录', () => {
@@ -46,8 +47,8 @@ describe('App.vue 视图调度', () => {
     expect(appSrc).toMatch(/tocVisible && viewMode !== 'focus'/)
   })
 
-  it('setViewMode 切换前应 flush liveContent', () => {
-    expect(appSrc).toMatch(/store\.updateCurrentContent\(store\.liveContent\)/)
+  it('setViewMode 切换前应 flush 当前 Tab', () => {
+    expect(appSrc).toMatch(/tabsStore\.flushActiveTab\(\)/)
   })
 
   it('进入 focus 时记录 prevMode', () => {
@@ -63,16 +64,17 @@ describe('App.vue 视图调度', () => {
 })
 
 describe('编辑器卸载 flush', () => {
-  it('Editor 挂载优先 liveContent，卸载时 flush', () => {
+  it('Editor 按 noteId 初始化，卸载时 flush', () => {
     const src = readSrc('src/components/Editor.vue')
-    expect(src).toMatch(/initEditor\(store\.liveContent \|\| store\.currentNote\?\.content/)
-    expect(src).toMatch(/store\.updateCurrentContent\(content\)/)
+    expect(src).toMatch(/noteId:\s*string/)
+    expect(src).toMatch(/tabsStore\.tabs\.find\(\(t\) => t\.noteId === props\.noteId\)/)
+    expect(src).toMatch(/store\.updateNoteContent\(props\.noteId, content\)/)
   })
 
   it('WysiwygEditor 卸载时 flush markdown', () => {
     const src = readSrc('src/components/WysiwygEditor.vue')
     expect(src).toMatch(/getMarkdown\(\)\(ctx\)/)
-    expect(src).toMatch(/store\.updateCurrentContent\(persisted\)/)
+    expect(src).toMatch(/store\.updateNoteContent\(props\.noteId, persisted\)/)
   })
 })
 

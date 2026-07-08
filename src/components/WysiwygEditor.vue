@@ -18,7 +18,7 @@
       @table="onToolbarTable"
       @link="onToolbarLink"
     />
-    <NoteTagsBar v-if="!focusMode" />
+    <NoteTagsBar v-if="!focusMode && isActive" />
     <div ref="containerRef" :class="['milkdown-host', { 'milkdown-dark': isDark }]"></div>
     <FocusFormatToolbar
       v-if="focusMode"
@@ -46,6 +46,7 @@ import { history } from '@milkdown/plugin-history'
 import { getMarkdown, replaceAll } from '@milkdown/utils'
 import { editorViewOptionsCtx } from '@milkdown/core'
 import { useNoteStore } from '../stores/note'
+import { useEditorTabsStore } from '../stores/editorTabs'
 import { useTocJumpHandler } from '../composables/useTocJumpHandler'
 import { markdownPaste } from '../plugins/markdownPaste'
 import { imagePaste } from '../plugins/imagePaste'
@@ -111,13 +112,19 @@ function sanitizePastedHTML(html: string): string {
   return body.innerHTML
 }
 
-const props = defineProps<{ focusMode?: boolean }>()
+const props = defineProps<{ noteId: string; focusMode?: boolean }>()
 
 const store = useNoteStore()
+const tabsStore = useEditorTabsStore()
 const containerRef = ref<HTMLDivElement>()
 let editor: Editor | null = null
 
-const charCount = computed(() => store.liveContent.length || store.currentNote?.content.length || 0)
+const isActive = computed(() => tabsStore.activeTabId === props.noteId)
+
+const charCount = computed(() => {
+  const tab = tabsStore.tabs.find((t) => t.noteId === props.noteId)
+  return tab?.liveContent.length ?? 0
+})
 
 const focusModeEnabled = computed(() => props.focusMode === true)
 const { visible: focusToolbarVisible, onToolbarEnter: onFocusToolbarEnter, onToolbarLeave: onFocusToolbarLeave } =
@@ -142,8 +149,6 @@ const isDark = computed(() => document.documentElement.getAttribute('data-theme'
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let initing: Promise<void> | null = null
-/** 编辑器未就绪时暂存待切换的内容，初始化后自动应用 */
-let pendingContent: string | null = null
 /** 编辑器未就绪时暂存外部写入（如插入目录），初始化后自动应用 */
 let pendingEditorPush: string | null = null
 
@@ -176,10 +181,12 @@ async function initEditor(content: string) {
         ctx.set(defaultValueCtx, displayContent)
         ctx.get(listenerCtx).markdownUpdated((_, markdown) => {
           void persistMarkdownAssets(markdown).then((persisted) => {
-            store.setLiveContent(persisted)
+            tabsStore.setTabLiveContent(props.noteId, persisted)
             if (saveTimer) clearTimeout(saveTimer)
             saveTimer = setTimeout(() => {
-              store.updateCurrentContent(persisted)
+              store.updateNoteContent(props.noteId, persisted)
+              const tab = tabsStore.tabs.find((t) => t.noteId === props.noteId)
+              if (tab) tab.savedContent = persisted
             }, 300)
           })
         })
@@ -217,16 +224,10 @@ async function initEditor(content: string) {
     editor.action((ctx) => {
       const md = getMarkdown()(ctx)
       void persistMarkdownAssets(md).then((persisted) => {
-        store.setLiveContent(persisted)
+        tabsStore.setTabLiveContent(props.noteId, persisted)
       })
     })
 
-    // 初始化完成后，应用初始化期间暂存的待切换内容
-    if (pendingContent !== null) {
-      const pc = pendingContent
-      pendingContent = null
-      await applyEditorMarkdown(pc)
-    }
     if (pendingEditorPush !== null) {
       const push = pendingEditorPush
       pendingEditorPush = null
@@ -238,33 +239,18 @@ async function initEditor(content: string) {
 }
 
 watch(
-  () => store.currentNote?.id,
+  () => store.editorContentPush?.id,
   () => {
-    const content = store.currentNote?.content ?? ''
-    store.setLiveContent(content)
+    if (!isActive.value) return
+    const push = store.editorContentPush
+    if (!push) return
     if (!editor) {
-      pendingContent = content
+      pendingEditorPush = push.content
       return
     }
-    void resolveMarkdownForDisplay(normalizeMarkdownForParse(content)).then((displayContent) => {
-      if (!editor) return
-      editor.action((ctx) => {
-        if (getMarkdown()(ctx) === displayContent) return
-        replaceAll(displayContent)(ctx)
-      })
-    })
+    void applyEditorMarkdown(push.content)
   }
 )
-
-watch(() => store.editorContentPush?.id, () => {
-  const push = store.editorContentPush
-  if (!push) return
-  if (!editor) {
-    pendingEditorPush = push.content
-    return
-  }
-  void applyEditorMarkdown(push.content)
-})
 
 watch(isDark, (dark) => {
   if (containerRef.value) {
@@ -272,7 +258,7 @@ watch(isDark, (dark) => {
   }
 })
 
-useTocJumpHandler(containerRef, store)
+useTocJumpHandler(containerRef, store, () => isActive.value)
 
 /** WYSIWYG 点击：页内锚点跳转 + 代码复制 */
 function onWysiwygClick(e: MouseEvent) {
@@ -281,8 +267,8 @@ function onWysiwygClick(e: MouseEvent) {
 }
 
 onMounted(() => {
-  const content = store.currentNote?.content ?? store.liveContent ?? ''
-  initEditor(content)
+  const tab = tabsStore.tabs.find((t) => t.noteId === props.noteId)
+  initEditor(tab?.liveContent ?? '')
   const host = containerRef.value
   if (host) {
     host.addEventListener('mousedown', handleCodeCopyCaptureMouseDown, true)
@@ -307,8 +293,10 @@ onBeforeUnmount(async () => {
       editor!.action((ctx) => resolve(getMarkdown()(ctx)))
     })
     const persisted = await persistMarkdownAssets(markdown)
-    store.setLiveContent(persisted)
-    store.updateCurrentContent(persisted)
+    tabsStore.setTabLiveContent(props.noteId, persisted)
+    store.updateNoteContent(props.noteId, persisted)
+    const tab = tabsStore.tabs.find((t) => t.noteId === props.noteId)
+    if (tab) tab.savedContent = persisted
     await editor.destroy()
     editor = null
   }

@@ -20,16 +20,8 @@
 
       </button>
 
-      <div v-if="store.currentNote" class="note-context">
-
-        <div class="note-context-title" :title="store.currentNote.title">
-
-          {{ store.currentNote.title }}
-
-        </div>
-
-        <div v-if="folderPath" class="note-context-path">{{ folderPath }}</div>
-
+      <div v-if="store.currentNote && folderPath" class="note-context">
+        <div class="note-context-path">{{ folderPath }}</div>
       </div>
 
       <div v-else class="app-logo">
@@ -253,6 +245,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 
 import { useNoteStore } from '../stores/note'
+import { useEditorTabsStore } from '../stores/editorTabs'
 
 import { useTheme } from '../composables/useTheme'
 
@@ -293,6 +286,7 @@ function emitSetViewMode(mode: ViewMode) {
 
 
 const store = useNoteStore()
+const tabsStore = useEditorTabsStore()
 
 const theme = useTheme()
 
@@ -419,9 +413,8 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
 /** 在当前文件夹下创建新笔记 */
 
 function createNote() {
-
-  store.createNote(store.activeFolderId ?? undefined)
-
+  const note = store.createNote(store.activeFolderId ?? undefined)
+  tabsStore.openTabForNewNote(note.id)
 }
 
 
