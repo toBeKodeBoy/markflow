@@ -6,6 +6,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import { useNoteStore } from '../../../src/stores/note'
 import { useEditorTabsStore } from '../../../src/stores/editorTabs'
 import { MAX_EDITOR_TABS } from '../../../src/constants'
+import { useStorage } from '../../../src/composables/useStorage'
 
 describe('useEditorTabsStore', () => {
   beforeEach(() => {
@@ -14,7 +15,7 @@ describe('useEditorTabsStore', () => {
     localStorage.clear()
   })
 
-  it('openTab 应打开并激活笔记', () => {
+  it('openTab opens and activates the note', () => {
     const noteStore = useNoteStore()
     const tabsStore = useEditorTabsStore()
     const note = noteStore.createNoteWithContent('# Tab A\n')
@@ -28,7 +29,7 @@ describe('useEditorTabsStore', () => {
     expect(noteStore.liveContent).toBe('# Tab A\n')
   })
 
-  it('重复 openTab 应激活已有 Tab', () => {
+  it('re-opening an existing tab only activates it', () => {
     const noteStore = useNoteStore()
     const tabsStore = useEditorTabsStore()
     const a = noteStore.createNoteWithContent('# A\n')
@@ -42,7 +43,7 @@ describe('useEditorTabsStore', () => {
     expect(tabsStore.activeTabId).toBe(a.id)
   })
 
-  it('setTabLiveContent 应标记 dirty', () => {
+  it('setTabLiveContent marks a tab dirty', () => {
     const noteStore = useNoteStore()
     const tabsStore = useEditorTabsStore()
     const note = noteStore.createNoteWithContent('# A\n')
@@ -54,7 +55,7 @@ describe('useEditorTabsStore', () => {
     expect(noteStore.liveContent).toBe('# A changed\n')
   })
 
-  it('flushTab 应持久化并清除 dirty', () => {
+  it('flushTab persists changes and clears dirty state', () => {
     const noteStore = useNoteStore()
     const tabsStore = useEditorTabsStore()
     const note = noteStore.createNoteWithContent('# A\n')
@@ -67,7 +68,7 @@ describe('useEditorTabsStore', () => {
     expect(noteStore.noteList[0].title).toBe('Saved')
   })
 
-  it('超过 maxTabs 应拒绝新开 Tab', () => {
+  it('refuses to open more than max tabs', () => {
     const noteStore = useNoteStore()
     const tabsStore = useEditorTabsStore()
 
@@ -83,7 +84,7 @@ describe('useEditorTabsStore', () => {
     expect(tabsStore.tabs.some((t) => t.noteId === extra.id)).toBe(false)
   })
 
-  it('restoreFromSettings 应恢复 Tab 列表', () => {
+  it('restoreFromSettings restores the open tabs list', () => {
     const noteStore = useNoteStore()
     const tabsStore = useEditorTabsStore()
     const a = noteStore.createNoteWithContent('# A\n')
@@ -100,5 +101,68 @@ describe('useEditorTabsStore', () => {
 
     expect(tabsStore2.tabs.map((t) => t.noteId)).toEqual([a.id, b.id])
     expect(tabsStore2.activeTabId).toBe(b.id)
+  })
+
+  it('closeOtherTabs keeps only the target tab and activates it', () => {
+    const noteStore = useNoteStore()
+    const tabsStore = useEditorTabsStore()
+    const a = noteStore.createNoteWithContent('# A\n')
+    const b = noteStore.createNoteWithContent('# B\n')
+    const c = noteStore.createNoteWithContent('# C\n')
+
+    tabsStore.openTab(a.id)
+    tabsStore.openTab(b.id)
+    tabsStore.openTab(c.id)
+
+    tabsStore.closeOtherTabs(b.id, { save: false })
+
+    expect(tabsStore.tabs.map((tab) => tab.noteId)).toEqual([b.id])
+    expect(tabsStore.activeTabId).toBe(b.id)
+    expect(noteStore.currentNote?.id).toBe(b.id)
+  })
+
+  it('closeAllTabs supports an empty zero-tab state', () => {
+    const noteStore = useNoteStore()
+    const tabsStore = useEditorTabsStore()
+    const note = noteStore.createNoteWithContent('# A\n')
+
+    tabsStore.openTab(note.id)
+    tabsStore.closeAllTabs({ save: false })
+
+    expect(tabsStore.tabs).toHaveLength(0)
+    expect(tabsStore.activeTabId).toBeNull()
+    expect(noteStore.currentNote).toBeNull()
+    expect(noteStore.liveContent).toBe('')
+  })
+
+  it('closeAllTabs saves dirty tabs when requested', () => {
+    const noteStore = useNoteStore()
+    const tabsStore = useEditorTabsStore()
+    const storage = useStorage()
+    const a = noteStore.createNoteWithContent('# A\n')
+    const b = noteStore.createNoteWithContent('# B\n')
+
+    tabsStore.openTab(a.id)
+    tabsStore.openTab(b.id)
+    tabsStore.setTabLiveContent(a.id, '# A saved\n')
+    tabsStore.setTabLiveContent(b.id, '# B saved\n')
+
+    tabsStore.closeAllTabs({ save: true })
+
+    expect(storage.getNote(a.id)?.content).toBe('# A saved\n')
+    expect(storage.getNote(b.id)?.content).toBe('# B saved\n')
+  })
+
+  it('closeAllTabs discards dirty drafts when save is false', () => {
+    const noteStore = useNoteStore()
+    const tabsStore = useEditorTabsStore()
+    const storage = useStorage()
+    const note = noteStore.createNoteWithContent('# A\n')
+
+    tabsStore.openTab(note.id)
+    tabsStore.setTabLiveContent(note.id, '# A draft\n')
+    tabsStore.closeAllTabs({ save: false })
+
+    expect(storage.getNote(note.id)?.content).toBe('# A\n')
   })
 })

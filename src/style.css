@@ -206,10 +206,61 @@ input:focus { border-color: var(--primary); }
   border-radius: 0;
 }
 
+.editor-tab-add:hover {
+  background: var(--bg-hover);
+}
+
 .editor-tab-pane {
   flex: 1;
   min-width: 0;
   min-height: 0;
+}
+
+.empty-tabs-state {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px;
+  text-align: center;
+  background:
+    radial-gradient(circle at top, rgba(99, 102, 241, 0.08), transparent 38%),
+    var(--bg-editor);
+}
+
+.empty-tabs-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.empty-tabs-text {
+  max-width: 420px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.empty-tabs-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.empty-tabs-actions button:not(.btn-primary) {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-toolbar);
+}
+
+.empty-tabs-actions button:not(.btn-primary):hover {
+  background: var(--bg-hover);
 }
 
 .mode-focus .editor-tab-bar { display: none; }
@@ -1448,6 +1499,7 @@ input:focus { border-color: var(--primary); }
 .btn-primary:hover { background: var(--primary-hover); }
 .modal-actions button:not(.btn-primary) { padding: 6px 12px; border-radius: var(--radius); }
 .modal-actions button:not(.btn-primary):hover { background: var(--bg-hover); }
+.danger-text-btn { color: var(--danger); }
 
 .move-folder-list {
   display: flex;
