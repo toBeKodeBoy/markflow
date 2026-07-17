@@ -1,6 +1,6 @@
 <template>
   <div class="editor-tab-bar" role="tablist" aria-label="打开的笔记">
-    <div ref="scrollRef" class="editor-tab-bar-scroll">
+    <div class="editor-tab-bar-scroll">
       <button
         v-for="tab in tabsStore.tabs"
         :key="tab.noteId"
@@ -102,7 +102,6 @@ interface PendingCloseState {
 
 const tabsStore = useEditorTabsStore()
 const noteStore = useNoteStore()
-const scrollRef = ref<HTMLElement>()
 const tabContextMenu = ref<TabContextMenuState | null>(null)
 const pendingClose = ref<PendingCloseState | null>(null)
 
