@@ -211,6 +211,12 @@ export function ensureFolderForPath(
 export const RELATIVE_IMAGE_MD_RE =
   /!\[([^\]]*)\]\((?!https?:|markflow-asset:|data:)([^)\s]+)(?:\s+"[^"]*")?\)/g
 
+/** Whether markdown contains local relative image references */
+export function hasRelativeImageReferences(content: string): boolean {
+  const re = new RegExp(RELATIVE_IMAGE_MD_RE.source, 'g')
+  return re.test(content)
+}
+
 /** Replace relative image paths with markflow-asset refs */
 export function rewriteRelativeImages(
   content: string,

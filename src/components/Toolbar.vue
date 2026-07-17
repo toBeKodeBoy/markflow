@@ -254,6 +254,7 @@ import { exportPdf, pdfExporting, sanitizeFilename } from '../utils/exportPdf'
 import { showAppNotification } from '../utils/notify'
 
 import { pickFolderScan } from '../utils/importFolderDevScan'
+import { hasRelativeImageReferences } from '../utils/importFolderHelpers'
 
 import { getFolderPathLabel } from '../utils/folderTree'
 
@@ -465,7 +466,7 @@ function exportNote() {
 
 /** 导入 .md 文件为笔记（uTools 环境或文件选择器） */
 
-function importNote() {
+async function importNote() {
 
   closeFileMenu()
 
@@ -473,11 +474,21 @@ function importNote() {
 
   if (typeof window.markflow !== 'undefined') {
 
-    const content = window.markflow.openMarkdownFile()
+    const file = window.markflow.openMarkdownFile()
 
-    if (content !== null) {
+    if (file !== null) {
 
-      store.createNoteWithContent(content, folderId)
+      const result = await store.importMarkdownFile(file, folderId)
+
+      tabsStore.openTabForNewNote(result.note.id)
+      const warning = result.warnings[0]
+      const importWarningMessage = `\u5bfc\u5165\u5b8c\u6210\uff0c\u4f46\u56fe\u7247\u5904\u7406\u5931\u8d25\uff1a${warning}`
+      if (warning) {
+        window.markflow.showNotification(importWarningMessage)
+        return
+        window.markflow.showNotification(`导入完成，但图片处理失败：${warning}`)
+        return
+      }
 
       window.markflow.showNotification('导入成功')
 
@@ -503,7 +514,14 @@ function importNote() {
 
         const content = ev.target?.result as string
 
-        store.createNoteWithContent(content, folderId)
+        if (hasRelativeImageReferences(content)) {
+          window.alert('浏览器环境下，含本地图片的 Markdown 请使用“导入文件夹”')
+          return
+        }
+
+        const note = store.createNoteWithContent(content, { folderId })
+
+        tabsStore.openTabForNewNote(note.id)
 
       }
 

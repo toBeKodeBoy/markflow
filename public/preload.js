@@ -69,7 +69,16 @@ window.markflow = {
       properties: ['openFile']
     });
     if (paths && paths.length > 0) {
-      return require('fs').readFileSync(paths[0], 'utf-8');
+      var selectedPath = paths[0];
+      var path = require('path');
+      var fs = require('fs');
+      var content = fs.readFileSync(selectedPath, 'utf-8');
+      return {
+        content: content,
+        path: selectedPath,
+        name: path.basename(selectedPath),
+        images: collectImages(content, selectedPath, fs, path)
+      };
     }
     return null;
   },

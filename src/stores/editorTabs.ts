@@ -16,6 +16,9 @@ import {
 import { registerEditorTabsBridge } from './editorTabsBridge'
 import type { EditorTab } from '../types'
 
+type SaveBehavior = { save: boolean }
+type TabCloseScope = 'current' | 'others' | 'all'
+
 export function isTabDirty(tab: EditorTab, liveContent?: string): boolean {
   const live = liveContent ?? tab.liveContent
   return live !== tab.savedContent
@@ -120,9 +123,10 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     const tab = findTab(noteId)
     if (!tab) return
     const noteStore = useNoteStore()
-    const content = noteStore.currentNote?.id === noteId
-      ? noteStore.liveContent
-      : (getTabContentCache(noteId) ?? tab.liveContent)
+    const content =
+      noteStore.currentNote?.id === noteId
+        ? noteStore.liveContent
+        : (getTabContentCache(noteId) ?? tab.liveContent)
     tab.liveContent = content
     syncTabCache(tab)
     if (!isTabDirty(tab, content)) return
@@ -148,35 +152,99 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     deleteTabContentCache(noteId)
   }
 
+  function clearActiveEditorState(): void {
+    activeTabId.value = null
+    useNoteStore().setActiveNote(null, '')
+  }
+
+  function getCloseTargetIds(scope: TabCloseScope, noteId?: string): string[] {
+    if (scope === 'all') return tabs.value.map((tab) => tab.noteId)
+    if (!noteId || !findTab(noteId)) return []
+    if (scope === 'current') return [noteId]
+    return tabs.value.filter((tab) => tab.noteId !== noteId).map((tab) => tab.noteId)
+  }
+
+  function getDirtyTabIds(noteIds: string[]): string[] {
+    return noteIds.filter((id) => {
+      const tab = findTab(id)
+      return tab ? isTabDirtyForTab(tab) : false
+    })
+  }
+
+  function applyTabClose(noteIds: string[], opts: SaveBehavior, preferredActiveId: string | null = null): void {
+    if (noteIds.length === 0) return
+
+    const uniqueIds = [...new Set(noteIds)].filter((id) => !!findTab(id))
+    if (uniqueIds.length === 0) return
+
+    if (opts.save) {
+      for (const id of uniqueIds) flushTab(id)
+    }
+
+    const closingIds = new Set(uniqueIds)
+    const currentActiveId = activeTabId.value
+    const activeWillClose = !!currentActiveId && closingIds.has(currentActiveId)
+    const fallbackNextId = activeWillClose && currentActiveId ? pickNextActiveId(currentActiveId) : null
+
+    for (const id of uniqueIds) removeTabEntry(id)
+
+    if (tabs.value.length === 0) {
+      clearActiveEditorState()
+      persistTabs()
+      return
+    }
+
+    if (preferredActiveId && findTab(preferredActiveId)) {
+      if (activeTabId.value !== preferredActiveId) {
+        activateTab(preferredActiveId)
+      } else {
+        persistTabs()
+      }
+      return
+    }
+
+    if (activeWillClose) {
+      const nextId = fallbackNextId && findTab(fallbackNextId) ? fallbackNextId : tabs.value[0]?.noteId ?? null
+      if (nextId) activateTab(nextId)
+      else {
+        clearActiveEditorState()
+        persistTabs()
+      }
+      return
+    }
+
+    persistTabs()
+  }
+
+  function closeCurrentTab(noteId: string, opts: SaveBehavior): void {
+    const tab = findTab(noteId)
+    if (!tab) return
+    applyTabClose([noteId], opts, null)
+  }
+
+  function closeOtherTabs(noteId: string, opts: SaveBehavior): void {
+    const targetIds = getCloseTargetIds('others', noteId)
+    applyTabClose(targetIds, opts, noteId)
+  }
+
+  function closeAllTabs(opts: SaveBehavior): void {
+    const targetIds = getCloseTargetIds('all')
+    applyTabClose(targetIds, opts, null)
+  }
+
   function closeTab(noteId: string): boolean {
     const tab = findTab(noteId)
     if (!tab) return true
 
     if (isTabDirtyForTab(tab)) {
       const title = getTabDisplayTitle(tab)
-      const save = window.confirm(`「${title}」有未保存的更改，是否保存？\n确定 = 保存并关闭，取消 = 不关闭`)
+      const save = window.confirm(`“${title}” 有未保存的更改，是否保存？\n确定 = 保存并关闭，取消 = 不关闭`)
       if (!save) return false
-      flushTab(noteId)
-    }
-
-    const wasActive = activeTabId.value === noteId
-    const nextId = wasActive ? pickNextActiveId(noteId) : null
-    removeTabEntry(noteId)
-
-    if (!wasActive) {
-      persistTabs()
+      closeCurrentTab(noteId, { save: true })
       return true
     }
 
-    if (tabs.value.length === 0) {
-      activeTabId.value = null
-      openWelcomeTab()
-      return true
-    }
-
-    if (nextId && findTab(nextId)) activateTab(nextId)
-    else if (tabs.value.length > 0) activateTab(tabs.value[0].noteId)
-    persistTabs()
+    closeCurrentTab(noteId, { save: false })
     return true
   }
 
@@ -218,20 +286,23 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
       }
       return
     }
+
     const wasActive = activeTabId.value === noteId
     const nextId = wasActive ? pickNextActiveId(noteId) : null
     removeTabEntry(noteId)
+
     if (!wasActive) {
       persistTabs()
       return
     }
+
     if (tabs.value.length === 0) {
       activeTabId.value = null
-      const noteStore = useNoteStore()
       noteStore.setActiveNote(null, '')
       openWelcomeTab()
       return
     }
+
     if (nextId && findTab(nextId)) activateTab(nextId)
     else if (tabs.value.length > 0) activateTab(tabs.value[0].noteId)
     persistTabs()
@@ -280,8 +351,7 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
   function clearAllTabs(): void {
     tabs.value = []
     clearTabContentCache()
-    activeTabId.value = null
-    useNoteStore().setActiveNote(null, '')
+    clearActiveEditorState()
     persistTabs()
   }
 
@@ -296,6 +366,11 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     openTab,
     activateTab,
     closeTab,
+    closeCurrentTab,
+    closeOtherTabs,
+    closeAllTabs,
+    getCloseTargetIds,
+    getDirtyTabIds,
     setTabLiveContent,
     flushTab,
     flushActiveTab,

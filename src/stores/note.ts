@@ -12,8 +12,9 @@ import { buildTagStats } from '../utils/tagStats'
 import { planSortOrderMigration } from '../utils/migrateNoteSortOrder'
 import { sortNotes } from '../utils/noteSort'
 import { runFolderImport, saveImportImageAsAsset } from '../utils/importFolderService'
+import { importMarkdownImages } from '../utils/importMarkdownImages'
 import type { ImportFolderOptions, ImportFolderProgress, ImportFolderResult, ImportFolderScanResult } from '../types/import'
-import type { Note, NoteListItem, Folder, TocJumpTarget, EditorContentPush } from '../types'
+import type { Note, NoteListItem, Folder, TocJumpTarget, EditorContentPush, ImportedMarkdownFile } from '../types'
 import { extractNoteTitle } from '../utils/noteTitle'
 import { getTabContentCache, setTabContentCache } from './tabContentCache'
 import { notifyNoteDeleted, notifyLibraryReset } from './editorTabsBridge'
@@ -29,6 +30,17 @@ function generateId() {
 }
 
 const extractTitle = extractNoteTitle
+
+interface CreateNoteWithContentOptions {
+  folderId?: string
+  sourceFilePath?: string
+}
+
+interface ImportMarkdownFileResult {
+  note: Note
+  imagesImported: number
+  warnings: string[]
+}
 
 export const useNoteStore = defineStore('note', () => {
   const storage = useStorage()
@@ -214,14 +226,19 @@ export const useNoteStore = defineStore('note', () => {
   }
 
   /** 以指定内容创建笔记，自动提取标题，保存并设为当前 */
-  function createNoteWithContent(content: string, folderId?: string) {
+  function createNoteWithContent(content: string, folderIdOrOptions?: string | CreateNoteWithContentOptions) {
+    const options =
+      typeof folderIdOrOptions === 'string'
+        ? { folderId: folderIdOrOptions }
+        : (folderIdOrOptions ?? {})
     const now = Date.now()
     const title = extractTitle(content)
     const note: Note = {
       id: generateId(),
       title,
       content,
-      folderId,
+      folderId: options.folderId,
+      sourceFilePath: options.sourceFilePath,
       tags: [],
       createdAt: now,
       updatedAt: now
@@ -233,6 +250,30 @@ export const useNoteStore = defineStore('note', () => {
     liveContent.value = content
     applyLargeFilePolicy(content)
     return note
+  }
+
+  async function importMarkdownFile(
+    file: ImportedMarkdownFile,
+    folderId?: string
+  ): Promise<ImportMarkdownFileResult> {
+    const assetStorage = getAssetStorage()
+    const result = await importMarkdownImages(
+      file.content,
+      file.images,
+      (base64, mime, filename) =>
+        saveImportImageAsAsset(base64, mime, filename, assetStorage.saveFromBlob)
+    )
+
+    const note = createNoteWithContent(result.content, {
+      folderId,
+      sourceFilePath: file.path,
+    })
+
+    return {
+      note,
+      imagesImported: result.imagesImported,
+      warnings: result.warnings,
+    }
   }
 
   /** 保存当前笔记内容变更（title/content/updatedAt），同步更新 noteList */
@@ -585,6 +626,7 @@ export const useNoteStore = defineStore('note', () => {
     searchedNoteList, filteredNoteList, allTags, tagStats, sidebarStateRevision,
     tocVisible, tocJumpTarget, editorContentPush, pendingLargeFileSwitch,
     loadNoteList, openNote, createNote, createNoteWithContent, setLiveContent, setActiveNote, setTocVisible,
+    importMarkdownFile,
     updateCurrentContent, updateNoteContent, deleteNote, renameNote, moveNote, requestTocJump, insertAutoToc,
     clearPendingLargeFileSwitch, applyLargeFilePolicy,
     createFolder, deleteFolder, renameFolder, moveFolder, getDeleteFolderImpact,

@@ -56,7 +56,12 @@ window.markflow = {
   showNotification: vi.fn(),
   saveMarkdownFile: vi.fn(() => true),
   savePdfFromHtml: vi.fn(() => Promise.resolve({ ok: true })),
-  openMarkdownFile: vi.fn(() => '# Test content\n'),
+  openMarkdownFile: vi.fn(() => ({
+    content: '# Test content\n',
+    path: 'D:\\mock\\test.md',
+    name: 'test.md',
+    images: [],
+  })),
   openMarkdownFolder: vi.fn(() =>
     Promise.resolve({
       rootPath: '/mock/import',

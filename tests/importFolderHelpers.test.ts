@@ -12,6 +12,7 @@ import {
   isImportableFilename,
   formatImportTextContent,
   normalizeRelativePath,
+  hasRelativeImageReferences,
 } from '../src/utils/importFolderHelpers'
 import type { Folder } from '../src/types'
 
@@ -126,6 +127,19 @@ describe('importFolderHelpers', () => {
   describe('normalizeRelativePath', () => {
     it('uses forward slashes', () => {
       expect(normalizeRelativePath('docs\\api.md')).toBe('docs/api.md')
+    })
+  })
+
+  describe('hasRelativeImageReferences', () => {
+    it('detects local relative markdown images', () => {
+      expect(hasRelativeImageReferences('![alt](assets/image.png)')).toBe(true)
+      expect(hasRelativeImageReferences('![alt](./assets/image.png "title")')).toBe(true)
+    })
+
+    it('ignores remote and asset-backed images', () => {
+      expect(hasRelativeImageReferences('![alt](https://example.com/a.png)')).toBe(false)
+      expect(hasRelativeImageReferences('![alt](markflow-asset://a1)')).toBe(false)
+      expect(hasRelativeImageReferences('plain text')).toBe(false)
     })
   })
 })
