@@ -15,8 +15,8 @@ import {
   normalizeRelativePath,
   resolveUniqueTitle,
   ensureFolderForPath,
-  rewriteRelativeImages,
 } from './importFolderHelpers'
+import { importMarkdownImages } from './importMarkdownImages'
 
 export interface FolderImportDeps {
   getFolderList: () => Folder[]
@@ -58,26 +58,18 @@ async function importImagesForFile(
     return { content: file.content, imported: 0, warnings: [] }
   }
 
-  const pathToAssetId = new Map<string, string>()
-  let imported = 0
-  const warnings: string[] = []
+  const createdAssetCountBefore = createdAssetIds.length
+  const result = await importMarkdownImages(file.content, file.images, async (base64, mime, filename) => {
+    const assetId = await saveImageFromBase64(base64, mime, filename)
+    createdAssetIds.push(assetId)
+    return assetId
+  })
 
-  for (const img of file.images) {
-    const key = img.relPath.trim().replace(/^<|>$/g, '')
-    try {
-      const assetId = await saveImageFromBase64(img.base64, img.mime, key.split('/').pop())
-      createdAssetIds.push(assetId)
-      pathToAssetId.set(key, assetId)
-      if (key.startsWith('./')) pathToAssetId.set(key.slice(2), assetId)
-      imported++
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      warnings.push(`图片导入失败 ${key}: ${msg}`)
-    }
+  return {
+    content: result.content,
+    imported: createdAssetIds.length - createdAssetCountBefore,
+    warnings: result.warnings,
   }
-
-  const content = rewriteRelativeImages(file.content, pathToAssetId)
-  return { content, imported, warnings }
 }
 
 async function importStandaloneImageNote(

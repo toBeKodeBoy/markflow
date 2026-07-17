@@ -12,7 +12,7 @@ export type {
   ImportFolderResult,
   PersistedImportFolderOptions,
 } from './import'
-import type { ImportFolderScanResult } from './import'
+import type { ImportFolderImage, ImportFolderScanResult } from './import'
 
 export interface Note {
   id: string
@@ -24,8 +24,17 @@ export interface Note {
   sortOrder?: number
   /** 文件夹导入时的源相对路径；存在时不从正文自动改标题 */
   importSourcePath?: string
+  /** 单文件导入时的源文件绝对路径 */
+  sourceFilePath?: string
   createdAt: number
   updatedAt: number
+}
+
+export interface ImportedMarkdownFile {
+  content: string
+  path: string
+  name: string
+  images: ImportFolderImage[]
 }
 
 export interface Folder {
@@ -149,7 +158,7 @@ export interface MarkFlowBridge {
     html: string,
     options?: PdfExportOptions
   ) => Promise<{ ok: true } | { ok: false; reason: 'cancel' | 'error' }>
-  openMarkdownFile: () => string | null
+  openMarkdownFile: () => ImportedMarkdownFile | null
   openMarkdownFolder: () => Promise<ImportFolderScanResult | null>
   isDarkTheme: () => boolean
   hideMainWindow: () => void
