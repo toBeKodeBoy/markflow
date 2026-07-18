@@ -1,5 +1,46 @@
 import type { NoteListItem } from '../types'
 
+export interface FuzzyMatchResult {
+  matched: boolean
+  score: number
+  indices: number[]
+}
+
+export function fuzzyMatch(text: string, query: string): FuzzyMatchResult {
+  if (!query) return { matched: false, score: 0, indices: [] }
+
+  const lowerText = text.toLowerCase()
+  const lowerQuery = query.toLowerCase()
+
+  const indices: number[] = []
+  let queryIdx = 0
+  let score = 0
+  let lastMatchIdx = -1
+
+  for (let i = 0; i < lowerText.length && queryIdx < lowerQuery.length; i++) {
+    if (lowerText[i] === lowerQuery[queryIdx]) {
+      indices.push(i)
+      if (lastMatchIdx >= 0) {
+        const gap = i - lastMatchIdx
+        score += gap === 1 ? 10 : Math.max(1, 6 - gap)
+      } else {
+        score += 10
+      }
+      if (i === 0 || lowerText[i - 1] === ' ' || lowerText[i - 1] === '/' || lowerText[i - 1] === '_' || lowerText[i - 1] === '-') {
+        score += 8
+      }
+      lastMatchIdx = i
+      queryIdx++
+    }
+  }
+
+  if (queryIdx < lowerQuery.length) {
+    return { matched: false, score: 0, indices: [] }
+  }
+
+  return { matched: true, score, indices }
+}
+
 export type SnippetSegment = { text: string; highlight: boolean }
 export type SearchMatchKind = 'title' | 'body' | 'tag'
 

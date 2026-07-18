@@ -3134,3 +3134,122 @@ img.ProseMirror-separator {
     grid-template-columns: 1fr;
   }
 }
+
+/* ===== Search Modal ===== */
+.search-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  z-index: 1200;
+}
+
+.search-modal {
+  width: min(520px, calc(100vw - 40px));
+  background: var(--bg-editor);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.search-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.search-modal-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+  opacity: 0.5;
+}
+
+.search-modal-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  color: var(--text);
+  outline: none;
+}
+
+.search-modal-input::placeholder {
+  color: var(--text-placeholder);
+}
+
+.search-modal-kbd {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.search-modal-results {
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.search-modal-results::-webkit-scrollbar { width: 4px; }
+.search-modal-results::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+.search-modal-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--text);
+}
+
+.search-modal-item:hover,
+.search-modal-item.active {
+  background: var(--bg-hover);
+}
+
+.search-modal-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-modal-item-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.search-modal-item-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+}
+
+.search-modal-empty {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
