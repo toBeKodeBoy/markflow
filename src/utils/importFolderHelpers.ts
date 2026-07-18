@@ -42,6 +42,14 @@ const CODE_FENCE_LANG: Record<string, string> = {
   adoc: 'asciidoc', asciidoc: 'asciidoc', org: 'org', tex: 'latex', latex: 'latex', bib: 'bib', rst: 'rst',
 }
 
+const FOLDER_SEQUENCE_RE = /^(\d+)(?:[\s._-]*)(.*)$/
+
+export interface FolderSequenceInfo {
+  hasSequence: boolean
+  sequence: number
+  restName: string
+}
+
 /** File extension from path (lowercase, no dot) */
 export function getFileExtension(relativePath: string): string {
   const name = relativePath.slice(relativePath.lastIndexOf('/') + 1)
@@ -53,6 +61,44 @@ export function getFileExtension(relativePath: string): string {
 /** Basename without path */
 export function getBasename(relativePath: string): string {
   return relativePath.slice(relativePath.lastIndexOf('/') + 1)
+}
+
+/** Parse leading integer prefix from a folder name for import ordering */
+export function parseFolderSequence(name: string): FolderSequenceInfo {
+  const trimmed = name.trim()
+  const match = trimmed.match(FOLDER_SEQUENCE_RE)
+  if (!match) {
+    return {
+      hasSequence: false,
+      sequence: Number.POSITIVE_INFINITY,
+      restName: trimmed,
+    }
+  }
+
+  return {
+    hasSequence: true,
+    sequence: Number.parseInt(match[1], 10),
+    restName: match[2].trim() || trimmed,
+  }
+}
+
+/** Compare folder names by leading integer prefix, then normalized name */
+export function compareImportFolderNames(a: string, b: string): number {
+  const parsedA = parseFolderSequence(a)
+  const parsedB = parseFolderSequence(b)
+
+  if (parsedA.hasSequence !== parsedB.hasSequence) {
+    return parsedA.hasSequence ? -1 : 1
+  }
+
+  if (parsedA.sequence !== parsedB.sequence) {
+    return parsedA.sequence - parsedB.sequence
+  }
+
+  const rest = parsedA.restName.localeCompare(parsedB.restName, undefined, { sensitivity: 'base' })
+  if (rest !== 0) return rest
+
+  return a.localeCompare(b, undefined, { sensitivity: 'base' })
 }
 
 /** Normalize path separators to forward slashes */
@@ -73,6 +119,33 @@ export function getFilenameStem(relativePath: string): string {
   const normalized = normalizeRelativePath(relativePath)
   const name = normalized.slice(normalized.lastIndexOf('/') + 1)
   return name.replace(/\.[^.]+$/, '')
+}
+
+/** Compare file names with case-insensitive locale semantics */
+export function compareImportFileNames(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { sensitivity: 'base' })
+}
+
+/** Compare import file paths by parent folder segments and filename */
+export function compareImportRelativePaths(a: string, b: string): number {
+  const normalizedA = normalizeRelativePath(a)
+  const normalizedB = normalizeRelativePath(b)
+  const partsA = normalizedA.split('/')
+  const partsB = normalizedB.split('/')
+  const fileA = partsA.pop() ?? normalizedA
+  const fileB = partsB.pop() ?? normalizedB
+  const maxDepth = Math.max(partsA.length, partsB.length)
+
+  for (let i = 0; i < maxDepth; i++) {
+    const segmentA = partsA[i]
+    const segmentB = partsB[i]
+    if (segmentA == null) return -1
+    if (segmentB == null) return 1
+    const folderCmp = compareImportFolderNames(segmentA, segmentB)
+    if (folderCmp !== 0) return folderCmp
+  }
+
+  return compareImportFileNames(fileA, fileB)
 }
 
 /** Whether directory name should be skipped during scan */

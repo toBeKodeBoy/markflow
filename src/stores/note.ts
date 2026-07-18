@@ -611,6 +611,7 @@ export const useNoteStore = defineStore('note', () => {
       saveImageFromBase64: (base64, mime, filename) =>
         saveImportImageAsAsset(base64, mime, filename, assetStorage.saveFromBlob),
       onProgress,
+      getExistingNotes: () => noteList.value,
     })
 
     noteList.value = storage.getNoteList()

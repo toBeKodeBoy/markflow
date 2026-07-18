@@ -6,6 +6,7 @@ import type {
   ImportFolderScanResult,
 } from '../types/import'
 import {
+  compareImportRelativePaths,
   extractImportTitle,
   formatImportTextContent,
   getFilenameStem,
@@ -20,6 +21,7 @@ import { importMarkdownImages } from './importMarkdownImages'
 
 export interface FolderImportDeps {
   getFolderList: () => Folder[]
+  getExistingNotes?: () => Array<Pick<Note, 'folderId' | 'sortOrder'>>
   saveFolderList: (folders: Folder[]) => void
   saveNote: (note: Note) => void
   getExistingTitles: () => Set<string>
@@ -41,11 +43,13 @@ function filterSelectedFiles(
     ...f,
     relativePath: normalizeRelativePath(f.relativePath),
   }))
-  if (!selectedPaths) return files
+  if (!selectedPaths) return [...files].sort((a, b) => compareImportRelativePaths(a.relativePath, b.relativePath))
   const normalizedSelected = new Set(
     [...selectedPaths].map((p) => normalizeRelativePath(p))
   )
-  return files.filter((f) => normalizedSelected.has(f.relativePath))
+  return files
+    .filter((f) => normalizedSelected.has(f.relativePath))
+    .sort((a, b) => compareImportRelativePaths(a.relativePath, b.relativePath))
 }
 
 async function importImagesForFile(
@@ -142,9 +146,18 @@ export async function runFolderImport(
   const folderSnapshot = folders.map((f) => ({ ...f }))
   const initialFolderCount = folders.length
   const existingTitles = deps.getExistingTitles()
+  const existingNotes = deps.getExistingNotes?.() ?? []
   const total = files.length
   const pendingNotes: Note[] = []
   const createdAssetIds: string[] = []
+  const nextFolderOrderByParent = new Map<string, number>()
+  const nextNoteOrderByFolder = new Map<string, number>()
+
+  for (const folder of folders) {
+    const key = folder.parentId ?? '__root__'
+    nextFolderOrderByParent.set(key, Math.max(nextFolderOrderByParent.get(key) ?? 0, folder.order + 1))
+  }
+  seedNextNoteOrderByFolder(nextNoteOrderByFolder, existingNotes)
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i]
@@ -179,7 +192,7 @@ export async function runFolderImport(
           folderId = ensureFolderForPath(dir, folders, (name, parentId) => ({
             id: generateId(),
             name,
-            order: folders.length,
+            order: nextSiblingImportOrder(nextFolderOrderByParent, parentId),
             parentId,
           }))
         }
@@ -216,6 +229,7 @@ export async function runFolderImport(
         title,
         content,
         folderId,
+        sortOrder: nextImportedNoteSortOrder(nextNoteOrderByFolder, folderId),
         tags: [],
         importSourcePath: file.relativePath.replace(/\\/g, '/'),
         titleLockedFromSource: true,
@@ -250,6 +264,31 @@ export async function runFolderImport(
   }
 
   return result
+}
+
+function nextSiblingImportOrder(nextOrderByParent: Map<string, number>, parentId?: string): number {
+  const key = parentId ?? '__root__'
+  const next = nextOrderByParent.get(key) ?? 0
+  nextOrderByParent.set(key, next + 1)
+  return next
+}
+
+function nextImportedNoteSortOrder(nextOrderByFolder: Map<string, number>, folderId?: string): number {
+  const key = folderId ?? '__root__'
+  const next = nextOrderByFolder.get(key) ?? 100
+  nextOrderByFolder.set(key, next + 100)
+  return next
+}
+
+function seedNextNoteOrderByFolder(
+  nextOrderByFolder: Map<string, number>,
+  notes: Array<Pick<Note, 'folderId' | 'sortOrder'>>
+): void {
+  for (const note of notes) {
+    const key = note.folderId ?? '__root__'
+    const next = note.sortOrder != null ? note.sortOrder + 100 : 100
+    nextOrderByFolder.set(key, Math.max(nextOrderByFolder.get(key) ?? 100, next))
+  }
 }
 
 /** Save image bytes as internal asset, return asset id */

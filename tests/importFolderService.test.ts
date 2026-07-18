@@ -48,6 +48,7 @@ describe('runFolderImport — Phase 1', () => {
       getFolderList: () => folders,
       saveFolderList,
       saveNote,
+      getExistingNotes: () => notes,
       getExistingTitles: () => new Set(notes.map((n) => n.title)),
       saveImageFromBase64: vi.fn(async () => 'asset-id'),
       onProgress,
@@ -71,6 +72,28 @@ describe('runFolderImport — Phase 1', () => {
     expect(notes.every((n) => n.importSourcePath)).toBe(true)
   })
 
+  it('sorts folders by leading integer prefix and assigns note sortOrder in that order', async () => {
+    const result = await run(
+      makeScan([
+        { path: '10-附录/z.md', content: '# Z' },
+        { path: '02-进阶/b.md', content: '# B' },
+        { path: '01-基础/c.md', content: '# C' },
+        { path: '01-基础/a.md', content: '# A' },
+      ])
+    )
+
+    expect(result.imported).toBe(4)
+    expect(folders.map((f) => `${f.order}:${f.name}`)).toEqual(['0:01-基础', '1:02-进阶', '2:10-附录'])
+
+    const baseFolderId = folders.find((f) => f.name === '01-基础')?.id
+    expect(
+      notes
+        .filter((n) => n.folderId === baseFolderId)
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+        .map((n) => `${n.sortOrder}:${n.title}`)
+    ).toEqual(['100:a', '200:c'])
+  })
+
   it('imports all files into target folder when preserveStructure is false', async () => {
     folders = [{ id: 'target', name: 'Imported', order: 0 }]
 
@@ -85,6 +108,48 @@ describe('runFolderImport — Phase 1', () => {
     expect(result.imported).toBe(2)
     expect(result.foldersCreated).toBe(0)
     expect(notes.every((n) => n.folderId === 'target')).toBe(true)
+  })
+
+  it('appends imported notes after existing sibling sortOrder in non-empty folder', async () => {
+    notes = [
+      {
+        id: 'existing-1',
+        title: 'old-a',
+        content: '',
+        folderId: 'target',
+        tags: [],
+        sortOrder: 100,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      {
+        id: 'existing-2',
+        title: 'old-b',
+        content: '',
+        folderId: 'target',
+        tags: [],
+        sortOrder: 200,
+        createdAt: 2,
+        updatedAt: 2,
+      },
+    ]
+    folders = [{ id: 'target', name: 'Imported', order: 0 }]
+
+    const result = await run(
+      makeScan([
+        { path: 'a.md', content: '# A' },
+        { path: 'b.md', content: '# B' },
+      ]),
+      { preserveStructure: false, targetFolderId: 'target' }
+    )
+
+    expect(result.imported).toBe(2)
+    expect(notes.filter((n) => n.folderId === 'target').map((n) => `${n.title}:${n.sortOrder}`)).toEqual([
+      'old-a:100',
+      'old-b:200',
+      'a:300',
+      'b:400',
+    ])
   })
 
   it('skips blank files', async () => {
