@@ -1,11 +1,5 @@
 ﻿<template>
   <aside class="sidebar" :style="{ width: sidebarWidth + 'px' }">
-    <SearchBar
-      ref="searchBarRef"
-      :show-count="isSearchMode"
-      :result-count="searchResultNotes.length"
-    />
-
     <div v-if="store.allTags.length" class="sidebar-tags">
       <button
         class="sidebar-tag"
@@ -20,7 +14,7 @@
         @click="onTagClick(tag)"
       >{{ tag }}</button>
     </div>
-    <div v-if="store.activeFolderId && !isSearchMode" class="sidebar-scope-bar">
+    <div v-if="store.activeFolderId" class="sidebar-scope-bar">
       <button
         type="button"
         class="sidebar-scope-reset"
@@ -32,7 +26,7 @@
       <span class="sidebar-scope-label">{{ activeFolderLabel }}</span>
     </div>
 
-    <div v-if="!isSearchMode" class="sidebar-section folders-section">
+    <div class="sidebar-section folders-section">
 
       <div
         ref="treeRef"
@@ -127,24 +121,6 @@
           {{ emptyTip }}
         </div>
       </div>
-    </div>
-
-    <div v-else class="sidebar-section search-results-section">
-      <SearchResultsList
-        :notes="searchResultNotes"
-        :query="store.searchQuery"
-        :folders="store.folderList"
-        :current-note-id="store.currentNote?.id"
-        :folder-scope-label="searchFolderScopeLabel"
-        :get-content="store.getNoteContentById"
-        :renaming-note-id="renamingNoteId"
-        v-model:renaming-note-name="renamingNoteName"
-        @select="openNoteTab"
-        @clear="onClearSearch"
-        @start-rename-note="startRenameNote"
-        @commit-rename-note="commitRenameNote"
-        @cancel-rename-note="cancelRenameNote"
-      />
     </div>
 
     <TagCloudPanel
@@ -298,8 +274,6 @@ import {
 import { buildTreeIndex } from '../utils/treeIndex'
 import CreateEntryModal from './CreateEntryModal.vue'
 import SidebarTreeRowView from './SidebarTreeRow.vue'
-import SearchBar from './SearchBar.vue'
-import SearchResultsList from './SearchResultsList.vue'
 import TagCloudPanel from './TagCloudPanel.vue'
 import { useAppSettings, clampSidebarWidth } from '../composables/useAppSettings'
 import { useNoteSort } from '../composables/useNoteSort'
@@ -319,7 +293,6 @@ const appSettings = useAppSettings()
 
 const sidebarWidth = ref(clampSidebarWidth(appSettings.get().sidebarWidth ?? 240))
 const treeRef = ref<HTMLElement>()
-const searchBarRef = ref<InstanceType<typeof SearchBar>>()
 const scrollTop = ref(0)
 const createModalVisible = ref(false)
 const createModalKind = ref<'note' | 'folder'>('folder')
@@ -365,16 +338,7 @@ const noteSort = useNoteSort({
 })
 
 const treeIndex = computed(() => buildTreeIndex(store.folderList, store.searchedNoteList))
-const isSearchMode = computed(() => store.searchQuery.trim().length > 0)
-const isSearching = computed(() => isSearchMode.value || !!store.activeTagFilter)
-
-const searchResultNotes = computed(() => store.filteredNoteList)
-
-const searchFolderScopeLabel = computed(() => {
-  if (!store.activeFolderId) return ''
-  const label = getFolderPathLabel(store.folderList, store.activeFolderId)
-  return label ? `文件夹：${label}` : ''
-})
+const isSearching = computed(() => !!store.activeTagFilter)
 
 const sidebarRows = computed(() =>
   flattenSidebarTree(store.folderList, store.searchedNoteList, expandedFolderIds.value, {
@@ -406,7 +370,6 @@ const showTreeEmpty = computed(() => {
 
 const emptyTip = computed(() => {
   if (store.activeTagFilter) return '无匹配标签的笔记'
-  if (store.searchQuery.trim()) return '无匹配笔记'
   return '暂无笔记，点击顶栏「新建」'
 })
 
@@ -440,10 +403,6 @@ function persistSidebarState() {
 function clearActiveFolder() {
   store.activeFolderId = null
   persistSidebarState()
-}
-
-function onClearSearch() {
-  searchBarRef.value?.clearSearch()
 }
 
 function isTagFilterActive(tag: string): boolean {
@@ -783,9 +742,9 @@ watch(
 )
 
 watch(
-  () => [store.searchQuery, store.activeTagFilter] as const,
-  ([q, tag]) => {
-    if (!q.trim() && !tag) return
+  () => store.activeTagFilter,
+  (tag) => {
+    if (!tag) return
     const ids = collectExpandIdsForSearch(store.folderList, store.searchedNoteList)
     expandedFolderIds.value = new Set([...expandedFolderIds.value, ...ids])
     persistSidebarState()
@@ -816,8 +775,4 @@ onMounted(() => {
 
 onUnmounted(() => document.removeEventListener('click', onGlobalClick))
 </script>
-
-
-
-
 

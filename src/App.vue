@@ -78,6 +78,12 @@
       @cancel="createModalVisible = false"
       @created="handleCreated"
     />
+
+    <SearchModal
+      :visible="searchModalVisible"
+      @close="searchModalVisible = false"
+      @select="onSearchSelect"
+    />
   </div>
 </template>
 
@@ -91,6 +97,7 @@ import Preview from './components/Preview.vue'
 import Toc from './components/Toc.vue'
 import ImageLightbox from './components/ImageLightbox.vue'
 import CreateEntryModal from './components/CreateEntryModal.vue'
+import SearchModal from './components/SearchModal.vue'
 import AppIcon from './components/AppIcon.vue'
 import EditorTabBar from './components/EditorTabBar.vue'
 import { useNoteStore } from './stores/note'
@@ -118,6 +125,7 @@ const { startScheduler, stopScheduler } = useAutoBackup()
 const sidebarVisible = ref(appSettings.get().sidebarVisible ?? true)
 const tocVisible = ref(false)
 const createModalVisible = ref(false)
+const searchModalVisible = ref(false)
 
 const showSidebar = computed(() => viewMode.value !== 'focus' && sidebarVisible.value)
 const hasOpenTabs = computed(() => tabsStore.tabs.length > 0)
@@ -191,8 +199,21 @@ function exitFocus() {
   viewMode.value = prevMode.value
 }
 
+function onSearchSelect(noteId: string) {
+  tabsStore.openTab(noteId)
+}
+
 function onKeydown(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault()
+    searchModalVisible.value = !searchModalVisible.value
+    return
+  }
   if (e.key !== 'Escape') return
+  if (searchModalVisible.value) {
+    searchModalVisible.value = false
+    return
+  }
   if (lightboxVisible.value) {
     closeLightbox()
     return
