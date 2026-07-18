@@ -1,10 +1,15 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import Sidebar from '../../../src/components/Sidebar.vue'
 import { useNoteStore } from '../../../src/stores/note'
 
 let pinia: Pinia
+let styleEl: HTMLStyleElement | null = null
+const root = resolve(import.meta.dirname, '../../..')
+const appStyles = readFileSync(resolve(root, 'src/style.css'), 'utf8')
 
 function mountSidebar() {
   return mount(Sidebar, {
@@ -62,6 +67,14 @@ describe('Sidebar', () => {
     document.body.innerHTML = ''
     pinia = createPinia()
     setActivePinia(pinia)
+    styleEl = document.createElement('style')
+    styleEl.textContent = appStyles
+    document.head.appendChild(styleEl)
+  })
+
+  afterEach(() => {
+    styleEl?.remove()
+    styleEl = null
   })
 
   it('removes redundant sidebar section headers and inline create hint', async () => {
@@ -132,5 +145,18 @@ describe('Sidebar', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('新建子文件夹')
     expect(wrapper.text()).toContain('新建笔记')
+  })
+  it('renders note context menu without fixed right anchoring', async () => {
+    const store = useNoteStore()
+    store.createNoteWithContent('# A\n')
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+    await wrapper.get('.note-context-trigger').trigger('click')
+    await flushPromises()
+
+    const menu = wrapper.get('.context-menu-fixed').element as HTMLElement
+    expect(menu.className).toContain('context-menu-fixed')
+    expect(getComputedStyle(menu).right).toBe('auto')
   })
 })
