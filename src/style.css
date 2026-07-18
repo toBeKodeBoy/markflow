@@ -1003,6 +1003,7 @@ input:focus { border-color: var(--primary); }
 
 .context-menu-fixed {
   position: fixed;
+  right: auto;
   z-index: 1100;
 }
 

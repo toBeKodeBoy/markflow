@@ -1,11 +1,16 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import EditorTabBar from '../../../src/components/EditorTabBar.vue'
 import { useNoteStore } from '../../../src/stores/note'
 import { useEditorTabsStore } from '../../../src/stores/editorTabs'
 
 let pinia: Pinia
+let styleEl: HTMLStyleElement | null = null
+const root = resolve(import.meta.dirname, '../../..')
+const appStyles = readFileSync(resolve(root, 'src/style.css'), 'utf8')
 
 function mountTabBar() {
   const container = document.createElement('div')
@@ -31,6 +36,14 @@ describe('EditorTabBar', () => {
     document.body.innerHTML = ''
     pinia = createPinia()
     setActivePinia(pinia)
+    styleEl = document.createElement('style')
+    styleEl.textContent = appStyles
+    document.head.appendChild(styleEl)
+  })
+
+  afterEach(() => {
+    styleEl?.remove()
+    styleEl = null
   })
 
   it('shows current, other, and all close actions in the tab context menu', async () => {
@@ -95,5 +108,19 @@ describe('EditorTabBar', () => {
 
     expect(wrapper.find('.editor-tab-add').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('新建内容')
+  })
+  it('uses the shared fixed context menu style without right anchoring', async () => {
+    const noteStore = useNoteStore()
+    const tabsStore = useEditorTabsStore()
+    const note = noteStore.createNoteWithContent('# A\n')
+    tabsStore.openTab(note.id)
+
+    const wrapper = mountTabBar()
+    await wrapper.find('.editor-tab').trigger('contextmenu', { clientX: 40, clientY: 32 })
+
+    const menu = document.body.querySelector('[data-testid="tab-context-menu"]') as HTMLElement | null
+    expect(menu?.className).toContain('context-menu-fixed')
+    expect(menu).not.toBeNull()
+    expect(getComputedStyle(menu!).right).toBe('auto')
   })
 })
