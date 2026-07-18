@@ -34,12 +34,18 @@ const extractTitle = extractNoteTitle
 interface CreateNoteWithContentOptions {
   folderId?: string
   sourceFilePath?: string
+  title?: string
+  titleLockedFromSource?: boolean
 }
 
 interface ImportMarkdownFileResult {
   note: Note
   imagesImported: number
   warnings: string[]
+}
+
+function shouldKeepImportedTitle(note: Pick<Note, 'titleLockedFromSource' | 'importSourcePath' | 'sourceFilePath'>): boolean {
+  return !!(note.titleLockedFromSource || note.importSourcePath || note.sourceFilePath)
 }
 
 export const useNoteStore = defineStore('note', () => {
@@ -185,7 +191,7 @@ export const useNoteStore = defineStore('note', () => {
   function updateNoteContent(noteId: string, content: string) {
     const note = storage.getNote(noteId)
     if (!note) return
-    const keepImportedTitle = !!note.importSourcePath
+    const keepImportedTitle = shouldKeepImportedTitle(note)
     const title = keepImportedTitle ? note.title : extractTitle(content)
     note.content = content
     note.title = title
@@ -232,13 +238,14 @@ export const useNoteStore = defineStore('note', () => {
         ? { folderId: folderIdOrOptions }
         : (folderIdOrOptions ?? {})
     const now = Date.now()
-    const title = extractTitle(content)
+    const title = options.title ?? extractTitle(content)
     const note: Note = {
       id: generateId(),
       title,
       content,
       folderId: options.folderId,
       sourceFilePath: options.sourceFilePath,
+      titleLockedFromSource: options.titleLockedFromSource,
       tags: [],
       createdAt: now,
       updatedAt: now
@@ -266,7 +273,9 @@ export const useNoteStore = defineStore('note', () => {
 
     const note = createNoteWithContent(result.content, {
       folderId,
+      title: extractTitle(result.content, file.name),
       sourceFilePath: file.path,
+      titleLockedFromSource: true,
     })
 
     return {
@@ -304,11 +313,15 @@ export const useNoteStore = defineStore('note', () => {
     note.title = title
     note.updatedAt = Date.now()
     delete note.importSourcePath
+    delete note.sourceFilePath
+    note.titleLockedFromSource = false
     storage.saveNote(note)
     noteList.value = storage.getNoteList()
     if (currentNote.value?.id === id) {
       currentNote.value.title = title
       delete currentNote.value.importSourcePath
+      delete currentNote.value.sourceFilePath
+      currentNote.value.titleLockedFromSource = false
     }
   }
 

@@ -67,7 +67,7 @@ describe('Toolbar', () => {
       .trigger('click')
     await flushPromises()
 
-    expect(noteStore.currentNote?.title).toBe('Imported Title')
+    expect(noteStore.currentNote?.title).toBe('imported')
     expect(noteStore.currentNote?.sourceFilePath).toBe('D:\\docs\\imported.md')
     expect(tabsStore.activeTabId).toBe(noteStore.currentNote?.id ?? null)
     expect(tabsStore.tabs).toHaveLength(1)
@@ -120,5 +120,46 @@ describe('Toolbar', () => {
     )
     expect(createNoteSpy).not.toHaveBeenCalled()
     expect(tabsStore.tabs).toHaveLength(0)
+  })
+
+  it('浏览器单文件导入应使用文件名作为标题', async () => {
+    const fakeInput = {
+      type: '',
+      accept: '',
+      files: [{ name: 'meeting-notes.md' }],
+      onchange: null as ((event: Event) => void) | null,
+      click() {
+        this.onchange?.({ target: this } as unknown as Event)
+      },
+    }
+
+    class MockFileReader {
+      result: string | ArrayBuffer | null = null
+      onload: ((event: ProgressEvent<FileReader>) => void) | null = null
+      readAsText() {
+        this.result = '前言\n\n没有一级标题'
+        this.onload?.({ target: this } as ProgressEvent<FileReader>)
+      }
+    }
+
+    delete (window as Partial<Window>).markflow
+    const realCreateElement = document.createElement.bind(document)
+    vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+      if (tagName === 'input') return fakeInput as unknown as HTMLInputElement
+      return realCreateElement(tagName)
+    })
+    window.FileReader = MockFileReader as unknown as typeof FileReader
+
+    const wrapper = mountToolbar()
+    const noteStore = useNoteStore()
+
+    await wrapper.find('.btn-icon.btn-icon-text').trigger('click')
+    await wrapper
+      .findAll('[role="menuitem"]')
+      .find((button) => button.text().includes('导入文件'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(noteStore.currentNote?.title).toBe('meeting-notes')
   })
 })

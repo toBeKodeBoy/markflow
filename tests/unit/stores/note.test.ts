@@ -151,6 +151,53 @@ describe('useNoteStore', () => {
   })
 
   describe('imported note title', () => {
+    it('importMarkdownFile 应优先使用文件名作为标题', async () => {
+      const store = useNoteStore()
+      const result = await store.importMarkdownFile({
+        content: '# Project Title\n\nbody',
+        path: 'D:\\docs\\imported.md',
+        name: 'imported.md',
+        images: [],
+      })
+
+      expect(result.note.title).toBe('imported')
+      expect(store.currentNote?.title).toBe('imported')
+    })
+
+    it('单文件导入后更新正文不应覆盖文件名标题', async () => {
+      const store = useNoteStore()
+      await store.importMarkdownFile({
+        content: '# Project Title\n\nbody',
+        path: 'D:\\docs\\imported.md',
+        name: 'imported.md',
+        images: [],
+      })
+
+      store.updateCurrentContent('# Changed Title\n\nbody edited')
+      expect(store.currentNote?.title).toBe('imported')
+    })
+
+    it('兼容历史导入笔记：旧数据更新正文时仍应保持文件名标题', () => {
+      const legacyNote = makeNote({
+        id: 'legacy-imported',
+        title: 'readme',
+        content: '# Project Title\n\nbody',
+        importSourcePath: 'docs/readme.md',
+      })
+      localStorage.setItem(
+        'markflow_note_list',
+        JSON.stringify([{ id: legacyNote.id, title: legacyNote.title, updatedAt: legacyNote.updatedAt }])
+      )
+      localStorage.setItem(`markflow_note_${legacyNote.id}`, JSON.stringify(legacyNote))
+
+      const store = useNoteStore()
+      store.loadNoteList()
+      store.openNote(legacyNote.id)
+
+      store.updateCurrentContent('# Changed Title\n\nbody edited')
+      expect(store.currentNote?.title).toBe('readme')
+    })
+
     it('updateCurrentContent 不应覆盖导入笔记的文件名标题', async () => {
       const store = useNoteStore()
       await store.batchImportFromFolder(
@@ -177,6 +224,20 @@ describe('useNoteStore', () => {
       const id = store.currentNote!.id
       store.renameNote(id, 'custom')
       store.updateCurrentContent('# New Heading\n\n')
+      expect(store.currentNote?.title).toBe('New Heading')
+    })
+
+    it('单文件导入重命名后应恢复从正文提取标题', async () => {
+      const store = useNoteStore()
+      const result = await store.importMarkdownFile({
+        content: '# Title\n\nbody',
+        path: 'D:\\docs\\imported.md',
+        name: 'imported.md',
+        images: [],
+      })
+
+      store.renameNote(result.note.id, 'custom')
+      store.updateCurrentContent('# New Heading\n\nbody edited')
       expect(store.currentNote?.title).toBe('New Heading')
     })
   })

@@ -519,9 +519,14 @@ async function importNote() {
           return
         }
 
-        const note = store.createNoteWithContent(content, { folderId })
-
-        tabsStore.openTabForNewNote(note.id)
+        void store.importMarkdownFile({
+          content,
+          path: file.name,
+          name: file.name,
+          images: [],
+        }, folderId).then((result) => {
+          tabsStore.openTabForNewNote(result.note.id)
+        })
 
       }
 
