@@ -133,7 +133,11 @@ const emit = defineEmits<{
 }>()
 
 const rowStyle = computed(() => {
-  const pad = 12 + props.row.depth * 16
+  const isNote = props.row.kind === 'note'
+  // 笔记行无折叠按钮，需补偿 folder-toggle(16px) + gap(6px) 的宽度，使文字与文件夹对齐
+  // 若 style.css 中 .folder-toggle 或 .folder-item gap 变更，此处需同步更新
+  const toggleArea = isNote ? 22 : 0
+  const pad = 12 + props.row.depth * 16 + toggleArea
   const base: Record<string, string> = { paddingLeft: `${pad}px` }
   if (props.virtual && props.virtualStyle) {
     return { ...base, ...props.virtualStyle, position: 'absolute', left: '0', right: '0' }
