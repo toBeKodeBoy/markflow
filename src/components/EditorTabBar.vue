@@ -1,18 +1,35 @@
 <template>
   <div class="editor-tab-bar" role="tablist" aria-label="打开的笔记">
     <div class="editor-tab-bar-scroll">
-      <button
+      <div
         v-for="tab in tabsStore.tabs"
         :key="tab.noteId"
-        type="button"
         role="tab"
         :class="['editor-tab', { active: tab.noteId === tabsStore.activeTabId, dirty: tabsStore.isTabDirtyForTab(tab) }]"
         :aria-selected="tab.noteId === tabsStore.activeTabId"
+        tabindex="0"
         @click="onActivate(tab.noteId)"
+        @keydown="onTabKeydown($event, tab.noteId)"
         @auxclick="onAuxClick($event, tab.noteId)"
         @contextmenu.prevent="onContextMenu($event, tab.noteId)"
       >
-        <span class="editor-tab-title" :title="tabsStore.getTabDisplayTitle(tab)">
+        <input
+          v-if="renamingNoteId === tab.noteId"
+          :value="renamingNoteName"
+          class="editor-tab-rename-input"
+          autofocus
+          @input="onRenameInput"
+          @keyup.enter="commitRenameNote"
+          @keyup.escape="cancelRenameNote"
+          @blur="commitRenameNote"
+          @click.stop
+        />
+        <span
+          v-else
+          class="editor-tab-title"
+          :title="tabsStore.getTabDisplayTitle(tab)"
+          @dblclick.stop="startRenameNote(tab.noteId)"
+        >
           {{ tabsStore.getTabDisplayTitle(tab) }}
         </span>
         <span v-if="tabsStore.isTabDirtyForTab(tab)" class="editor-tab-dirty" aria-hidden="true">•</span>
@@ -26,7 +43,7 @@
         >
           <AppIcon name="close" :size="12" />
         </span>
-      </button>
+      </div>
     </div>
   </div>
 
@@ -72,6 +89,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { useNoteStore } from '../stores/note'
 import { useEditorTabsStore } from '../stores/editorTabs'
 import AppIcon from './AppIcon.vue'
 
@@ -90,19 +108,32 @@ interface PendingCloseState {
   dirtyCount: number
 }
 
+const noteStore = useNoteStore()
 const tabsStore = useEditorTabsStore()
 const tabContextMenu = ref<TabContextMenuState | null>(null)
 const pendingClose = ref<PendingCloseState | null>(null)
+const renamingNoteId = ref<string | null>(null)
+const renamingNoteName = ref('')
 
 function onActivate(noteId: string) {
+  if (renamingNoteId.value) return
+  tabsStore.activateTab(noteId)
+}
+
+function onTabKeydown(e: KeyboardEvent, noteId: string) {
+  if (renamingNoteId.value) return
+  if (e.key !== 'Enter' && e.key !== ' ') return
+  e.preventDefault()
   tabsStore.activateTab(noteId)
 }
 
 function onClose(noteId: string) {
+  if (renamingNoteId.value === noteId) return
   tabsStore.closeTab(noteId)
 }
 
 function onAuxClick(e: MouseEvent, noteId: string) {
+  if (renamingNoteId.value) return
   if (e.button === 1) {
     e.preventDefault()
     tabsStore.closeTab(noteId)
@@ -110,8 +141,35 @@ function onAuxClick(e: MouseEvent, noteId: string) {
 }
 
 function onContextMenu(e: MouseEvent, noteId: string) {
+  if (renamingNoteId.value) return
   pendingClose.value = null
   tabContextMenu.value = { noteId, x: e.clientX, y: e.clientY }
+}
+
+function startRenameNote(noteId: string) {
+  const note = noteStore.noteList.find((item) => item.id === noteId)
+  if (!note) return
+  tabContextMenu.value = null
+  pendingClose.value = null
+  renamingNoteId.value = noteId
+  renamingNoteName.value = note.title
+}
+
+function onRenameInput(e: Event) {
+  renamingNoteName.value = (e.target as HTMLInputElement).value
+}
+
+function commitRenameNote() {
+  const title = renamingNoteName.value.trim()
+  if (renamingNoteId.value && title) {
+    noteStore.renameNote(renamingNoteId.value, title)
+  }
+  cancelRenameNote()
+}
+
+function cancelRenameNote() {
+  renamingNoteId.value = null
+  renamingNoteName.value = ''
 }
 
 function requestClose(scope: TabCloseScope, noteId: string) {
@@ -164,6 +222,7 @@ function onGlobalKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
     tabContextMenu.value = null
     pendingClose.value = null
+    cancelRenameNote()
   }
 }
 

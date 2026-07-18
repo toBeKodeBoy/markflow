@@ -123,4 +123,53 @@ describe('EditorTabBar', () => {
     expect(menu).not.toBeNull()
     expect(getComputedStyle(menu!).right).toBe('auto')
   })
+
+  it('双击标签标题应进入原地重命名并提交到 store', async () => {
+    const noteStore = useNoteStore()
+    const tabsStore = useEditorTabsStore()
+    const note = noteStore.createNoteWithContent('# A\n')
+    tabsStore.openTab(note.id)
+
+    const wrapper = mountTabBar()
+    await wrapper.get('.editor-tab-title').trigger('dblclick')
+
+    const input = wrapper.get('.editor-tab-rename-input')
+    await input.setValue('改名后的标签')
+    await input.trigger('keyup.enter')
+
+    expect(noteStore.noteList[0].title).toBe('改名后的标签')
+    expect(wrapper.text()).toContain('改名后的标签')
+  })
+
+  it('标签重命名按 Escape 应取消且不改标题', async () => {
+    const noteStore = useNoteStore()
+    const tabsStore = useEditorTabsStore()
+    const note = noteStore.createNoteWithContent('# A\n')
+    tabsStore.openTab(note.id)
+
+    const wrapper = mountTabBar()
+    await wrapper.get('.editor-tab-title').trigger('dblclick')
+
+    const input = wrapper.get('.editor-tab-rename-input')
+    await input.setValue('不会生效')
+    await input.trigger('keyup.escape')
+
+    expect(noteStore.noteList[0].title).toBe('A')
+    expect(wrapper.find('.editor-tab-rename-input').exists()).toBe(false)
+  })
+
+  it('键盘按 Enter 应激活标签页', async () => {
+    const noteStore = useNoteStore()
+    const tabsStore = useEditorTabsStore()
+    const a = noteStore.createNoteWithContent('# A\n')
+    const b = noteStore.createNoteWithContent('# B\n')
+    tabsStore.openTab(a.id)
+    tabsStore.openTab(b.id)
+
+    const wrapper = mountTabBar()
+    const tabs = wrapper.findAll('.editor-tab')
+    await tabs[0].trigger('keydown', { key: 'Enter' })
+
+    expect(tabsStore.activeTabId).toBe(a.id)
+  })
 })
