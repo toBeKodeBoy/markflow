@@ -88,7 +88,7 @@
 
     <div class="topbar-right">
 
-      <button class="btn-action" @click="createNote" title="新建笔记" aria-label="新建笔记">
+      <button class="btn-action" @click="openCreateModal('note')" title="新建笔记" aria-label="新建笔记">
 
         <AppIcon name="plus" :size="14" />
 
@@ -236,6 +236,16 @@
 
   />
 
+  <CreateEntryModal
+    :visible="createModalVisible"
+    :default-kind="createModalKind"
+    :default-parent-id="store.activeFolderId ?? undefined"
+    :folders="store.folderList"
+    :active-folder-id="store.activeFolderId"
+    @cancel="createModalVisible = false"
+    @created="handleCreated"
+  />
+
 </template>
 
 
@@ -256,13 +266,14 @@ import { showAppNotification } from '../utils/notify'
 import { pickFolderScan } from '../utils/importFolderDevScan'
 import { hasRelativeImageReferences } from '../utils/importFolderHelpers'
 
-import { getFolderPathLabel } from '../utils/folderTree'
+import { collectAncestorFolderIds, getFolderPathLabel } from '../utils/folderTree'
 
 import PdfExportModal from './PdfExportModal.vue'
 
 import SettingsModal from './SettingsModal.vue'
 
 import ImportFolderModal from './ImportFolderModal.vue'
+import CreateEntryModal from './CreateEntryModal.vue'
 
 import AppIcon from './AppIcon.vue'
 
@@ -300,6 +311,8 @@ const settingsModalVisible = ref(false)
 const fileMenuOpen = ref(false)
 
 const importFolderVisible = ref(false)
+const createModalVisible = ref(false)
+const createModalKind = ref<'note' | 'folder'>('note')
 
 const importFolderScan = ref<ImportFolderScanResult | null>(null)
 
@@ -411,11 +424,28 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
 
 
 
-/** 在当前文件夹下创建新笔记 */
+function openCreateModal(kind: 'note' | 'folder') {
+  createModalKind.value = kind
+  createModalVisible.value = true
+}
 
-function createNote() {
-  const note = store.createNote(store.activeFolderId ?? undefined)
-  tabsStore.openTabForNewNote(note.id)
+function handleCreated(payload: { kind: 'note' | 'folder'; id: string; parentId?: string }) {
+  createModalVisible.value = false
+  if (payload.kind === 'note') {
+    store.activeFolderId = payload.parentId ?? null
+    tabsStore.openTabForNewNote(payload.id)
+    return
+  }
+
+  store.activeFolderId = payload.id
+  const settings = appSettings.get()
+  const nextExpandedFolderIds = new Set(settings.sidebarExpandedFolderIds ?? [])
+  for (const id of collectAncestorFolderIds(payload.id, store.folderList)) nextExpandedFolderIds.add(id)
+  nextExpandedFolderIds.add(payload.id)
+  appSettings.save({
+    sidebarExpandedFolderIds: [...nextExpandedFolderIds],
+    sidebarActiveFolderId: payload.id,
+  })
 }
 
 
@@ -519,9 +549,14 @@ async function importNote() {
           return
         }
 
-        const note = store.createNoteWithContent(content, { folderId })
-
-        tabsStore.openTabForNewNote(note.id)
+        void store.importMarkdownFile({
+          content,
+          path: file.name,
+          name: file.name,
+          images: [],
+        }, folderId).then((result) => {
+          tabsStore.openTabForNewNote(result.note.id)
+        })
 
       }
 

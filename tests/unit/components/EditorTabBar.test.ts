@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
 import EditorTabBar from '../../../src/components/EditorTabBar.vue'
 import { useNoteStore } from '../../../src/stores/note'
@@ -8,10 +8,19 @@ import { useEditorTabsStore } from '../../../src/stores/editorTabs'
 let pinia: Pinia
 
 function mountTabBar() {
+  const container = document.createElement('div')
+  document.body.appendChild(container)
   return mount(EditorTabBar, {
-    attachTo: document.body,
+    attachTo: container,
     global: {
       plugins: [pinia],
+      stubs: {
+        Teleport: true,
+        CreateEntryModal: {
+          props: ['visible'],
+          template: '<div v-if="visible">新建内容</div>',
+        },
+      },
     },
   })
 }
@@ -78,5 +87,13 @@ describe('EditorTabBar', () => {
     expect(modal?.textContent).toContain('保存并关闭')
     expect(modal?.textContent).toContain('直接关闭')
     expect(modal?.textContent).toContain('取消')
+  })
+
+  it('does not render the redundant add button in the tab bar', async () => {
+    const wrapper = mountTabBar()
+    await flushPromises()
+
+    expect(wrapper.find('.editor-tab-add').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('新建内容')
   })
 })

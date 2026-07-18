@@ -81,17 +81,14 @@ describe('笔记 CRUD 集成', () => {
     expect(store.pendingLargeFileSwitch).toBe(false)
   })
 
-  it('从内容提取标题：扫描前 50 行', () => {
-    // 前 50 行无标题
+  it('从内容提取标题：仅识别前 50 行内的一级标题', () => {
     const lines = Array.from({ length: 50 }, (_, i) => `第${i + 1}行`)
-    const noHeading = lines.join('\n')
-    store.createNoteWithContent(noHeading)
-    // 无 # 标题时取第一个非空行前 30 字符
-    expect(store.currentNote!.title).toBe('第1行')
 
-    // 标题在最后一行（第51行 > TITLE_SCAN_LINES）
-    const content = lines.join('\n') + '\n# 第51行标题'
+    store.createNoteWithContent(lines.join('\n'))
+    expect(store.currentNote!.title).toBe('无标题')
+
+    const content = `${lines.join('\n')}\n# 第51行标题`
     const note2 = store.createNoteWithContent(content)
-    expect(note2.title).toBe('第1行') // 未超出扫描范围，取第一行
+    expect(note2.title).toBe('无标题')
   })
 })

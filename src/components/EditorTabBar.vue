@@ -28,15 +28,6 @@
         </span>
       </button>
     </div>
-    <button
-      type="button"
-      class="editor-tab-add btn-icon"
-      title="新建笔记"
-      aria-label="新建笔记"
-      @click="onCreate"
-    >
-      <AppIcon name="plus" :size="14" />
-    </button>
   </div>
 
   <Teleport to="body">
@@ -82,7 +73,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useEditorTabsStore } from '../stores/editorTabs'
-import { useNoteStore } from '../stores/note'
 import AppIcon from './AppIcon.vue'
 
 type TabCloseScope = 'current' | 'others' | 'all'
@@ -101,7 +91,6 @@ interface PendingCloseState {
 }
 
 const tabsStore = useEditorTabsStore()
-const noteStore = useNoteStore()
 const tabContextMenu = ref<TabContextMenuState | null>(null)
 const pendingClose = ref<PendingCloseState | null>(null)
 
@@ -176,11 +165,6 @@ function onGlobalKeydown(e: KeyboardEvent) {
     tabContextMenu.value = null
     pendingClose.value = null
   }
-}
-
-function onCreate() {
-  const note = noteStore.createNote(noteStore.activeFolderId ?? undefined)
-  tabsStore.openTabForNewNote(note.id)
 }
 
 onMounted(() => {

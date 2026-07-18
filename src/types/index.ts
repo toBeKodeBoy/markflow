@@ -26,6 +26,8 @@ export interface Note {
   importSourcePath?: string
   /** 单文件导入时的源文件绝对路径 */
   sourceFilePath?: string
+  /** 导入来源标题锁定；存在时编辑正文不自动改标题 */
+  titleLockedFromSource?: boolean
   createdAt: number
   updatedAt: number
 }
