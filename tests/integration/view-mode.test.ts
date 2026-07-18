@@ -70,6 +70,17 @@ describe('四视图模式切换', () => {
     expect(wrapper.find('.stub-preview').exists()).toBe(false)
   })
 
+  it('非专注模式下页签栏位于右侧主内容列，侧栏上移为 workspace 首列', () => {
+    const wrapper = mountApp()
+    const workspace = wrapper.get('.workspace')
+    const children = workspace.element.children
+
+    expect(children[0]).toBe(wrapper.get('.stub-sidebar').element)
+    expect(children[1]).toBe(wrapper.get('.workspace-main').element)
+    expect(wrapper.get('.workspace-main').find('.editor-tab-bar-stub').exists()).toBe(true)
+    expect(Array.from(children).some((child) => child.classList.contains('editor-tab-bar-stub'))).toBe(false)
+  })
+
   it('分屏模式渲染 Editor + Preview', async () => {
     const wrapper = mountApp()
     await clickMode(wrapper, '分屏')
