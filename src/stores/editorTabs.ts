@@ -36,7 +36,13 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
   }
 
   function getTabDisplayTitle(tab: EditorTab): string {
-    return extractNoteTitle(tab.liveContent)
+    const noteStore = useNoteStore()
+    const currentNote = noteStore.currentNote?.id === tab.noteId ? noteStore.currentNote : null
+    const persistedNote = currentNote ?? storage.getNote(tab.noteId)
+    return currentNote?.title
+      ?? noteStore.noteList.find((note) => note.id === tab.noteId)?.title
+      ?? persistedNote?.title
+      ?? extractNoteTitle(tab.liveContent)
   }
 
   function persistTabs(): void {
