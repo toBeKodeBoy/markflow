@@ -165,4 +165,29 @@ describe('useEditorTabsStore', () => {
 
     expect(storage.getNote(note.id)?.content).toBe('# A\n')
   })
+
+  it('getTabDisplayTitle uses locked source title for imported notes', () => {
+    const noteStore = useNoteStore()
+    const tabsStore = useEditorTabsStore()
+    const note = noteStore.createNoteWithContent('# 001\n正文', {
+      title: '002',
+      sourceFilePath: 'D:\\docs\\002.md',
+      titleLockedFromSource: true,
+    })
+
+    tabsStore.openTab(note.id)
+
+    expect(tabsStore.getTabDisplayTitle(tabsStore.tabs[0])).toBe('002')
+  })
+
+  it('getTabDisplayTitle stays consistent with renamed note title', () => {
+    const noteStore = useNoteStore()
+    const tabsStore = useEditorTabsStore()
+    const note = noteStore.createNoteWithContent('# 入门练习\n正文')
+
+    tabsStore.openTab(note.id)
+    noteStore.renameNote(note.id, '入门练习001')
+
+    expect(tabsStore.getTabDisplayTitle(tabsStore.tabs[0])).toBe('入门练习001')
+  })
 })
