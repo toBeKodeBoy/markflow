@@ -31,6 +31,7 @@
       v-if="renamingFolderId === row.folder!.id"
       :value="renamingFolderName"
       class="rename-input"
+      autofocus
       @input="$emit('update:renamingFolderName', ($event.target as HTMLInputElement).value)"
       @keyup.enter="$emit('commit-rename-folder')"
       @keyup.escape="$emit('cancel-rename-folder')"
@@ -53,6 +54,7 @@
     :style="rowStyle"
     draggable="true"
     @click="$emit('note-click', row.note!.id)"
+    @dblclick.stop="$emit('start-rename-note', row.note!.id)"
     @contextmenu.prevent="$emit('note-context', $event, row.note!.id)"
     @dragstart.stop="onDragStart('note', row.note!.id, $event)"
     @dragover.prevent.stop="onNoteDragOver($event, row.note!.id)"
@@ -60,7 +62,18 @@
     @drop.prevent.stop="onNoteDrop($event, row.note!.id)"
   >
     <span v-if="row.note!.pinned" class="note-pin-icon" title="已置顶">📌</span>
-    <div class="note-title">{{ row.note!.title }}</div>
+    <input
+      v-if="renamingNoteId === row.note!.id"
+      :value="renamingNoteName"
+      class="rename-input note-rename-input"
+      autofocus
+      @input="$emit('update:renamingNoteName', ($event.target as HTMLInputElement).value)"
+      @keyup.enter="$emit('commit-rename-note')"
+      @keyup.escape="$emit('cancel-rename-note')"
+      @blur="$emit('commit-rename-note')"
+      @click.stop
+    />
+    <div v-else class="note-title">{{ row.note!.title }}</div>
     <div v-if="row.note!.tags?.length" class="note-item-tags">
       <button
         v-for="tag in row.note!.tags"
@@ -86,6 +99,8 @@ const props = defineProps<{
   currentNoteId?: string
   renamingFolderId: string | null
   renamingFolderName: string
+  renamingNoteId: string | null
+  renamingNoteName: string
   dragOverFolderId: string | null
   dragOverNoteId?: string | null
   dragOverNotePosition?: 'before' | 'after' | null
@@ -101,6 +116,9 @@ const emit = defineEmits<{
   'cancel-rename-folder': []
   'start-rename-folder': [folder: { id: string; name: string }]
   'note-click': [noteId: string]
+  'start-rename-note': [noteId: string]
+  'commit-rename-note': []
+  'cancel-rename-note': []
   'tag-click': [tag: string]
   'note-context': [event: MouseEvent, noteId: string]
   'drag-start': [payload: { kind: 'note' | 'folder'; id: string }]
@@ -111,6 +129,7 @@ const emit = defineEmits<{
   'drag-leave-note': []
   'drop-on-note': [noteId: string, position: 'before' | 'after']
   'update:renamingFolderName': [value: string]
+  'update:renamingNoteName': [value: string]
 }>()
 
 const rowStyle = computed(() => {

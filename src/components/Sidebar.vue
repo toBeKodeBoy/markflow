@@ -56,6 +56,8 @@
               :current-note-id="store.currentNote?.id"
               :renaming-folder-id="renamingFolderId"
               v-model:renaming-folder-name="renamingFolderName"
+              :renaming-note-id="renamingNoteId"
+              v-model:renaming-note-name="renamingNoteName"
               :drag-over-folder-id="dragOverFolderId"
               :drag-over-note-id="dragOverNoteId"
               :drag-over-note-position="dragOverNotePosition"
@@ -68,6 +70,9 @@
               @cancel-rename-folder="renamingFolderId = null"
               @start-rename-folder="startRenameFolder"
               @note-click="openNoteTab"
+              @start-rename-note="startRenameNote"
+              @commit-rename-note="commitRenameNote"
+              @cancel-rename-note="cancelRenameNote"
               @tag-click="onTagClick"
               @note-context="openNoteContextMenu"
               @drag-start="onDragStart"
@@ -91,6 +96,8 @@
             :current-note-id="store.currentNote?.id"
             :renaming-folder-id="renamingFolderId"
             v-model:renaming-folder-name="renamingFolderName"
+            :renaming-note-id="renamingNoteId"
+            v-model:renaming-note-name="renamingNoteName"
             :drag-over-folder-id="dragOverFolderId"
             :drag-over-note-id="dragOverNoteId"
             :drag-over-note-position="dragOverNotePosition"
@@ -101,6 +108,9 @@
             @cancel-rename-folder="renamingFolderId = null"
             @start-rename-folder="startRenameFolder"
             @note-click="openNoteTab"
+            @start-rename-note="startRenameNote"
+            @commit-rename-note="commitRenameNote"
+            @cancel-rename-note="cancelRenameNote"
             @tag-click="onTagClick"
             @note-context="openNoteContextMenu"
             @drag-start="onDragStart"
@@ -127,8 +137,13 @@
         :current-note-id="store.currentNote?.id"
         :folder-scope-label="searchFolderScopeLabel"
         :get-content="store.getNoteContentById"
+        :renaming-note-id="renamingNoteId"
+        v-model:renaming-note-name="renamingNoteName"
         @select="openNoteTab"
         @clear="onClearSearch"
+        @start-rename-note="startRenameNote"
+        @commit-rename-note="commitRenameNote"
+        @cancel-rename-note="cancelRenameNote"
       />
     </div>
 
@@ -171,17 +186,6 @@
         <button class="danger" @click="promptDeleteFolder(folderContextMenu.folderId)">删除</button>
       </div>
     </Teleport>
-
-    <div v-if="renamingNoteId" class="modal-overlay" @click.self="renamingNoteId = null">
-      <div class="modal">
-        <div class="modal-title">重命名笔记</div>
-        <input v-model="renamingNoteName" class="modal-input" @keyup.enter="commitRenameNote" />
-        <div class="modal-actions">
-          <button class="btn-primary" @click="commitRenameNote">确认</button>
-          <button @click="renamingNoteId = null">取消</button>
-        </div>
-      </div>
-    </div>
 
     <div v-if="movingNoteId" class="modal-overlay" @click.self="closeMoveNoteModal">
       <div class="modal">
@@ -605,10 +609,16 @@ function startRenameNote(id: string) {
 }
 
 function commitRenameNote() {
-  if (renamingNoteId.value && renamingNoteName.value.trim()) {
-    store.renameNote(renamingNoteId.value, renamingNoteName.value.trim())
+  const title = renamingNoteName.value.trim()
+  if (renamingNoteId.value && title) {
+    store.renameNote(renamingNoteId.value, title)
   }
+  cancelRenameNote()
+}
+
+function cancelRenameNote() {
   renamingNoteId.value = null
+  renamingNoteName.value = ''
 }
 
 function startMoveNote(id: string) {

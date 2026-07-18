@@ -14,7 +14,13 @@
       :folders="folders"
       :current-note-id="currentNoteId"
       :content="resolveContent(note.id)"
+      :renaming-note-id="renamingNoteId"
+      :renaming-note-name="renamingNoteName"
       @select="$emit('select', $event)"
+      @update:renaming-note-name="$emit('update:renamingNoteName', $event)"
+      @start-rename-note="$emit('start-rename-note', $event)"
+      @commit-rename-note="$emit('commit-rename-note')"
+      @cancel-rename-note="$emit('cancel-rename-note')"
     />
   </div>
 </template>
@@ -31,9 +37,18 @@ const props = defineProps<{
   currentNoteId?: string
   folderScopeLabel?: string
   getContent: (id: string) => string
+  renamingNoteId: string | null
+  renamingNoteName: string
 }>()
 
-defineEmits<{ select: [id: string]; clear: [] }>()
+defineEmits<{
+  select: [id: string]
+  clear: []
+  'update:renamingNoteName': [value: string]
+  'start-rename-note': [id: string]
+  'commit-rename-note': []
+  'cancel-rename-note': []
+}>()
 
 function resolveContent(id: string) {
   return props.getContent(id)

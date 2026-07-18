@@ -1,15 +1,31 @@
 <template>
-  <button
-    type="button"
+  <div
     class="search-result-item"
     :class="{ active: currentNoteId === note.id }"
-    @click="$emit('select', note.id)"
+    role="button"
+    tabindex="0"
+    @click="onSelect"
+    @keydown="onKeydown"
+    @dblclick.stop="$emit('start-rename-note', note.id)"
   >
     <div class="search-result-title">
       <span v-if="note.pinned" class="note-pin-icon" title="已置顶">📌</span>
-      <template v-for="(seg, i) in titleSegments" :key="'t' + i">
-        <mark v-if="seg.highlight" class="search-highlight">{{ seg.text }}</mark>
-        <span v-else>{{ seg.text }}</span>
+      <input
+        v-if="renamingNoteId === note.id"
+        :value="renamingNoteName"
+        class="rename-input search-result-rename-input"
+        autofocus
+        @input="$emit('update:renamingNoteName', ($event.target as HTMLInputElement).value)"
+        @keyup.enter="$emit('commit-rename-note')"
+        @keyup.escape="$emit('cancel-rename-note')"
+        @blur="$emit('commit-rename-note')"
+        @click.stop
+      />
+      <template v-else>
+        <template v-for="(seg, i) in titleSegments" :key="'t' + i">
+          <mark v-if="seg.highlight" class="search-highlight">{{ seg.text }}</mark>
+          <span v-else>{{ seg.text }}</span>
+        </template>
       </template>
     </div>
     <div v-if="folderLabel" class="search-result-folder">{{ folderLabel }}</div>
@@ -26,7 +42,7 @@
         <span v-else>{{ seg.text }}</span>
       </template>
     </div>
-  </button>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -41,9 +57,17 @@ const props = defineProps<{
   folders: Folder[]
   currentNoteId?: string
   content: string
+  renamingNoteId: string | null
+  renamingNoteName: string
 }>()
 
-defineEmits<{ select: [id: string] }>()
+const emit = defineEmits<{
+  select: [id: string]
+  'update:renamingNoteName': [value: string]
+  'start-rename-note': [id: string]
+  'commit-rename-note': []
+  'cancel-rename-note': []
+}>()
 
 const match = computed(() => getSearchMatchInfo(props.note, props.query, props.content))
 
@@ -56,4 +80,16 @@ const folderLabel = computed(() => {
   if (!props.note.folderId) return ''
   return getFolderPathLabel(props.folders, props.note.folderId)
 })
+
+function onSelect() {
+  if (props.renamingNoteId === props.note.id) return
+  emit('select', props.note.id)
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (props.renamingNoteId === props.note.id) return
+  if (e.key !== 'Enter' && e.key !== ' ') return
+  e.preventDefault()
+  emit('select', props.note.id)
+}
 </script>

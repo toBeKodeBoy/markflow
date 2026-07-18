@@ -155,6 +155,7 @@ input:focus { border-color: var(--primary); }
   color: var(--text-muted);
   font-size: 12px;
   flex-shrink: 0;
+  cursor: pointer;
 }
 
 .editor-tab:hover {
@@ -169,10 +170,22 @@ input:focus { border-color: var(--primary); }
 }
 
 .editor-tab-title {
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
+}
+
+.editor-tab-rename-input {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-editor);
+  color: var(--text);
+  font-size: 12px;
 }
 
 .editor-tab-dirty {
@@ -441,9 +454,16 @@ input:focus { border-color: var(--primary); }
 }
 
 .search-result-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
   font-weight: 500;
   line-height: 1.4;
+}
+
+.search-result-rename-input {
+  width: 100%;
 }
 
 .search-result-folder,
@@ -650,9 +670,14 @@ input:focus { border-color: var(--primary); }
 
 .rename-input {
   flex: 1;
+  min-width: 0;
   padding: 2px 6px;
   font-size: 13px;
   border-radius: 4px;
+}
+
+.note-rename-input {
+  margin-right: 6px;
 }
 
 .danger { color: var(--danger) !important; }
