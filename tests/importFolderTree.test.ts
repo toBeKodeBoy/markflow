@@ -23,8 +23,20 @@ describe('importFolderTree', () => {
       ])
       expect(tree.map((n) => n.name)).toEqual(['docs', 'readme.md'])
       expect(tree[0].kind).toBe('folder')
-      expect(tree[0].children.map((n) => n.name)).toEqual(['api.md', 'guide'])
-      expect(tree[0].children[1].children[0].name).toBe('setup.md')
+      expect(tree[0].children.map((n) => n.name)).toEqual(['guide', 'api.md'])
+      expect(tree[0].children[0].children[0].name).toBe('setup.md')
+    })
+
+    it('sorts sibling folders by leading integer prefix and files by name', () => {
+      const tree = buildImportFileTree([
+        file('附录/z.md'),
+        file('02-进阶/b.md'),
+        file('01-基础/c.md'),
+        file('01-基础/a.md'),
+      ])
+
+      expect(tree.map((n) => n.name)).toEqual(['01-基础', '02-进阶', '附录'])
+      expect(tree[0].children.map((n) => n.name)).toEqual(['a.md', 'c.md'])
     })
   })
 

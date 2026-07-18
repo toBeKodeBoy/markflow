@@ -24,5 +24,6 @@ dist-ssr
 *.sln
 *.sw?
 .cursor
+.codegraph/
 docs
 AGENTS.md

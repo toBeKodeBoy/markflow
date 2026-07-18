@@ -4,6 +4,8 @@ import {
   getFilenameStem,
   extractImportTitle,
   findRootFolderByName,
+  parseFolderSequence,
+  compareImportFolderNames,
   resolveUniqueTitle,
   isBlankContent,
   shouldSkipDirName,
@@ -53,6 +55,36 @@ describe('importFolderHelpers', () => {
         { id: 'b', name: 'docs', order: 0, parentId: 'a' },
       ]
       expect(findRootFolderByName(folders, 'docs')?.id).toBe('a')
+    })
+  })
+
+  describe('folder sequence helpers', () => {
+    it('parses leading integer prefix from folder names', () => {
+      expect(parseFolderSequence('01-介绍')).toEqual({
+        hasSequence: true,
+        sequence: 1,
+        restName: '介绍',
+      })
+      expect(parseFolderSequence('2.安装')).toEqual({
+        hasSequence: true,
+        sequence: 2,
+        restName: '安装',
+      })
+      expect(parseFolderSequence('10 API')).toEqual({
+        hasSequence: true,
+        sequence: 10,
+        restName: 'API',
+      })
+      expect(parseFolderSequence('附录')).toEqual({
+        hasSequence: false,
+        sequence: Number.POSITIVE_INFINITY,
+        restName: '附录',
+      })
+    })
+
+    it('sorts sequenced folders before non-sequenced ones', () => {
+      const names = ['附录', '10 API', '02-进阶', '01-基础']
+      expect(names.sort(compareImportFolderNames)).toEqual(['01-基础', '02-进阶', '10 API', '附录'])
     })
   })
 

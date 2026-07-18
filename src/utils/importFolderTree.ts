@@ -1,5 +1,10 @@
 import type { ImportFolderFile } from '../types/import'
-import { getBasename, normalizeRelativePath } from './importFolderHelpers'
+import {
+  compareImportFileNames,
+  compareImportFolderNames,
+  getBasename,
+  normalizeRelativePath,
+} from './importFolderHelpers'
 
 export interface ImportFileTreeNode {
   path: string
@@ -18,11 +23,8 @@ export interface ImportFileTreeRow {
 export function buildImportFileTree(files: ImportFolderFile[]): ImportFileTreeNode[] {
   const root: ImportFileTreeNode[] = []
   const folderMap = new Map<string, ImportFileTreeNode>()
-  const sorted = [...files].sort((a, b) =>
-    a.relativePath.localeCompare(b.relativePath, undefined, { sensitivity: 'base' })
-  )
 
-  for (const file of sorted) {
+  for (const file of files) {
     const normalized = normalizeRelativePath(file.relativePath)
     const parts = normalized.split('/')
     const fileName = parts.pop()!
@@ -49,7 +51,24 @@ export function buildImportFileTree(files: ImportFolderFile[]): ImportFileTreeNo
     })
   }
 
+  sortImportTreeNodes(root)
   return root
+}
+
+function sortImportTreeNodes(nodes: ImportFileTreeNode[]): void {
+  nodes.sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === 'folder' ? -1 : 1
+    if (a.kind === 'folder' && b.kind === 'folder') {
+      return compareImportFolderNames(a.name, b.name)
+    }
+    return compareImportFileNames(a.name, b.name)
+  })
+
+  for (const node of nodes) {
+    if (node.kind === 'folder' && node.children.length > 0) {
+      sortImportTreeNodes(node.children)
+    }
+  }
 }
 
 /** Visible rows respecting expanded folder paths */
