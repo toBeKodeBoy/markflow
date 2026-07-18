@@ -218,6 +218,7 @@ export async function runFolderImport(
         folderId,
         tags: [],
         importSourcePath: file.relativePath.replace(/\\/g, '/'),
+        titleLockedFromSource: true,
         createdAt: now,
         updatedAt: now,
       }

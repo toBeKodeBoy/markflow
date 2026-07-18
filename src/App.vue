@@ -27,7 +27,7 @@
         <h2 class="empty-tabs-title">当前没有打开的笔记</h2>
         <p class="empty-tabs-text">你可以新建一篇笔记，或者从侧边栏重新打开已有内容。</p>
         <div class="empty-tabs-actions">
-          <button class="btn-primary" @click="createNoteFromEmptyState">新建笔记</button>
+          <button class="btn-primary" @click="createModalVisible = true">新建笔记</button>
           <button @click="sidebarVisible = true">从侧边栏打开</button>
         </div>
       </div>
@@ -64,6 +64,16 @@
     </footer>
 
     <ImageLightbox />
+
+    <CreateEntryModal
+      :visible="createModalVisible"
+      default-kind="note"
+      :default-parent-id="store.activeFolderId ?? undefined"
+      :folders="store.folderList"
+      :active-folder-id="store.activeFolderId"
+      @cancel="createModalVisible = false"
+      @created="handleCreated"
+    />
   </div>
 </template>
 
@@ -76,6 +86,7 @@ import WysiwygEditor from './components/WysiwygEditor.vue'
 import Preview from './components/Preview.vue'
 import Toc from './components/Toc.vue'
 import ImageLightbox from './components/ImageLightbox.vue'
+import CreateEntryModal from './components/CreateEntryModal.vue'
 import AppIcon from './components/AppIcon.vue'
 import EditorTabBar from './components/EditorTabBar.vue'
 import { useNoteStore } from './stores/note'
@@ -84,6 +95,7 @@ import { useTheme } from './composables/useTheme'
 import { useAppSettings } from './composables/useAppSettings'
 import { useImageLightbox } from './composables/useImageLightbox'
 import { showAppNotification } from './utils/notify'
+import { collectAncestorFolderIds } from './utils/folderTree'
 import { useAutoBackup } from './composables/useAutoBackup'
 import type { ViewMode } from './types'
 
@@ -101,6 +113,7 @@ const appSettings = useAppSettings()
 const { startScheduler, stopScheduler } = useAutoBackup()
 const sidebarVisible = ref(appSettings.get().sidebarVisible ?? true)
 const tocVisible = ref(false)
+const createModalVisible = ref(false)
 
 const showSidebar = computed(() => viewMode.value !== 'focus' && sidebarVisible.value)
 const hasOpenTabs = computed(() => tabsStore.tabs.length > 0)
@@ -127,9 +140,31 @@ function toggleToc() {
   store.setTocVisible(tocVisible.value)
 }
 
-function createNoteFromEmptyState() {
-  const note = store.createNote(store.activeFolderId ?? undefined)
-  tabsStore.openTabForNewNote(note.id)
+function handleCreated(payload: { kind: 'note' | 'folder'; id: string; parentId?: string }) {
+  createModalVisible.value = false
+  const activeFolderId = payload.kind === 'note' ? (payload.parentId ?? null) : payload.id
+  const expandTargetId = payload.kind === 'note' ? payload.parentId : payload.id
+  const settings = appSettings.get()
+  const nextExpandedFolderIds = new Set(settings.sidebarExpandedFolderIds ?? [])
+
+  if (expandTargetId) {
+    for (const id of collectAncestorFolderIds(expandTargetId, store.folderList)) nextExpandedFolderIds.add(id)
+    nextExpandedFolderIds.add(expandTargetId)
+  }
+
+  appSettings.save({
+    sidebarActiveFolderId: activeFolderId,
+    sidebarExpandedFolderIds: [...nextExpandedFolderIds],
+  })
+
+  if (payload.kind === 'note') {
+    store.activeFolderId = activeFolderId
+    tabsStore.openTabForNewNote(payload.id)
+    return
+  }
+
+  sidebarVisible.value = true
+  store.activeFolderId = activeFolderId
 }
 
 watch(sidebarVisible, (visible) => {

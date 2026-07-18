@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <aside class="sidebar" :style="{ width: sidebarWidth + 'px' }">
     <SearchBar
       ref="searchBarRef"
@@ -20,45 +20,19 @@
         @click="onTagClick(tag)"
       >{{ tag }}</button>
     </div>
-
-    <div v-if="!isSearchMode" class="sidebar-section">
-      <div class="section-header" @click="clearActiveFolder">
-        <span class="section-icon"><AppIcon name="file" :size="14" /></span>
-        <span class="section-title">全部笔记</span>
-        <span class="count">{{ store.noteList.length }}</span>
-      </div>
+    <div v-if="store.activeFolderId && !isSearchMode" class="sidebar-scope-bar">
+      <button
+        type="button"
+        class="sidebar-scope-reset"
+        data-testid="sidebar-clear-folder-filter"
+        @click="clearActiveFolder"
+      >
+        返回全部
+      </button>
+      <span class="sidebar-scope-label">{{ activeFolderLabel }}</span>
     </div>
 
     <div v-if="!isSearchMode" class="sidebar-section folders-section">
-      <div class="section-header folders-header">
-        <span class="section-icon"><AppIcon name="folder" :size="14" /></span>
-        <span class="section-title">文件夹</span>
-        <button
-          class="btn-icon"
-          @click.stop="openNewFolderInput()"
-          title="新建文件夹"
-          aria-label="新建文件夹"
-        >
-          <AppIcon name="plus" :size="14" />
-        </button>
-      </div>
-
-      <p v-if="store.activeFolderId" class="folder-context-hint">
-        在此新建：
-        <span class="folder-context-name">{{ activeFolderLabel }}</span>
-      </p>
-
-      <div v-if="showNewFolder" class="new-folder-input">
-        <input
-          ref="folderInputRef"
-          v-model="newFolderName"
-          type="text"
-          :placeholder="newFolderParentId ? '子文件夹名称' : '文件夹名称'"
-          @keyup.enter="createFolder"
-          @keyup.escape="cancelNewFolder"
-          @blur="createFolder"
-        />
-      </div>
 
       <div
         ref="treeRef"
@@ -190,10 +164,10 @@
         :style="{ top: folderContextMenu.y + 'px', left: folderContextMenu.x + 'px' }"
         @click.stop
       >
-        <button @click="openNewFolderInput(folderContextMenu.folderId)">新建子文件夹</button>
-        <button @click="createNoteInFolder(folderContextMenu.folderId)">新建笔记</button>
+        <button @click="openCreateModal('folder', folderContextMenu.folderId, true)">新建子文件夹</button>
+        <button @click="openCreateModal('note', folderContextMenu.folderId, true)">新建笔记</button>
         <button @click="startRenameFolderById(folderContextMenu.folderId)">重命名</button>
-        <button @click="startMoveFolder(folderContextMenu.folderId)">移动到…</button>
+        <button @click="startMoveFolder(folderContextMenu.folderId)">移动到</button>
         <button class="danger" @click="promptDeleteFolder(folderContextMenu.folderId)">删除</button>
       </div>
     </Teleport>
@@ -276,7 +250,7 @@
         <div class="modal-title">删除文件夹</div>
         <p class="modal-body-text">
           将删除 <strong>{{ deleteFolderTarget.impact.folderCount }}</strong> 个文件夹，
-          <strong>{{ deleteFolderTarget.impact.noteCount }}</strong> 篇笔记将移至
+          <strong>{{ deleteFolderTarget.impact.noteCount }}</strong> 篇笔记将移动到
           {{ deleteMoveTargetLabel }}。
         </p>
         <div class="modal-actions">
@@ -285,11 +259,22 @@
         </div>
       </div>
     </div>
+
+    <CreateEntryModal
+      :visible="createModalVisible"
+      :default-kind="createModalKind"
+      :default-parent-id="createModalDefaultParentId"
+      :locked-parent-id="createModalLockedParentId"
+      :folders="store.folderList"
+      :active-folder-id="store.activeFolderId"
+      @cancel="closeCreateModal"
+      @created="handleCreateEntry"
+    />
   </aside>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useNoteStore } from '../stores/note'
 import { useEditorTabsStore } from '../stores/editorTabs'
 import { showAppNotification } from '../utils/notify'
@@ -307,7 +292,7 @@ import {
   type SidebarTreeRow,
 } from '../utils/sidebarTree'
 import { buildTreeIndex } from '../utils/treeIndex'
-import AppIcon from './AppIcon.vue'
+import CreateEntryModal from './CreateEntryModal.vue'
 import SidebarTreeRowView from './SidebarTreeRow.vue'
 import SearchBar from './SearchBar.vue'
 import SearchResultsList from './SearchResultsList.vue'
@@ -329,13 +314,13 @@ function openNoteTab(noteId: string) {
 const appSettings = useAppSettings()
 
 const sidebarWidth = ref(clampSidebarWidth(appSettings.get().sidebarWidth ?? 240))
-const showNewFolder = ref(false)
-const newFolderName = ref('')
-const newFolderParentId = ref<string | undefined>(undefined)
-const folderInputRef = ref<HTMLInputElement>()
 const treeRef = ref<HTMLElement>()
 const searchBarRef = ref<InstanceType<typeof SearchBar>>()
 const scrollTop = ref(0)
+const createModalVisible = ref(false)
+const createModalKind = ref<'note' | 'folder'>('folder')
+const createModalDefaultParentId = ref<string | undefined>(undefined)
+const createModalLockedParentId = ref<string | undefined>(undefined)
 
 const renamingFolderId = ref<string | null>(null)
 const renamingFolderName = ref('')
@@ -478,38 +463,34 @@ function onTreeScroll(e: Event) {
   scrollTop.value = (e.target as HTMLElement).scrollTop
 }
 
-function openNewFolderInput(parentId?: string) {
+function openCreateModal(kind: 'note' | 'folder', parentId?: string, locked = false) {
   folderContextMenu.value = null
-  newFolderParentId.value = parentId ?? store.activeFolderId ?? undefined
-  showNewFolder.value = true
+  createModalKind.value = kind
+  createModalDefaultParentId.value = parentId ?? store.activeFolderId ?? undefined
+  createModalLockedParentId.value = locked ? parentId : undefined
+  createModalVisible.value = true
 }
 
-function cancelNewFolder() {
-  showNewFolder.value = false
-  newFolderName.value = ''
-  newFolderParentId.value = undefined
+function closeCreateModal() {
+  createModalVisible.value = false
+  createModalDefaultParentId.value = undefined
+  createModalLockedParentId.value = undefined
 }
 
-function createFolder() {
-  if (newFolderName.value.trim()) {
-    const folder = store.createFolder(newFolderName.value.trim(), newFolderParentId.value)
-    store.activeFolderId = folder.id
-    const next = new Set(expandedFolderIds.value)
-    if (folder.parentId) {
-      for (const id of collectAncestorFolderIds(folder.id, store.folderList)) next.add(id)
-    }
-    next.add(folder.id)
-    expandedFolderIds.value = next
+function handleCreateEntry(payload: { kind: 'note' | 'folder'; id: string; parentId?: string }) {
+  closeCreateModal()
+  if (payload.kind === 'note') {
+    store.activeFolderId = payload.parentId ?? null
+    tabsStore.openTabForNewNote(payload.id)
     persistSidebarState()
+    return
   }
-  cancelNewFolder()
-}
 
-function createNoteInFolder(folderId: string) {
-  folderContextMenu.value = null
-  store.activeFolderId = folderId
-  const note = store.createNote(folderId)
-  tabsStore.openTabForNewNote(note.id)
+  store.activeFolderId = payload.id
+  const next = new Set(expandedFolderIds.value)
+  for (const id of collectAncestorFolderIds(payload.id, store.folderList)) next.add(id)
+  next.add(payload.id)
+  expandedFolderIds.value = next
   persistSidebarState()
 }
 
@@ -769,13 +750,6 @@ function onGlobalClick() {
   folderContextMenu.value = null
 }
 
-watch(showNewFolder, async (val) => {
-  if (val) {
-    await nextTick()
-    folderInputRef.value?.focus()
-  }
-})
-
 watch(
   () => store.activeFolderId,
   (folderId) => {
@@ -832,3 +806,8 @@ onMounted(() => {
 
 onUnmounted(() => document.removeEventListener('click', onGlobalClick))
 </script>
+
+
+
+
+
