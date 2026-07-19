@@ -108,6 +108,7 @@ import { useImageLightbox } from './composables/useImageLightbox'
 import { showAppNotification } from './utils/notify'
 import { collectAncestorFolderIds } from './utils/folderTree'
 import { useAutoBackup } from './composables/useAutoBackup'
+import { useFullscreen } from './composables/useFullscreen'
 import type { ViewMode } from './types'
 
 const store = useNoteStore()
@@ -122,6 +123,7 @@ const viewMode = ref<ViewMode>('live')
 const prevMode = ref<ViewMode>('live')
 const appSettings = useAppSettings()
 const { startScheduler, stopScheduler } = useAutoBackup()
+const { isFullscreen, enter: enterFullscreen, exit: exitFullscreen } = useFullscreen()
 const sidebarVisible = ref(appSettings.get().sidebarVisible ?? true)
 const tocVisible = ref(false)
 const createModalVisible = ref(false)
@@ -143,7 +145,12 @@ tabsStore.bootstrapAfterLoad()
 
 function setViewMode(mode: ViewMode) {
   tabsStore.flushActiveTab()
-  if (mode === 'focus') prevMode.value = viewMode.value
+  if (mode === 'focus') {
+    prevMode.value = viewMode.value
+    enterFullscreen()
+  } else if (viewMode.value === 'focus' && isFullscreen.value) {
+    exitFullscreen()
+  }
   viewMode.value = mode
 }
 
@@ -195,7 +202,14 @@ watch(
   }
 )
 
+watch(isFullscreen, (fs) => {
+  if (!fs && viewMode.value === 'focus') {
+    viewMode.value = prevMode.value
+  }
+})
+
 function exitFocus() {
+  if (isFullscreen.value) exitFullscreen()
   viewMode.value = prevMode.value
 }
 
@@ -204,6 +218,15 @@ function onSearchSelect(noteId: string) {
 }
 
 function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'F11') {
+    e.preventDefault()
+    if (viewMode.value === 'focus') {
+      exitFocus()
+    } else {
+      setViewMode('focus')
+    }
+    return
+  }
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
     e.preventDefault()
     searchModalVisible.value = !searchModalVisible.value
