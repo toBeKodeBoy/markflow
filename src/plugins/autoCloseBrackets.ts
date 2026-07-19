@@ -1,6 +1,7 @@
 import type { Ctx } from '@milkdown/ctx'
 import { $prose } from '@milkdown/utils'
 import type { Node as ProseNode } from '@milkdown/prose/model'
+import type { Mark } from '@milkdown/prose/model'
 import { Plugin, PluginKey, TextSelection } from '@milkdown/prose/state'
 import type { EditorView } from '@milkdown/prose/view'
 
@@ -26,6 +27,13 @@ export interface TextblockContext {
   offset: number
 }
 
+export interface MarkRange {
+  from: number
+  to: number
+}
+
+export type InlineCodeArrowKey = 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown'
+
 export interface AutoCloseInputParams {
   text: string
   from: number
@@ -43,6 +51,22 @@ export interface AutoCloseInputResult {
   convertInlineCode?: BacktickPairRange
   /** 输入 closing ` 完成未闭合 pair 并转为 inlineCode（块内偏移） */
   completeInlineCode?: { openPos: number; content: string }
+}
+
+export interface InlineCodeArrowActionParams {
+  key: InlineCodeArrowKey
+  pos: number
+  range: MarkRange
+  singleLine?: boolean
+  atFirstLine?: boolean
+  atLastLine?: boolean
+  hasInlineCodeStoredMark?: boolean
+}
+
+export interface InlineCodeArrowAction {
+  handled: boolean
+  targetPos?: number
+  clearStoredMarks?: boolean
 }
 
 /** 获取光标所在可编辑块上下文（块内偏移，非全文索引） */
@@ -72,6 +96,49 @@ export function mapPairToDocPositions(
   }
 }
 
+function hasMarkNamed(marks: readonly Mark[] | null | undefined, markName: string): boolean {
+  return !!marks?.some((mark) => mark.type.name === markName)
+}
+
+export function findInlineCodeMarkRange(
+  doc: ProseNode,
+  pos: number,
+  markName = 'inlineCode',
+): MarkRange | null {
+  const safePos = Math.min(Math.max(pos, 1), Math.max(doc.content.size - 1, 1))
+  const $pos = doc.resolve(safePos)
+  if (!$pos.parent.inlineContent) return null
+
+  const blockStart = $pos.start()
+  let cursor = blockStart
+  let activeFrom: number | null = null
+  let activeTo: number | null = null
+
+  for (let index = 0; index < $pos.parent.childCount; index += 1) {
+    const child = $pos.parent.child(index)
+    const childFrom = cursor
+    const childTo = cursor + child.nodeSize
+    const hasInlineCode = child.isText && hasMarkNamed(child.marks, markName)
+
+    if (hasInlineCode) {
+      if (activeFrom === null) activeFrom = childFrom
+      activeTo = childTo
+    } else if (activeFrom !== null && activeTo !== null) {
+      if (safePos >= activeFrom && safePos <= activeTo) return { from: activeFrom, to: activeTo }
+      activeFrom = null
+      activeTo = null
+    }
+
+    cursor = childTo
+  }
+
+  if (activeFrom !== null && activeTo !== null && safePos >= activeFrom && safePos <= activeTo) {
+    return { from: activeFrom, to: activeTo }
+  }
+
+  return null
+}
+
 /** 查找闭合反引号对应的字面量 pair（块内偏移） */
 export function findPlainBacktickPair(
   blockText: string,
@@ -79,12 +146,13 @@ export function findPlainBacktickPair(
 ): BacktickPairRange | null {
   if (blockText[closeOffset] !== '`') return null
 
-  let openOffset = closeOffset - 1
-  while (openOffset >= 0 && blockText[openOffset] !== '`') {
-    if (blockText[openOffset] === '\n') return null
-    openOffset--
+  const previousBackticks: number[] = []
+  for (let index = 0; index < closeOffset; index += 1) {
+    if (blockText[index] === '`') previousBackticks.push(index)
   }
-  if (openOffset < 0) return null
+  if (previousBackticks.length % 2 === 0) return null
+
+  const openOffset = previousBackticks[previousBackticks.length - 1]
 
   const content = blockText.slice(openOffset + 1, closeOffset)
   if (!content || /[`\n]/.test(content)) return null
@@ -98,8 +166,13 @@ export function findUnclosedBacktickBefore(
   cursorOffset: number,
 ): BacktickPairRange | null {
   const before = blockText.slice(0, cursorOffset)
-  const openOffset = before.lastIndexOf('`')
-  if (openOffset < 0) return null
+  const previousBackticks: number[] = []
+  for (let index = 0; index < before.length; index += 1) {
+    if (before[index] === '`') previousBackticks.push(index)
+  }
+  if (previousBackticks.length % 2 === 0) return null
+
+  const openOffset = previousBackticks[previousBackticks.length - 1]
 
   const content = blockText.slice(openOffset + 1, cursorOffset)
   if (!content || /[`\n]/.test(content)) return null
@@ -175,6 +248,30 @@ export function computeAutoCloseTextInput(params: AutoCloseInputParams): AutoClo
   }
 }
 
+export function computeInlineCodeArrowAction(params: InlineCodeArrowActionParams): InlineCodeArrowAction {
+  const { key, pos, range, singleLine, atFirstLine, atLastLine, hasInlineCodeStoredMark } = params
+
+  if (key === 'ArrowLeft') return { handled: false }
+  if (key === 'ArrowRight') {
+    if (pos >= range.to && hasInlineCodeStoredMark) {
+      return { handled: true, targetPos: range.to, clearStoredMarks: true }
+    }
+    return { handled: false }
+  }
+
+  if (key === 'ArrowUp') {
+    if (singleLine || atFirstLine) {
+      return { handled: true, targetPos: range.from, clearStoredMarks: true }
+    }
+    return { handled: false }
+  }
+
+  if (singleLine || atLastLine) {
+    return { handled: true, targetPos: range.to, clearStoredMarks: true }
+  }
+  return { handled: false }
+}
+
 function isInCodeContext(view: EditorView, from: number): boolean {
   const $from = view.state.doc.resolve(from)
   if ($from.parent.type.spec.code) return true
@@ -183,11 +280,74 @@ function isInCodeContext(view: EditorView, from: number): boolean {
   return marks.some((mark) => mark.type.name === 'inlineCode')
 }
 
+function isInInlineCodeContext(view: EditorView, pos: number): boolean {
+  const { state } = view
+  const $pos = state.doc.resolve(pos)
+  if (state.storedMarks !== null) return hasMarkNamed(state.storedMarks, 'inlineCode')
+  if (hasMarkNamed($pos.marks(), 'inlineCode')) return true
+  if ($pos.nodeBefore?.isText && hasMarkNamed($pos.nodeBefore.marks, 'inlineCode')) return true
+  if ($pos.nodeAfter?.isText && hasMarkNamed($pos.nodeAfter.marks, 'inlineCode')) return true
+  return false
+}
+
+function clearInlineCodeStoredMarks(view: EditorView) {
+  const { state } = view
+  const nextStoredMarks = (state.storedMarks ?? state.selection.$from.marks()).filter(
+    (mark) => mark.type.name !== 'inlineCode',
+  )
+  return nextStoredMarks
+}
+
+function readInlineCodeLineContext(
+  view: EditorView,
+  pos: number,
+  range: MarkRange,
+): Pick<InlineCodeArrowActionParams, 'singleLine' | 'atFirstLine' | 'atLastLine'> {
+  try {
+    const current = view.coordsAtPos(pos)
+    const start = view.coordsAtPos(range.from)
+    const end = view.coordsAtPos(range.to)
+    const tolerance = 2
+    const singleLine = Math.abs(start.top - end.top) <= tolerance
+    return {
+      singleLine,
+      atFirstLine: Math.abs(current.top - start.top) <= tolerance,
+      atLastLine: Math.abs(current.top - end.top) <= tolerance,
+    }
+  } catch {
+    return { singleLine: true, atFirstLine: true, atLastLine: true }
+  }
+}
+
+function handleInlineCodeArrowExit(view: EditorView, event: KeyboardEvent): boolean {
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return false
+  const { state } = view
+  if (!state.selection.empty) return false
+
+  const pos = state.selection.from
+  if (!isInInlineCodeContext(view, pos)) return false
+
+  const range = findInlineCodeMarkRange(state.doc, pos)
+  if (!range) return false
+
+  const action = computeInlineCodeArrowAction({
+    key: event.key as InlineCodeArrowKey,
+    pos,
+    range,
+    ...readInlineCodeLineContext(view, pos, range),
+    hasInlineCodeStoredMark: hasMarkNamed(state.storedMarks ?? state.selection.$from.marks(), 'inlineCode'),
+  })
+  if (!action.handled || action.targetPos === undefined) return false
+
+  const tr = state.tr.setSelection(TextSelection.create(state.doc, action.targetPos))
+  if (action.clearStoredMarks) tr.setStoredMarks(clearInlineCodeStoredMarks(view))
+  view.dispatch(tr.scrollIntoView())
+  return true
+}
+
 function applyCompleteInlineCode(
   view: EditorView,
   blockStart: number,
-  from: number,
-  to: number,
   complete: { openPos: number; content: string },
 ): boolean {
   const { state } = view
@@ -195,13 +355,11 @@ function applyCompleteInlineCode(
   if (!markType) return false
 
   const absOpen = blockStart + complete.openPos
-  let tr = state.tr.insertText('`', from, to)
-  const absClose = from + 1
-  tr = tr.delete(absClose, absClose + 1)
-  tr = tr.delete(absOpen, absOpen + 1)
+  let tr = state.tr.delete(absOpen, absOpen + 1)
   const end = absOpen + complete.content.length
   tr = tr.addMark(absOpen, end, markType.create())
   tr.setSelection(TextSelection.create(tr.doc, end))
+  tr.setStoredMarks([])
   view.dispatch(tr)
   return true
 }
@@ -270,8 +428,6 @@ function handleAutoCloseInput(
     return applyCompleteInlineCode(
       view,
       blockStart,
-      from,
-      to,
       result.completeInlineCode,
     )
   }
@@ -311,6 +467,9 @@ export function createAutoCloseBracketsProsePlugin(): Plugin {
   return new Plugin({
     key: new PluginKey('MARKFLOW_AUTO_CLOSE_BRACKETS'),
     props: {
+      handleKeyDown(view, event) {
+        return handleInlineCodeArrowExit(view, event)
+      },
       handleTextInput(view, from, to, text) {
         return handleAutoCloseInput(view, from, to, text)
       },
