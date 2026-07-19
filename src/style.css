@@ -2475,6 +2475,10 @@ input:focus { border-color: var(--primary); }
 .mode-focus .topbar { display: none; }
 .mode-focus .workspace { justify-content: center; background: var(--bg-editor); }
 
+/* ===== Fullscreen + Focus ===== */
+.app.mode-focus:fullscreen { padding: 0; }
+.app.mode-focus:fullscreen .focus-exit-btn { top: 8px; }
+
 /* Focus exit button */
 .focus-exit-btn {
   position: fixed;
