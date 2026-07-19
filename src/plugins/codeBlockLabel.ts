@@ -71,6 +71,50 @@ const exitCodeBlockCommand: Command = (state, dispatch) => {
   return true
 }
 
+function exitCodeBlockAtNodePos(
+  view: EditorView,
+  nodePos: number,
+): boolean {
+  const { state, dispatch } = view
+  const codeBlockNode = state.doc.nodeAt(nodePos)
+  if (!codeBlockNode || codeBlockNode.type.name !== 'code_block') return false
+
+  const afterPos = nodePos + codeBlockNode.nodeSize
+  const $after = state.doc.resolve(afterPos)
+  const atParentEnd = $after.parentOffset >= $after.parent.content.size
+
+  if (atParentEnd) {
+    const paragraph = state.schema.nodes.paragraph
+    if (!paragraph) return false
+    const tr = state.tr
+    tr.insert(afterPos, paragraph.create())
+    tr.setSelection(TextSelection.create(tr.doc, afterPos + 1))
+    dispatch(tr.scrollIntoView())
+    return true
+  }
+
+  dispatch(state.tr.setSelection(TextSelection.near($after)).scrollIntoView())
+  return true
+}
+
+export function shouldStopCodeBlockEvent(event: Event, contentDOM: HTMLElement, wrapper: HTMLDivElement): boolean {
+  const target = event.target
+  if (!(target instanceof Node)) return false
+  if (!wrapper.contains(target)) return false
+  if (contentDOM.contains(target)) return false
+  if (target instanceof HTMLElement) {
+    return !!target.closest('.code-block-actions, .code-copy-btn, .code-lang-badge, .mermaid-preview')
+  }
+  return false
+}
+
+function shouldExitCodeBlockOnClick(event: MouseEvent): boolean {
+  const target = event.target
+  if (!(target instanceof HTMLElement)) return false
+  if (target.closest('.code-block-actions, .code-copy-btn, .code-lang-badge, .mermaid-preview')) return false
+  return true
+}
+
 function buildCodeBlockDOM(lang: string): {
   wrapper: HTMLDivElement
   actions: HTMLDivElement
@@ -427,9 +471,7 @@ class CodeBlockNodeView implements NodeView {
   }
 
   stopEvent(event: Event): boolean {
-    const target = event.target
-    if (!(target instanceof Node)) return false
-    return this.dom.contains(target) && !this.contentDOM.contains(target)
+    return shouldStopCodeBlockEvent(event, this.contentDOM, this.dom)
   }
 
   ignoreMutation(mutation: ViewMutationRecord) {
@@ -458,10 +500,15 @@ export const codeBlockLabelPlugin = $prose((_ctx: Ctx) => {
   })
 })
 
-export const codeBlockExitPlugin = $prose((_ctx: Ctx) => {
+export function createCodeBlockExitProsePlugin(): Plugin {
   return new Plugin({
     key: new PluginKey('MARKFLOW_CODE_BLOCK_EXIT'),
     props: {
+      handleClickOn: (view, _pos, node, nodePos, event, direct) => {
+        if (!direct || node.type.name !== 'code_block') return false
+        if (!shouldExitCodeBlockOnClick(event)) return false
+        return exitCodeBlockAtNodePos(view, nodePos)
+      },
       handleKeyDown: (view, event) => {
         if (event.key === 'ArrowDown') {
           return exitCodeBlockCommand(view.state, view.dispatch, view)
@@ -470,4 +517,8 @@ export const codeBlockExitPlugin = $prose((_ctx: Ctx) => {
       },
     },
   })
+}
+
+export const codeBlockExitPlugin = $prose((_ctx: Ctx) => {
+  return createCodeBlockExitProsePlugin()
 })

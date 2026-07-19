@@ -19,9 +19,10 @@ import { extractNoteTitle } from '../utils/noteTitle'
 import { getTabContentCache, setTabContentCache } from './tabContentCache'
 import { notifyNoteDeleted, notifyLibraryReset } from './editorTabsBridge'
 
-/** 将笔记正文规范化为可搜索文本（小写） */
+/** 将笔记正文规范化为可搜索文本（小写），截断到 2000 字节省内存 */
 function normalizeForSearch(text: string): string {
-  return text.toLowerCase()
+  const lower = text.toLowerCase()
+  return lower.length > 2000 ? lower.slice(0, 2000) : lower
 }
 
 /** 生成唯一 ID：当前时间戳(36进制) + 随机数(36进制) */
@@ -639,6 +640,7 @@ export const useNoteStore = defineStore('note', () => {
     noteList, currentNote, liveContent, folderList, searchQuery, activeTagFilter, activeFolderId,
     searchedNoteList, filteredNoteList, allTags, tagStats, sidebarStateRevision,
     tocVisible, tocJumpTarget, editorContentPush, pendingLargeFileSwitch,
+    contentSearchIndex,
     loadNoteList, openNote, createNote, createNoteWithContent, setLiveContent, setActiveNote, setTocVisible,
     importMarkdownFile,
     updateCurrentContent, updateNoteContent, deleteNote, renameNote, moveNote, requestTocJump, insertAutoToc,

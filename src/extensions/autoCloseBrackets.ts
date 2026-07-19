@@ -8,14 +8,14 @@ import { markdown } from '@codemirror/lang-markdown'
 export const markdownEditorSupport = markdown()
 
 export const closeBracketsConfig = {
-  brackets: ['(', '{', '`'],
+  brackets: ['(', '{'],
 } as const
 
 const autoCloseBracketsLanguageData = markdownEditorSupport.language.data.of({
   closeBrackets: closeBracketsConfig,
 })
 
-/** CodeMirror 扩展：输入 ( / { 时自动补全对应右括号（含 markdown 语言包） */
+/** CodeMirror 扩展：输入 ( / { 时自动补全对应右括号（含 markdown 语言包）；反引号与 WYSIWYG 保持单次输入 */
 export const autoCloseBracketsExtensions = [
   markdownEditorSupport,
   closeBrackets(),

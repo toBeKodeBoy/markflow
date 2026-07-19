@@ -1,9 +1,11 @@
 import type { Editor } from '@milkdown/core'
 import { editorViewCtx, schemaCtx } from '@milkdown/core'
+import { TextSelection } from '@milkdown/prose/state'
 import { setBlockType, toggleMark, wrapIn } from '@milkdown/prose/commands'
 import { wrapInList } from '@milkdown/prose/schema-list'
 import type { EditorView } from '@milkdown/prose/view'
 import type { Schema } from '@milkdown/prose/model'
+import { INLINE_CODE_PLACEHOLDER } from './inlineCode'
 
 function runEditorCommand(editor: Editor, runner: (view: EditorView, schema: Schema) => void) {
   editor.action((ctx) => {
@@ -20,6 +22,25 @@ function toggleNamedMark(editor: Editor, markName: string) {
     if (!mark) return
     toggleMark(mark)(view.state, view.dispatch)
   })
+}
+
+function hasStoredOrActiveMark(view: EditorView, markName: string): boolean {
+  const { state } = view
+  const marks = state.storedMarks ?? state.selection.$from.marks()
+  return marks.some((mark) => mark.type.name === markName)
+}
+
+function insertInlineCodePlaceholder(view: EditorView, schema: Schema) {
+  const mark = schema.marks.inlineCode
+  if (!mark) return
+
+  const { from, to } = view.state.selection
+  let tr = view.state.tr.insertText(INLINE_CODE_PLACEHOLDER, from, to)
+  const end = from + INLINE_CODE_PLACEHOLDER.length
+  tr = tr.addMark(from, end, mark.create())
+  tr = tr.setSelection(TextSelection.create(tr.doc, from, end))
+  tr.setStoredMarks([mark.create()])
+  view.dispatch(tr)
 }
 
 function setHeading(editor: Editor, level: number) {
@@ -78,7 +99,15 @@ export function wysiwygToggleUnderline(editor: Editor | null) {
 
 export function wysiwygToggleInlineCode(editor: Editor | null) {
   if (!editor) return
-  toggleNamedMark(editor, 'inlineCode')
+  runEditorCommand(editor, (view, schema) => {
+    if (!view.state.selection.empty || hasStoredOrActiveMark(view, 'inlineCode')) {
+      const mark = schema.marks.inlineCode
+      if (!mark) return
+      toggleMark(mark)(view.state, view.dispatch)
+      return
+    }
+    insertInlineCodePlaceholder(view, schema)
+  })
 }
 
 export function wysiwygSetHeading(editor: Editor | null, level: 1 | 2 | 3) {
