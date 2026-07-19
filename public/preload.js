@@ -94,7 +94,7 @@ window.markflow = {
   },
 
   /**
-   * 导出 PDF（Typora 路线：完整 HTML + ubrowser Chromium printToPDF）
+   * 导出 PDF（uTools 官方 ubrowser 路线：about:blank + evaluate 注入 HTML + pdf）
    * options: { pageSize, margin, printBackground, landscape, scale, displayHeaderFooter, preferCssPageSize }
    * 返回 Promise<{ ok: true } | { ok: false, reason: string }>
    */
@@ -120,70 +120,99 @@ window.markflow = {
       none: { top: '5mm', right: '5mm', bottom: '5mm', left: '5mm' }
     };
     var margin = marginMap[opts.margin] || marginMap.default;
+    var MAX_EVALUATE_HTML_CHARS = 4 * 1024 * 1024;
 
-    var fs = require('fs');
-    var os = require('os');
-    var path = require('path');
-    var pathToFileURL = require('url').pathToFileURL;
-    var tmpPath = path.join(os.tmpdir(), 'markflow-print-' + Date.now() + '.html');
+    function isPrintPageReady() {
+      return window.__MARKFLOW_PDF_READY__ === true;
+    }
 
-    function cleanupTmp() {
-      try {
-        if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-      } catch (e) {
-        /* ignore */
-      }
+    function isPrintPageErrored() {
+      return window.__MARKFLOW_PDF_READY__ === 'error';
+    }
+
+    function mountPrintHtml(payload) {
+      document.open();
+      document.write(payload);
+      document.close();
+      return true;
     }
 
     try {
-      try {
-        fs.writeFileSync(tmpPath, html, 'utf-8');
-      } catch (writeErr) {
-        cleanupTmp();
-        console.error('[MarkFlow] 写入临时打印文件失败:', writeErr);
-        return Promise.resolve({ ok: false, reason: 'write-temp-failed' });
-      }
-      var fileUrl = pathToFileURL(tmpPath).href;
-
       if (!utools.ubrowser || typeof utools.ubrowser.goto !== 'function') {
-        cleanupTmp();
         console.error('[MarkFlow] utools.ubrowser 不可用');
         return Promise.resolve({ ok: false, reason: 'ubrowser-unavailable' });
       }
 
-      return utools.ubrowser
-        .goto(fileUrl)
+      var browser = utools.ubrowser.goto('about:blank');
+
+      if (typeof html !== 'string' || html.length > MAX_EVALUATE_HTML_CHARS) {
+        console.error('[MarkFlow] 打印 HTML 过大，不适合通过 evaluate 注入:', html ? html.length : 0);
+        return Promise.resolve({ ok: false, reason: 'write-temp-failed' });
+      }
+
+      return browser
+        .evaluate(mountPrintHtml, [html])
         .wait(function () {
-          return window.__MARKFLOW_PDF_READY__ === true;
+          return document.readyState === 'complete' || window.__MARKFLOW_PDF_READY__ === 'error';
+        }, 10000)
+        .wait(function () {
+          return isPrintPageReady() || isPrintPageErrored();
         }, 20000)
-        .pdf(
-          {
-            printBackground: printBackground,
-            pageSize: pageSize,
-            landscape: landscape,
-            scale: scale,
-            displayHeaderFooter: displayHeaderFooter,
-            preferCSSPageSize: preferCssPageSize,
-            margin: margin
-          },
-          savePath
-        )
-        .run({ show: false, width: 1024, height: 768 })
+        .evaluate(function () {
+          return {
+            ready: window.__MARKFLOW_PDF_READY__ === true,
+            errored: window.__MARKFLOW_PDF_READY__ === 'error',
+            reason: window.__MARKFLOW_PDF_READY_REASON__ || ''
+          };
+        })
+        .then(function (status) {
+          if (!status || status.errored || !status.ready) {
+            var initError = new Error(status && status.reason ? status.reason : 'print-page-init-failed');
+            initError.code = 'PRINT_PAGE_INIT_FAILED';
+            throw initError;
+          }
+
+          return browser
+            .hide()
+            .viewport(1280, 900)
+            .pdf(
+              {
+                printBackground: printBackground,
+                pageSize: pageSize,
+                landscape: landscape,
+                scale: scale,
+                displayHeaderFooter: displayHeaderFooter,
+                preferCSSPageSize: preferCssPageSize,
+                margin: margin
+              },
+              savePath
+            )
+            .run({
+              show: false,
+              width: 1280,
+              height: 900,
+              resizable: false,
+              movable: false,
+              minimizable: false,
+              maximizable: false,
+              fullscreenable: false
+            });
+        })
         .then(function () {
-          cleanupTmp();
           return { ok: true };
         })
         .catch(function (err) {
-          cleanupTmp();
           console.error('[MarkFlow] PDF 导出失败:', err);
           var msg = err && err.message ? String(err.message) : String(err || '');
+          if (err && err.code === 'PRINT_PAGE_INIT_FAILED') {
+            return { ok: false, reason: 'page-init-failed' };
+          }
           if (/wait|timeout/i.test(msg)) {
             return { ok: false, reason: 'resource-timeout' };
           }
           return { ok: false, reason: 'save-failed' };
         });
     } catch (err) {
-      cleanupTmp();
       console.error('[MarkFlow] PDF 导出初始化失败:', err);
       return Promise.resolve({ ok: false, reason: 'error' });
     }

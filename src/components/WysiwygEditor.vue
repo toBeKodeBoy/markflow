@@ -29,6 +29,7 @@
       @delete-row="onTableDeleteRow"
       @delete-col="onTableDeleteCol"
       @delete-table="onTableDeleteTable"
+      @set-col-align="onTableSetColAlign"
     />
     <FocusFormatToolbar
       v-if="focusMode"
@@ -101,6 +102,7 @@ import {
   wysiwygDeleteRow,
   wysiwygDeleteCol,
   wysiwygDeleteTable,
+  wysiwygSetColAlign,
 } from '../utils/wysiwygFormat'
 
 /** 粘贴 HTML 清洗：剥离 ProseMirror schema 不兼容的元素，防止 replaceSelection 异常触发静默粘贴失败 */
@@ -168,6 +170,7 @@ function onTableAddColAfter() { wysiwygAddColAfter(editor) }
 function onTableDeleteRow() { wysiwygDeleteRow(editor) }
 function onTableDeleteCol() { wysiwygDeleteCol(editor) }
 function onTableDeleteTable() { wysiwygDeleteTable(editor) }
+function onTableSetColAlign(alignment: 'left' | 'center' | 'right') { wysiwygSetColAlign(editor, alignment) }
 
 const isDark = computed(() => document.documentElement.getAttribute('data-theme') === 'dark')
 

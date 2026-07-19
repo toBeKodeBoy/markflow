@@ -9,6 +9,7 @@ import {
   selectColCommand,
   selectTableCommand,
   deleteSelectedCellsCommand,
+  setAlignCommand,
 } from '@milkdown/preset-gfm'
 import { Schema } from '@milkdown/prose/model'
 import { EditorState, TextSelection } from '@milkdown/prose/state'
@@ -21,6 +22,7 @@ import {
   wysiwygDeleteRow,
   wysiwygDeleteCol,
   wysiwygDeleteTable,
+  wysiwygSetColAlign,
 } from '../../../src/utils/wysiwygFormat'
 
 const schema = new Schema({
@@ -242,5 +244,38 @@ describe('wysiwygDeleteTable', () => {
 
   it('does nothing when editor is null', () => {
     wysiwygDeleteTable(null)
+  })
+})
+
+describe('wysiwygSetColAlign', () => {
+  it('calls selectColCommand then setAlignCommand with alignment', () => {
+    const view = createTableView()
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 5)))
+    const mockCall = vi.fn().mockReturnValue(true)
+    const editor = createEditorWithCommands(view, mockCall, tableSchema)
+
+    wysiwygSetColAlign(editor, 'center')
+
+    expect(mockCall).toHaveBeenCalledTimes(2)
+    expect(mockCall).toHaveBeenNthCalledWith(1, selectColCommand.key, { index: 0 })
+    expect(mockCall).toHaveBeenNthCalledWith(2, setAlignCommand.key, 'center')
+    view.destroy()
+  })
+
+  it('defaults to left alignment when no alignment specified', () => {
+    const view = createTableView()
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 5)))
+    const mockCall = vi.fn().mockReturnValue(true)
+    const editor = createEditorWithCommands(view, mockCall, tableSchema)
+
+    wysiwygSetColAlign(editor)
+
+    expect(mockCall).toHaveBeenCalledTimes(2)
+    expect(mockCall).toHaveBeenNthCalledWith(2, setAlignCommand.key, 'left')
+    view.destroy()
+  })
+
+  it('does nothing when editor is null', () => {
+    wysiwygSetColAlign(null)
   })
 })

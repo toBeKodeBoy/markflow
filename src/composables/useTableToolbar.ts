@@ -1,8 +1,7 @@
-import { ref, onBeforeUnmount, type Ref } from 'vue'
+import { ref, onBeforeUnmount } from 'vue'
 import { editorViewCtx } from '@milkdown/core'
 import type { Editor } from '@milkdown/core'
 import type { EditorState } from '@milkdown/prose/state'
-import { coordsAtPos } from '@milkdown/prose/view'
 
 export function isCursorInTable(state: EditorState): boolean {
   const { $from } = state.selection
@@ -29,14 +28,14 @@ export function useTableToolbar(editorRef: () => Editor | null) {
         const start = $from.start($from.depth)
         const end = $from.end($from.depth)
         const mid = start + Math.floor((end - start) / 2) || start
-        const coords = coordsAtPos(mid, view)
+        const coords = view.coordsAtPos(mid)
         const editorRect = view.dom.getBoundingClientRect()
         toolbarPosition.value = {
           top: coords.top - editorRect.top,
           left: coords.left - editorRect.left + 8,
         }
       } catch {
-        // coordsAtPos may throw for empty/invalid selections
+        // view.coordsAtPos may throw for empty/invalid selections
       }
     })
   }

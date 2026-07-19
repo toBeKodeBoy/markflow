@@ -24,6 +24,7 @@ export type PdfSaveResult =
         | 'ubrowser-unavailable'
         | 'write-temp-failed'
         | 'resource-timeout'
+        | 'page-init-failed'
         | 'save-failed'
     }
 
@@ -95,7 +96,11 @@ function handleNativeSaveResult(result: PdfSaveResult, filename: string): void {
     return
   }
   if (reason === 'write-temp-failed') {
-    showAppNotification('PDF 导出失败：无法写入临时打印文件')
+    showAppNotification('PDF 导出失败：文档过大，无法注入打印页面')
+    return
+  }
+  if (reason === 'page-init-failed') {
+    showAppNotification('PDF 导出失败：打印页面初始化失败')
     return
   }
   if (reason === 'resource-timeout') {

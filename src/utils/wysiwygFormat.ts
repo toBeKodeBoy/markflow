@@ -8,6 +8,7 @@ import {
   selectColCommand,
   selectTableCommand,
   deleteSelectedCellsCommand,
+  setAlignCommand,
 } from '@milkdown/preset-gfm'
 import { TextSelection } from '@milkdown/prose/state'
 import { setBlockType, toggleMark, wrapIn } from '@milkdown/prose/commands'
@@ -235,4 +236,12 @@ export function wysiwygInsertLink(editor: Editor | null) {
     if (!link) return
     toggleMark(link, { href })(view.state, view.dispatch)
   })
+}
+
+export function wysiwygSetColAlign(editor: Editor | null, alignment: 'left' | 'center' | 'right' = 'left') {
+  if (!editor) return
+  const index = getTableColIndex(editor)
+  if (index < 0) return
+  callGfmCommand(editor, selectColCommand, { index })
+  callGfmCommand(editor, setAlignCommand, alignment)
 }

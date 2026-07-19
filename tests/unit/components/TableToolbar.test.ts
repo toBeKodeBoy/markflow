@@ -56,4 +56,22 @@ describe('TableToolbar', () => {
     expect(el.attributes('style')).toContain('top: 42px')
     expect(el.attributes('style')).toContain('left: 88px')
   })
+
+  it('emits setColAlign with left when left-align button clicked', async () => {
+    const wrapper = mount(TableToolbar, { props: { visible: true, position: defaultPosition } })
+    await wrapper.get('[data-testid="table-align-left"]').trigger('click')
+    expect(wrapper.emitted('setColAlign')![0]).toEqual(['left'])
+  })
+
+  it('emits setColAlign with center when center-align button clicked', async () => {
+    const wrapper = mount(TableToolbar, { props: { visible: true, position: defaultPosition } })
+    await wrapper.get('[data-testid="table-align-center"]').trigger('click')
+    expect(wrapper.emitted('setColAlign')![0]).toEqual(['center'])
+  })
+
+  it('emits setColAlign with right when right-align button clicked', async () => {
+    const wrapper = mount(TableToolbar, { props: { visible: true, position: defaultPosition } })
+    await wrapper.get('[data-testid="table-align-right"]').trigger('click')
+    expect(wrapper.emitted('setColAlign')![0]).toEqual(['right'])
+  })
 })
