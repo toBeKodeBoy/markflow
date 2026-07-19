@@ -25,10 +25,7 @@ import {
 
 const schema = new Schema({
   nodes: {
-    doc: {
-      content: 'block+',
-      toDOM: () => ['div', 0] as const,
-    },
+    doc: { content: 'block+', toDOM: () => ['div', 0] as const },
     paragraph: {
       group: 'block',
       content: 'text*',
@@ -45,6 +42,35 @@ const schema = new Schema({
   },
 })
 
+const tableSchema = new Schema({
+  nodes: {
+    doc: { content: 'block+', toDOM: () => ['div', 0] as const },
+    paragraph: {
+      group: 'block',
+      content: 'text*',
+      toDOM: () => ['p', 0] as const,
+      parseDOM: [{ tag: 'p' }],
+    },
+    table: {
+      group: 'block',
+      content: 'table_row+',
+      toDOM: () => ['table', 0] as const,
+      parseDOM: [{ tag: 'table' }],
+    },
+    table_row: {
+      content: 'table_cell+',
+      toDOM: () => ['tr', 0] as const,
+      parseDOM: [{ tag: 'tr' }],
+    },
+    table_cell: {
+      content: 'paragraph',
+      toDOM: () => ['td', 0] as const,
+      parseDOM: [{ tag: 'td' }],
+    },
+    text: { group: 'inline' },
+  },
+})
+
 function createView(text: string): EditorView {
   const parent = document.createElement('div')
   document.body.appendChild(parent)
@@ -54,13 +80,31 @@ function createView(text: string): EditorView {
   })
 }
 
-function createEditorWithCommands(view: EditorView, mockCall: ReturnType<typeof vi.fn>): Editor {
+function createTableView(): EditorView {
+  const parent = document.createElement('div')
+  document.body.appendChild(parent)
+  const cell = (text: string) =>
+    tableSchema.node('table_cell', null, [tableSchema.node('paragraph', null, [tableSchema.text(text)])])
+  const row = tableSchema.node('table_row', null, [cell('a'), cell('b'), cell('c')])
+  const doc = tableSchema.node('doc', null, [
+    tableSchema.node('table', null, [row, row, row]),
+  ])
+  return new EditorView(parent, {
+    state: EditorState.create({ doc }),
+  })
+}
+
+function createEditorWithCommands(
+  view: EditorView,
+  mockCall: ReturnType<typeof vi.fn>,
+  s: Schema = schema,
+): Editor {
   return {
     action: (runner: (ctx: { get: (key: unknown) => unknown }) => void) => {
       runner({
         get: (key: unknown) => {
           if (key === editorViewCtx) return view
-          if (key === schemaCtx) return schema
+          if (key === schemaCtx) return s
           if (key === commandsCtx) return { call: mockCall }
           throw new Error('Unexpected Milkdown context key')
         },
@@ -141,10 +185,12 @@ describe('wysiwygAddColAfter', () => {
 })
 
 describe('wysiwygDeleteRow', () => {
-  it('calls selectRowCommand then deleteSelectedCellsCommand', () => {
-    const view = createView('hello')
+  it('calls selectRowCommand with cursor row index then deleteSelectedCellsCommand', () => {
+    const view = createTableView()
+    // cursor inside first cell text "a" (pos 5)
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 5)))
     const mockCall = vi.fn().mockReturnValue(true)
-    const editor = createEditorWithCommands(view, mockCall)
+    const editor = createEditorWithCommands(view, mockCall, tableSchema)
 
     wysiwygDeleteRow(editor)
 
@@ -160,10 +206,12 @@ describe('wysiwygDeleteRow', () => {
 })
 
 describe('wysiwygDeleteCol', () => {
-  it('calls selectColCommand then deleteSelectedCellsCommand', () => {
-    const view = createView('hello')
+  it('calls selectColCommand with cursor col index then deleteSelectedCellsCommand', () => {
+    const view = createTableView()
+    // cursor inside first cell text "a" (pos 5)
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 5)))
     const mockCall = vi.fn().mockReturnValue(true)
-    const editor = createEditorWithCommands(view, mockCall)
+    const editor = createEditorWithCommands(view, mockCall, tableSchema)
 
     wysiwygDeleteCol(editor)
 

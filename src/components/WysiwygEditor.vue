@@ -251,6 +251,9 @@ async function initEditor(content: string) {
       })
     })
 
+    detachTableToolbar()
+    attachTableToolbar()
+
     if (pendingEditorPush !== null) {
       const push = pendingEditorPush
       pendingEditorPush = null

@@ -156,6 +156,44 @@ function callGfmCommand(editor: Editor, cmd: { key: string }, payload?: unknown)
   })
 }
 
+function getTableRowIndex(editor: Editor): number {
+  let index = -1
+  editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx)
+    const { $from } = view.state.selection
+    for (let depth = $from.depth; depth > 0; depth--) {
+      const node = $from.node(depth)
+      if (node.type.name === 'table_row') {
+        const parent = $from.node(depth - 1)
+        for (let i = 0; i < parent.childCount; i++) {
+          if (parent.child(i) === node) { index = i; break }
+        }
+        break
+      }
+    }
+  })
+  return index
+}
+
+function getTableColIndex(editor: Editor): number {
+  let index = -1
+  editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx)
+    const { $from } = view.state.selection
+    for (let depth = $from.depth; depth > 0; depth--) {
+      const node = $from.node(depth)
+      if (node.type.name === 'table_cell' || node.type.name === 'table_header') {
+        const parent = $from.node(depth - 1)
+        for (let i = 0; i < parent.childCount; i++) {
+          if (parent.child(i) === node) { index = i; break }
+        }
+        break
+      }
+    }
+  })
+  return index
+}
+
 export function wysiwygAddRowAfter(editor: Editor | null) {
   if (!editor) return
   callGfmCommand(editor, addRowAfterCommand)
@@ -168,13 +206,17 @@ export function wysiwygAddColAfter(editor: Editor | null) {
 
 export function wysiwygDeleteRow(editor: Editor | null) {
   if (!editor) return
-  callGfmCommand(editor, selectRowCommand, { index: 0 })
+  const index = getTableRowIndex(editor)
+  if (index < 0) return
+  callGfmCommand(editor, selectRowCommand, { index })
   callGfmCommand(editor, deleteSelectedCellsCommand)
 }
 
 export function wysiwygDeleteCol(editor: Editor | null) {
   if (!editor) return
-  callGfmCommand(editor, selectColCommand, { index: 0 })
+  const index = getTableColIndex(editor)
+  if (index < 0) return
+  callGfmCommand(editor, selectColCommand, { index })
   callGfmCommand(editor, deleteSelectedCellsCommand)
 }
 
