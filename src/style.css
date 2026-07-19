@@ -2935,6 +2935,8 @@ img.ProseMirror-separator {
 
 /* 表格浮动工具栏 */
 .table-toolbar {
+  position: absolute;
+  z-index: 100;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -2942,8 +2944,11 @@ img.ProseMirror-separator {
   background: var(--bg-sidebar);
   border: 1px solid var(--border);
   border-radius: 6px;
-  margin-bottom: 4px;
   font-size: 12px;
+  white-space: nowrap;
+  pointer-events: auto;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transition: top 150ms ease, left 150ms ease;
 }
 
 .table-toolbar button {

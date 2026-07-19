@@ -1,5 +1,10 @@
 <template>
-  <div v-if="visible" class="table-toolbar" data-testid="table-toolbar">
+  <div
+    v-if="visible"
+    class="table-toolbar"
+    data-testid="table-toolbar"
+    :style="{ top: position.top + 'px', left: position.left + 'px' }"
+  >
     <button type="button" data-testid="table-add-row" title="在下方插入行" aria-label="在下方插入行" @click="$emit('addRowAfter')">+行</button>
     <button type="button" data-testid="table-add-col" title="在右侧插入列" aria-label="在右侧插入列" @click="$emit('addColAfter')">+列</button>
     <span class="sep" aria-hidden="true">|</span>
@@ -10,7 +15,7 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{ visible: boolean }>()
+defineProps<{ visible: boolean; position: { top: number; left: number } }>()
 defineEmits<{
   addRowAfter: []
   addColAfter: []

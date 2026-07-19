@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { isCursorInTable } from '../../../src/composables/useTableToolbar'
+import { describe, it, expect, vi } from 'vitest'
+import { isCursorInTable, useTableToolbar } from '../../../src/composables/useTableToolbar'
 import { Schema } from '@milkdown/prose/model'
 import { EditorState, TextSelection } from '@milkdown/prose/state'
 import { EditorView } from '@milkdown/prose/view'
@@ -82,6 +82,48 @@ describe('isCursorInTable', () => {
     const view = createView(doc)
     view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, 47)))
     expect(isCursorInTable(view.state)).toBe(true)
+    view.destroy()
+  })
+})
+
+describe('useTableToolbar toolbarPosition', () => {
+  it('updates position when cursor is inside table', () => {
+    const doc = createTableDoc()
+    const view = createView(doc)
+    view.dom.getBoundingClientRect = () => ({
+      top: 100, left: 200, width: 800, height: 600,
+      bottom: 700, right: 1000, x: 200, y: 100, toJSON: () => {},
+    } as DOMRect)
+    const editorMock = {
+      action: (runner: (ctx: { get: (key: unknown) => unknown }) => void) => {
+        runner({ get: () => view })
+      },
+    }
+    const { isInTable, toolbarPosition, check } = useTableToolbar(() => editorMock as any)
+    // trigger selection inside table cell, then check
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, 9)))
+    check()
+    expect(isInTable.value).toBe(true)
+    expect(typeof toolbarPosition.value.top).toBe('number')
+    expect(typeof toolbarPosition.value.left).toBe('number')
+    view.destroy()
+  })
+
+  it('does not change position when cursor is outside table', () => {
+    const doc = createTableDoc()
+    const view = createView(doc)
+    const editorMock = {
+      action: (runner: (ctx: { get: (key: unknown) => unknown }) => void) => {
+        runner({ get: () => view })
+      },
+    }
+    const { isInTable, toolbarPosition, check } = useTableToolbar(() => editorMock as any)
+    // cursor at doc start (outside table)
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, 1)))
+    check()
+    expect(isInTable.value).toBe(false)
+    // toolbarPosition remains at initial {0,0}
+    expect(toolbarPosition.value).toEqual({ top: 0, left: 0 })
     view.destroy()
   })
 })

@@ -23,6 +23,7 @@
     <TableToolbar
       v-if="!focusMode"
       :visible="isInTable"
+      :position="toolbarPosition"
       @add-row-after="onTableAddRowAfter"
       @add-col-after="onTableAddColAfter"
       @delete-row="onTableDeleteRow"
@@ -146,7 +147,7 @@ const focusModeEnabled = computed(() => props.focusMode === true)
 const { visible: focusToolbarVisible, onToolbarEnter: onFocusToolbarEnter, onToolbarLeave: onFocusToolbarLeave } =
   useFocusToolbarVisibility(focusModeEnabled)
 
-const { isInTable, attach: attachTableToolbar, detach: detachTableToolbar } = useTableToolbar(() => editor)
+const { isInTable, toolbarPosition, attach: attachTableToolbar, detach: detachTableToolbar } = useTableToolbar(() => editor)
 
 function onToolbarBold() { wysiwygToggleBold(editor) }
 function onToolbarItalic() { wysiwygToggleItalic(editor) }
