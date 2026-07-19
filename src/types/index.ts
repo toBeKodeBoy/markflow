@@ -82,12 +82,23 @@ export type PdfPageSize = 'A4' | 'A3' | 'Letter'
 /** PDF 页边距预设 */
 export type PdfMarginPreset = 'default' | 'narrow' | 'wide' | 'none'
 
+/** PDF 页面方向 */
+export type PdfOrientation = 'portrait' | 'landscape'
+
 /** PDF 导出选项（持久化到 AppSettings） */
 export interface PdfExportOptions {
   pageSize: PdfPageSize
   margin: PdfMarginPreset
   /** 是否打印背景色（代码块、表格底色等） */
   printBackground: boolean
+  /** 页面方向 */
+  landscape: PdfOrientation
+  /** Chromium printToPDF 缩放 */
+  scale: number
+  /** 是否启用页眉页脚 */
+  displayHeaderFooter: boolean
+  /** 优先使用 CSS @page size */
+  preferCssPageSize: boolean
 }
 
 /** 自动备份间隔（小时） */

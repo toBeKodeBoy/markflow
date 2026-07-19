@@ -21,9 +21,37 @@
         </select>
       </label>
 
+      <label class="pdf-option-row">
+        <span class="pdf-option-label">方向</span>
+        <select v-model="draft.landscape" class="pdf-option-select">
+          <option v-for="item in PDF_ORIENTATIONS" :key="item.value" :value="item.value">
+            {{ item.label }}
+          </option>
+        </select>
+      </label>
+
+      <label class="pdf-option-row">
+        <span class="pdf-option-label">缩放</span>
+        <select v-model.number="draft.scale" class="pdf-option-select">
+          <option v-for="item in PDF_SCALE_OPTIONS" :key="item.value" :value="item.value">
+            {{ item.label }}
+          </option>
+        </select>
+      </label>
+
       <label class="pdf-option-row pdf-option-check">
         <input v-model="draft.printBackground" type="checkbox" />
         <span>打印背景色（代码块、表格底色等）</span>
+      </label>
+
+      <label class="pdf-option-row pdf-option-check">
+        <input v-model="draft.displayHeaderFooter" type="checkbox" />
+        <span>显示页眉页脚</span>
+      </label>
+
+      <label class="pdf-option-row pdf-option-check">
+        <input v-model="draft.preferCssPageSize" type="checkbox" />
+        <span>优先使用 CSS 纸张尺寸</span>
       </label>
 
       <p v-if="isBrowserExport" class="pdf-export-tip">
@@ -43,7 +71,14 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
 import type { PdfExportOptions } from '../types'
-import { PDF_MARGINS, PDF_PAGE_SIZES, loadPdfOptions, normalizePdfOptions } from '../utils/pdfOptions'
+import {
+  PDF_MARGINS,
+  PDF_ORIENTATIONS,
+  PDF_PAGE_SIZES,
+  PDF_SCALE_OPTIONS,
+  loadPdfOptions,
+  normalizePdfOptions,
+} from '../utils/pdfOptions'
 
 const props = defineProps<{
   visible: boolean
@@ -69,7 +104,11 @@ watch(
     const loaded = loadPdfOptions()
     draft.pageSize = loaded.pageSize
     draft.margin = loaded.margin
+    draft.landscape = loaded.landscape
+    draft.scale = loaded.scale
     draft.printBackground = loaded.printBackground
+    draft.displayHeaderFooter = loaded.displayHeaderFooter
+    draft.preferCssPageSize = loaded.preferCssPageSize
   }
 )
 

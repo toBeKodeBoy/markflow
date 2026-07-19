@@ -1,5 +1,14 @@
 import type { Editor } from '@milkdown/core'
-import { editorViewCtx, schemaCtx } from '@milkdown/core'
+import { editorViewCtx, schemaCtx, commandsCtx } from '@milkdown/core'
+import {
+  insertTableCommand,
+  addRowAfterCommand,
+  addColAfterCommand,
+  selectRowCommand,
+  selectColCommand,
+  selectTableCommand,
+  deleteSelectedCellsCommand,
+} from '@milkdown/preset-gfm'
 import { TextSelection } from '@milkdown/prose/state'
 import { setBlockType, toggleMark, wrapIn } from '@milkdown/prose/commands'
 import { wrapInList } from '@milkdown/prose/schema-list'
@@ -67,16 +76,6 @@ function wrapInListType(editor: Editor, listName: string) {
   })
 }
 
-function insertTextBlock(editor: Editor, text: string) {
-  runEditorCommand(editor, (view, schema) => {
-    const { from, to } = view.state.selection
-    const paragraph = schema.nodes.paragraph
-    if (!paragraph) return
-    const node = paragraph.create(null, schema.text(text))
-    view.dispatch(view.state.tr.replaceWith(from, to, node))
-  })
-}
-
 export function wysiwygToggleBold(editor: Editor | null) {
   if (!editor) return
   toggleNamedMark(editor, 'strong')
@@ -141,10 +140,48 @@ export function wysiwygInsertCodeBlock(editor: Editor | null) {
 
 export function wysiwygInsertTable(editor: Editor | null) {
   if (!editor) return
-  insertTextBlock(
-    editor,
-    '| 标题1 | 标题2 | 标题3 |\n| --- | --- | --- |\n| 内容 | 内容 | 内容 |'
-  )
+  editor.action((ctx) => {
+    ctx.get(commandsCtx).call(insertTableCommand.key)
+  })
+}
+
+function callGfmCommand(editor: Editor, cmd: { key: string }, payload?: unknown) {
+  editor.action((ctx) => {
+    const commands = ctx.get(commandsCtx)
+    if (payload !== undefined) {
+      commands.call(cmd.key, payload)
+    } else {
+      commands.call(cmd.key)
+    }
+  })
+}
+
+export function wysiwygAddRowAfter(editor: Editor | null) {
+  if (!editor) return
+  callGfmCommand(editor, addRowAfterCommand)
+}
+
+export function wysiwygAddColAfter(editor: Editor | null) {
+  if (!editor) return
+  callGfmCommand(editor, addColAfterCommand)
+}
+
+export function wysiwygDeleteRow(editor: Editor | null) {
+  if (!editor) return
+  callGfmCommand(editor, selectRowCommand, { index: 0 })
+  callGfmCommand(editor, deleteSelectedCellsCommand)
+}
+
+export function wysiwygDeleteCol(editor: Editor | null) {
+  if (!editor) return
+  callGfmCommand(editor, selectColCommand, { index: 0 })
+  callGfmCommand(editor, deleteSelectedCellsCommand)
+}
+
+export function wysiwygDeleteTable(editor: Editor | null) {
+  if (!editor) return
+  callGfmCommand(editor, selectTableCommand)
+  callGfmCommand(editor, deleteSelectedCellsCommand)
 }
 
 export function wysiwygInsertLink(editor: Editor | null) {

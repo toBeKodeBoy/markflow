@@ -20,6 +20,15 @@
     />
     <NoteTagsBar v-if="!focusMode && isActive" />
     <div ref="containerRef" :class="['milkdown-host', { 'milkdown-dark': isDark }]"></div>
+    <TableToolbar
+      v-if="!focusMode"
+      :visible="isInTable"
+      @add-row-after="onTableAddRowAfter"
+      @add-col-after="onTableAddColAfter"
+      @delete-row="onTableDeleteRow"
+      @delete-col="onTableDeleteCol"
+      @delete-table="onTableDeleteTable"
+    />
     <FocusFormatToolbar
       v-if="focusMode"
       :visible="focusToolbarVisible"
@@ -69,8 +78,10 @@ import { handlePreviewFragmentClick } from '../utils/previewFragmentNav'
 import { resolveMarkdownForDisplay, persistMarkdownAssets } from '../utils/resolveMarkdownAssets'
 import FormatToolbar from './FormatToolbar.vue'
 import FocusFormatToolbar from './FocusFormatToolbar.vue'
+import TableToolbar from './TableToolbar.vue'
 import NoteTagsBar from './NoteTagsBar.vue'
 import { useFocusToolbarVisibility } from '../composables/useFocusToolbarVisibility'
+import { useTableToolbar } from '../composables/useTableToolbar'
 import {
   wysiwygToggleBold,
   wysiwygToggleItalic,
@@ -84,6 +95,11 @@ import {
   wysiwygInsertCodeBlock,
   wysiwygInsertTable,
   wysiwygInsertLink,
+  wysiwygAddRowAfter,
+  wysiwygAddColAfter,
+  wysiwygDeleteRow,
+  wysiwygDeleteCol,
+  wysiwygDeleteTable,
 } from '../utils/wysiwygFormat'
 
 /** 粘贴 HTML 清洗：剥离 ProseMirror schema 不兼容的元素，防止 replaceSelection 异常触发静默粘贴失败 */
@@ -130,6 +146,8 @@ const focusModeEnabled = computed(() => props.focusMode === true)
 const { visible: focusToolbarVisible, onToolbarEnter: onFocusToolbarEnter, onToolbarLeave: onFocusToolbarLeave } =
   useFocusToolbarVisibility(focusModeEnabled)
 
+const { isInTable, attach: attachTableToolbar, detach: detachTableToolbar } = useTableToolbar(() => editor)
+
 function onToolbarBold() { wysiwygToggleBold(editor) }
 function onToolbarItalic() { wysiwygToggleItalic(editor) }
 function onToolbarStrike() { wysiwygToggleStrike(editor) }
@@ -144,6 +162,11 @@ function onToolbarInlineCode() { wysiwygToggleInlineCode(editor) }
 function onToolbarCodeBlock() { wysiwygInsertCodeBlock(editor) }
 function onToolbarTable() { wysiwygInsertTable(editor) }
 function onToolbarLink() { wysiwygInsertLink(editor) }
+function onTableAddRowAfter() { wysiwygAddRowAfter(editor) }
+function onTableAddColAfter() { wysiwygAddColAfter(editor) }
+function onTableDeleteRow() { wysiwygDeleteRow(editor) }
+function onTableDeleteCol() { wysiwygDeleteCol(editor) }
+function onTableDeleteTable() { wysiwygDeleteTable(editor) }
 
 const isDark = computed(() => document.documentElement.getAttribute('data-theme') === 'dark')
 
@@ -266,9 +289,10 @@ function onWysiwygClick(e: MouseEvent) {
   handleCodeCopyCaptureClick(e)
 }
 
-onMounted(() => {
+onMounted(async () => {
   const tab = tabsStore.tabs.find((t) => t.noteId === props.noteId)
-  initEditor(tab?.liveContent ?? '')
+  await initEditor(tab?.liveContent ?? '')
+  attachTableToolbar()
   const host = containerRef.value
   if (host) {
     host.addEventListener('mousedown', handleCodeCopyCaptureMouseDown, true)
@@ -278,6 +302,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(async () => {
+  detachTableToolbar()
   const host = containerRef.value
   if (host) {
     host.removeEventListener('mousedown', handleCodeCopyCaptureMouseDown, true)

@@ -14,6 +14,7 @@ const tableSchema = new Schema({
       parseDOM: [{ tag: 'p' }],
     },
     table: {
+      group: 'block',
       content: 'table_row+',
       toDOM: () => ['table', 0] as const,
       parseDOM: [{ tag: 'table' }],
@@ -55,7 +56,6 @@ describe('isCursorInTable', () => {
   it('returns true when cursor is inside a table cell', () => {
     const doc = createTableDoc()
     const view = createView(doc)
-    // cursor inside first table_cell (pos 9 is inside "a" text)
     view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, 9)))
     expect(isCursorInTable(view.state)).toBe(true)
     view.destroy()
@@ -64,7 +64,6 @@ describe('isCursorInTable', () => {
   it('returns false when cursor is in a paragraph outside table', () => {
     const doc = createTableDoc()
     const view = createView(doc)
-    // cursor in "before" paragraph (pos 1)
     view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, 1)))
     expect(isCursorInTable(view.state)).toBe(false)
     view.destroy()
@@ -73,7 +72,6 @@ describe('isCursorInTable', () => {
   it('returns false for empty selection outside table', () => {
     const doc = createTableDoc()
     const view = createView(doc)
-    // cursor at very start of doc
     view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, 0)))
     expect(isCursorInTable(view.state)).toBe(false)
     view.destroy()
@@ -82,7 +80,6 @@ describe('isCursorInTable', () => {
   it('returns true for any position inside table', () => {
     const doc = createTableDoc()
     const view = createView(doc)
-    // cursor in last cell of last row
     view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, 47)))
     expect(isCursorInTable(view.state)).toBe(true)
     view.destroy()

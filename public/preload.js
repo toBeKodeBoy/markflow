@@ -95,8 +95,8 @@ window.markflow = {
 
   /**
    * 导出 PDF（Typora 路线：完整 HTML + ubrowser Chromium printToPDF）
-   * options: { pageSize, margin, printBackground }
-   * 返回 Promise<{ ok: true } | { ok: false, reason: 'cancel' | 'error' }>
+   * options: { pageSize, margin, printBackground, landscape, scale, displayHeaderFooter, preferCssPageSize }
+   * 返回 Promise<{ ok: true } | { ok: false, reason: string }>
    */
   savePdfFromHtml: function (filename, html, options) {
     var savePath = utools.showSaveDialog({
@@ -108,7 +108,18 @@ window.markflow = {
 
     var opts = options || {};
     var pageSize = opts.pageSize || 'A4';
+    var landscape = opts.landscape === 'landscape';
     var printBackground = opts.printBackground !== false;
+    var scale = typeof opts.scale === 'number' && isFinite(opts.scale) ? opts.scale : 1;
+    var displayHeaderFooter = opts.displayHeaderFooter === true;
+    var preferCssPageSize = opts.preferCssPageSize !== false;
+    var marginMap = {
+      default: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+      narrow: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
+      wide: { top: '25mm', right: '25mm', bottom: '25mm', left: '25mm' },
+      none: { top: '5mm', right: '5mm', bottom: '5mm', left: '5mm' }
+    };
+    var margin = marginMap[opts.margin] || marginMap.default;
 
     var fs = require('fs');
     var os = require('os');
@@ -125,28 +136,35 @@ window.markflow = {
     }
 
     try {
-      fs.writeFileSync(tmpPath, html, 'utf-8');
+      try {
+        fs.writeFileSync(tmpPath, html, 'utf-8');
+      } catch (writeErr) {
+        cleanupTmp();
+        console.error('[MarkFlow] 写入临时打印文件失败:', writeErr);
+        return Promise.resolve({ ok: false, reason: 'write-temp-failed' });
+      }
       var fileUrl = pathToFileURL(tmpPath).href;
 
       if (!utools.ubrowser || typeof utools.ubrowser.goto !== 'function') {
         cleanupTmp();
         console.error('[MarkFlow] utools.ubrowser 不可用');
-        return Promise.resolve({ ok: false, reason: 'error' });
+        return Promise.resolve({ ok: false, reason: 'ubrowser-unavailable' });
       }
 
       return utools.ubrowser
         .goto(fileUrl)
         .wait(function () {
-          var imgs = document.images;
-          for (var i = 0; i < imgs.length; i++) {
-            if (!imgs[i].complete) return false;
-          }
-          return true;
-        }, 15000)
+          return window.__MARKFLOW_PDF_READY__ === true;
+        }, 20000)
         .pdf(
           {
             printBackground: printBackground,
-            pageSize: pageSize
+            pageSize: pageSize,
+            landscape: landscape,
+            scale: scale,
+            displayHeaderFooter: displayHeaderFooter,
+            preferCSSPageSize: preferCssPageSize,
+            margin: margin
           },
           savePath
         )
@@ -158,7 +176,11 @@ window.markflow = {
         .catch(function (err) {
           cleanupTmp();
           console.error('[MarkFlow] PDF 导出失败:', err);
-          return { ok: false, reason: 'error' };
+          var msg = err && err.message ? String(err.message) : String(err || '');
+          if (/wait|timeout/i.test(msg)) {
+            return { ok: false, reason: 'resource-timeout' };
+          }
+          return { ok: false, reason: 'save-failed' };
         });
     } catch (err) {
       cleanupTmp();

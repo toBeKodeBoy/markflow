@@ -3,7 +3,7 @@ import type { PdfExportOptions } from '../types'
 import { useNoteStore } from '../stores/note'
 import { showAppNotification } from './notify'
 import { resolveMarkdownForDisplay } from './resolveMarkdownAssets'
-import { buildPrintDocument } from './printDocument'
+import { buildPdfDocument } from './printDocument'
 import { loadPdfOptions, normalizePdfOptions, savePdfOptions } from './pdfOptions'
 
 /** 导出进行中，供工具栏禁用按钮 */
@@ -16,7 +16,16 @@ const PDF_MAX_CHARS = 20_000_000
 export type PdfSaveResult =
   | boolean
   | { ok: true }
-  | { ok: false; reason: 'cancel' | 'error' }
+  | {
+      ok: false
+      reason:
+        | 'cancel'
+        | 'error'
+        | 'ubrowser-unavailable'
+        | 'write-temp-failed'
+        | 'resource-timeout'
+        | 'save-failed'
+    }
 
 /**
  * 导出当前笔记为 PDF（Typora 路线：预览同款 HTML + Chromium 排版）。
@@ -49,9 +58,13 @@ export async function exportPdf(options?: Partial<PdfExportOptions>): Promise<vo
     if (content.length > PDF_WARN_CHARS) {
       showAppNotification('文档较大，导出可能需要较长时间…')
     }
+    const diagnostics = collectPdfExportWarnings(markdown, content)
+    if (diagnostics.length > 0) {
+      showAppNotification(diagnostics.join('；'))
+    }
 
     const filename = `${sanitizeFilename(title)}.pdf`
-    const html = buildPrintDocument(content, title, opts)
+    const html = await buildPdfDocument(content, title, opts)
 
     if (typeof window.markflow !== 'undefined' && window.markflow.savePdfFromHtml) {
       const result = await window.markflow.savePdfFromHtml(filename, html, opts)
@@ -77,6 +90,22 @@ function handleNativeSaveResult(result: PdfSaveResult, filename: string): void {
   const reason =
     typeof result === 'object' && result && 'reason' in result ? result.reason : 'error'
   if (reason === 'cancel') return
+  if (reason === 'ubrowser-unavailable') {
+    showAppNotification('当前 uTools 环境缺少 printToPDF 能力，请升级宿主后重试')
+    return
+  }
+  if (reason === 'write-temp-failed') {
+    showAppNotification('PDF 导出失败：无法写入临时打印文件')
+    return
+  }
+  if (reason === 'resource-timeout') {
+    showAppNotification('PDF 导出失败：图片、字体或图表加载超时')
+    return
+  }
+  if (reason === 'save-failed') {
+    showAppNotification('PDF 导出失败：Chromium 保存 PDF 失败')
+    return
+  }
   showAppNotification('PDF 导出失败，请稍后重试')
 }
 
@@ -106,15 +135,19 @@ async function printViaBrowser(html: string): Promise<void> {
   doc.write(html)
   doc.close()
 
-  await waitForImages(doc)
-  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  const ready = await waitForPrintDocumentReady(doc, win)
+  if (!ready.ok) {
+    cleanupPrintFrame(iframe)
+    showAppNotification(
+      ready.reason === 'resource-timeout'
+        ? '导出失败：打印资源加载超时'
+        : '导出失败：打印页面初始化失败'
+    )
+    return
+  }
 
   const cleanup = () => {
-    try {
-      iframe.remove()
-    } catch {
-      /* ignore */
-    }
+    cleanupPrintFrame(iframe)
   }
   win.onafterprint = cleanup
   setTimeout(cleanup, 60_000)
@@ -123,21 +156,56 @@ async function printViaBrowser(html: string): Promise<void> {
   win.print()
 }
 
-function waitForImages(doc: Document): Promise<void> {
-  const images = Array.from(doc.images)
-  if (images.length === 0) return Promise.resolve()
+function cleanupPrintFrame(iframe: HTMLIFrameElement): void {
+  try {
+    iframe.remove()
+  } catch {
+    /* ignore */
+  }
+}
 
-  return Promise.all(
-    images.map(
-      (img) =>
-        new Promise<void>((resolve) => {
-          if (img.complete) {
-            resolve()
-            return
-          }
-          img.onload = () => resolve()
-          img.onerror = () => resolve()
-        })
-    )
-  ).then(() => undefined)
+async function waitForPrintDocumentReady(
+  doc: Document,
+  win: Window,
+  timeoutMs = 20_000
+): Promise<{ ok: true } | { ok: false; reason: 'resource-timeout' | 'document-init-failed' }> {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < timeoutMs) {
+    const readyState = (win as Window & { __MARKFLOW_PDF_READY__?: boolean | string }).__MARKFLOW_PDF_READY__
+    if (readyState === true) return { ok: true }
+    if (readyState === 'error') return { ok: false, reason: 'document-init-failed' }
+
+    const imagesReady = Array.from(doc.images).every((img) => img.complete)
+    const fontsReady =
+      !('fonts' in doc) ||
+      !(doc as Document & { fonts?: FontFaceSet }).fonts ||
+      (doc as Document & { fonts?: FontFaceSet }).fonts?.status === 'loaded'
+    if (imagesReady && fontsReady) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      return { ok: true }
+    }
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 60))
+  }
+  return { ok: false, reason: 'resource-timeout' }
+}
+
+function collectPdfExportWarnings(markdown: string, renderedMarkdown: string): string[] {
+  const warnings: string[] = []
+  const mermaidCount = (markdown.match(/```mermaid\b/gi) ?? []).length
+  const dataImageCount = (renderedMarkdown.match(/data:image\//gi) ?? []).length
+  const wideTableLine = renderedMarkdown
+    .split('\n')
+    .some((line) => line.includes('|') && line.length >= 200)
+
+  if (dataImageCount >= 8) {
+    warnings.push(`文档包含 ${dataImageCount} 张内联图片，导出可能较慢`)
+  }
+  if (mermaidCount > 0) {
+    warnings.push(`文档包含 ${mermaidCount} 个 Mermaid 图表，首次导出可能稍慢`)
+  }
+  if (wideTableLine) {
+    warnings.push('文档包含较宽表格，PDF 中可能自动换页或缩放')
+  }
+  return warnings
 }
