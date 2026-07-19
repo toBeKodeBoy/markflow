@@ -1,4 +1,4 @@
-import type { Editor } from '@milkdown/core'
+import type { CmdKey, Editor } from '@milkdown/core'
 import { editorViewCtx, schemaCtx, commandsCtx } from '@milkdown/core'
 import {
   insertTableCommand,
@@ -146,7 +146,7 @@ export function wysiwygInsertTable(editor: Editor | null) {
   })
 }
 
-function callGfmCommand(editor: Editor, cmd: { key: string }, payload?: unknown) {
+function callGfmCommand<T>(editor: Editor, cmd: { key: CmdKey<T> }, payload?: T) {
   editor.action((ctx) => {
     const commands = ctx.get(commandsCtx)
     if (payload !== undefined) {

@@ -2,6 +2,27 @@
 // preload.js - uTools API 桥接层（CommonJS，不压缩）
 // 挂载到 window.markflow，供 Vue 应用调用
 
+function appendPdfExportLog(message, extra) {
+  try {
+    var fs = require('fs');
+    var os = require('os');
+    var path = require('path');
+    var logPath = path.join(os.tmpdir(), 'markflow-pdf-export.log');
+    var line =
+      '[' +
+      new Date().toISOString() +
+      '] ' +
+      message +
+      (typeof extra === 'undefined' ? '' : ' ' + JSON.stringify(extra)) +
+      '\n';
+    fs.appendFileSync(logPath, line, 'utf8');
+    return logPath;
+  } catch (err) {
+    console.error('[MarkFlow] 写 PDF 导出日志失败:', err);
+    return '';
+  }
+}
+
 window.markflow = {
   // ---- 笔记存储 ----
   getNoteList: function () {
@@ -99,11 +120,24 @@ window.markflow = {
    * 返回 Promise<{ ok: true } | { ok: false, reason: string }>
    */
   savePdfFromHtml: function (filename, html, options) {
+    var logPath = appendPdfExportLog('savePdfFromHtml:start', {
+      filename: filename,
+      htmlLength: typeof html === 'string' ? html.length : -1
+    });
+
+    try {
+      utools.showNotification('MarkFlow: 已进入 uTools 原生 PDF 导出');
+      console.log('[MarkFlow] 使用 uTools ubrowser 原生 PDF 导出');
+    } catch (notifyErr) {
+      console.warn('[MarkFlow] 原生 PDF 导出探针通知失败:', notifyErr);
+    }
+
     var savePath = utools.showSaveDialog({
       title: '导出 PDF',
       defaultPath: filename.replace(/\.md$/, '.pdf'),
       filters: [{ name: 'PDF', extensions: ['pdf'] }]
     });
+    appendPdfExportLog('savePdfFromHtml:save-dialog', { savePath: savePath, logPath: logPath });
     if (!savePath) return Promise.resolve({ ok: false, reason: 'cancel' });
 
     var opts = options || {};
@@ -122,41 +156,67 @@ window.markflow = {
     var margin = marginMap[opts.margin] || marginMap.default;
     var MAX_EVALUATE_HTML_CHARS = 4 * 1024 * 1024;
 
-    function isPrintPageReady() {
-      return window.__MARKFLOW_PDF_READY__ === true;
+    function createTempPrintFile(payload) {
+      var fs = require('fs');
+      var os = require('os');
+      var path = require('path');
+      var tempName =
+        'markflow-pdf-' + Date.now() + '-' + Math.random().toString(16).slice(2) + '.html';
+      var tempPath = path.join(os.tmpdir(), tempName);
+      fs.writeFileSync(tempPath, payload, 'utf8');
+      return tempPath;
     }
 
-    function isPrintPageErrored() {
-      return window.__MARKFLOW_PDF_READY__ === 'error';
-    }
-
-    function mountPrintHtml(payload) {
-      document.open();
-      document.write(payload);
-      document.close();
-      return true;
+    function toFileUrl(filePath) {
+      var normalized = String(filePath).replace(/\\/g, '/');
+      if (normalized.charAt(0) !== '/') {
+        normalized = '/' + normalized;
+      }
+      return encodeURI('file://' + normalized);
     }
 
     try {
       if (!utools.ubrowser || typeof utools.ubrowser.goto !== 'function') {
         console.error('[MarkFlow] utools.ubrowser 不可用');
+        appendPdfExportLog('savePdfFromHtml:ubrowser-unavailable');
         return Promise.resolve({ ok: false, reason: 'ubrowser-unavailable' });
       }
 
-      var browser = utools.ubrowser.goto('about:blank');
-
       if (typeof html !== 'string' || html.length > MAX_EVALUATE_HTML_CHARS) {
         console.error('[MarkFlow] 打印 HTML 过大，不适合通过 evaluate 注入:', html ? html.length : 0);
+        appendPdfExportLog('savePdfFromHtml:html-too-large', {
+          htmlLength: html ? html.length : 0,
+          limit: MAX_EVALUATE_HTML_CHARS
+        });
         return Promise.resolve({ ok: false, reason: 'write-temp-failed' });
       }
 
-      return browser
-        .evaluate(mountPrintHtml, [html])
+      var tempHtmlPath = '';
+      try {
+        tempHtmlPath = createTempPrintFile(html);
+        appendPdfExportLog('savePdfFromHtml:temp-html-created', { tempHtmlPath: tempHtmlPath });
+      } catch (writeErr) {
+        console.error('[MarkFlow] 写临时打印页面失败:', writeErr);
+        appendPdfExportLog('savePdfFromHtml:temp-html-failed', {
+          message: writeErr && writeErr.message ? writeErr.message : String(writeErr || '')
+        });
+        return Promise.resolve({ ok: false, reason: 'write-temp-failed' });
+      }
+
+      var fileUrl = toFileUrl(tempHtmlPath);
+      appendPdfExportLog('savePdfFromHtml:run-begin', {
+        savePath: savePath,
+        fileUrl: fileUrl,
+        pageSize: pageSize,
+        landscape: landscape,
+        scale: scale
+      });
+
+      return utools.ubrowser
+        .goto(fileUrl)
+        .wait(300)
         .wait(function () {
-          return document.readyState === 'complete' || window.__MARKFLOW_PDF_READY__ === 'error';
-        }, 10000)
-        .wait(function () {
-          return isPrintPageReady() || isPrintPageErrored();
+          return document.readyState === 'complete';
         }, 20000)
         .evaluate(function () {
           return {
@@ -165,46 +225,120 @@ window.markflow = {
             reason: window.__MARKFLOW_PDF_READY_REASON__ || ''
           };
         })
-        .then(function (status) {
+        .hide()
+        .viewport(1280, 900)
+        .pdf(
+          {
+            printBackground: printBackground,
+            pageSize: pageSize,
+            landscape: landscape,
+            scale: scale,
+            displayHeaderFooter: displayHeaderFooter,
+            preferCSSPageSize: preferCssPageSize,
+            margin: margin
+          },
+          savePath
+        )
+        .run({
+          show: false,
+          width: 1280,
+          height: 900,
+          resizable: false,
+          movable: false,
+          minimizable: false,
+          maximizable: false,
+          fullscreenable: false
+        })
+        .then(function (result) {
+          appendPdfExportLog('savePdfFromHtml:run-resolved', {
+            resultLength: Array.isArray(result) ? result.length : -1
+          });
+          var status = Array.isArray(result) ? result[0] : null;
           if (!status || status.errored || !status.ready) {
-            var initError = new Error(status && status.reason ? status.reason : 'print-page-init-failed');
-            initError.code = 'PRINT_PAGE_INIT_FAILED';
-            throw initError;
+            console.error('[MarkFlow] 打印页面未就绪:', status);
+            appendPdfExportLog('savePdfFromHtml:page-not-ready', status);
+            try {
+              utools.showNotification('MarkFlow: PDF 页面未就绪，详情见临时日志');
+            } catch (notifyErr) {
+              console.warn('[MarkFlow] 通知失败:', notifyErr);
+            }
+            return { ok: false, reason: 'page-init-failed' };
           }
 
-          return browser
-            .hide()
-            .viewport(1280, 900)
-            .pdf(
-              {
-                printBackground: printBackground,
-                pageSize: pageSize,
-                landscape: landscape,
-                scale: scale,
-                displayHeaderFooter: displayHeaderFooter,
-                preferCSSPageSize: preferCssPageSize,
-                margin: margin
-              },
-              savePath
-            )
-            .run({
-              show: false,
-              width: 1280,
-              height: 900,
-              resizable: false,
-              movable: false,
-              minimizable: false,
-              maximizable: false,
-              fullscreenable: false
+          try {
+            var fs = require('fs');
+            if (!fs.existsSync(savePath)) {
+              console.error('[MarkFlow] PDF 文件未生成:', savePath);
+              appendPdfExportLog('savePdfFromHtml:file-missing', { savePath: savePath });
+              try {
+                utools.showNotification('MarkFlow: PDF 文件未生成，详情见临时日志');
+              } catch (notifyErr) {
+                console.warn('[MarkFlow] 通知失败:', notifyErr);
+              }
+              return { ok: false, reason: 'save-failed' };
+            }
+
+            var stat = fs.statSync(savePath);
+            if (!stat || !stat.isFile() || stat.size <= 0) {
+              console.error('[MarkFlow] PDF 文件为空:', savePath, stat ? stat.size : 0);
+              appendPdfExportLog('savePdfFromHtml:file-empty', {
+                savePath: savePath,
+                size: stat ? stat.size : 0
+              });
+              try {
+                utools.showNotification('MarkFlow: PDF 文件为空，详情见临时日志');
+              } catch (notifyErr) {
+                console.warn('[MarkFlow] 通知失败:', notifyErr);
+              }
+              return { ok: false, reason: 'save-failed' };
+            }
+          } catch (fsErr) {
+            console.error('[MarkFlow] PDF 落盘校验失败:', fsErr);
+            appendPdfExportLog('savePdfFromHtml:file-check-failed', {
+              message: fsErr && fsErr.message ? fsErr.message : String(fsErr || '')
             });
-        })
-        .then(function () {
+            return { ok: false, reason: 'save-failed' };
+          }
+
+          console.log('[MarkFlow] PDF 导出完成:', savePath);
+          appendPdfExportLog('savePdfFromHtml:success', { savePath: savePath });
+          try {
+            require('fs').unlinkSync(tempHtmlPath);
+            appendPdfExportLog('savePdfFromHtml:temp-html-removed', { tempHtmlPath: tempHtmlPath });
+          } catch (removeErr) {
+            appendPdfExportLog('savePdfFromHtml:temp-html-remove-failed', {
+              tempHtmlPath: tempHtmlPath,
+              message: removeErr && removeErr.message ? removeErr.message : String(removeErr || '')
+            });
+          }
           return { ok: true };
         })
         .catch(function (err) {
           console.error('[MarkFlow] PDF 导出失败:', err);
+          appendPdfExportLog('savePdfFromHtml:catch', {
+            message: err && err.message ? err.message : String(err || ''),
+            stack: err && err.stack ? err.stack : ''
+          });
+          try {
+            utools.showNotification('MarkFlow: PDF 导出失败，详情见临时日志');
+          } catch (notifyErr) {
+            console.warn('[MarkFlow] 通知失败:', notifyErr);
+          }
+          try {
+            if (tempHtmlPath) {
+              require('fs').unlinkSync(tempHtmlPath);
+              appendPdfExportLog('savePdfFromHtml:temp-html-removed-after-catch', {
+                tempHtmlPath: tempHtmlPath
+              });
+            }
+          } catch (removeErr) {
+            appendPdfExportLog('savePdfFromHtml:temp-html-remove-failed-after-catch', {
+              tempHtmlPath: tempHtmlPath,
+              message: removeErr && removeErr.message ? removeErr.message : String(removeErr || '')
+            });
+          }
           var msg = err && err.message ? String(err.message) : String(err || '');
-          if (err && err.code === 'PRINT_PAGE_INIT_FAILED') {
+          if (/print-page-init-failed|ready-script-error/i.test(msg)) {
             return { ok: false, reason: 'page-init-failed' };
           }
           if (/wait|timeout/i.test(msg)) {
@@ -214,6 +348,10 @@ window.markflow = {
         });
     } catch (err) {
       console.error('[MarkFlow] PDF 导出初始化失败:', err);
+      appendPdfExportLog('savePdfFromHtml:init-failed', {
+        message: err && err.message ? err.message : String(err || ''),
+        stack: err && err.stack ? err.stack : ''
+      });
       return Promise.resolve({ ok: false, reason: 'error' });
     }
   },
