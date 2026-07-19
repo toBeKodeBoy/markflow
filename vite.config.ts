@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { copyFileSync, mkdirSync } from 'fs'
 import { resolve } from 'path'
 
 const codemirrorDedupe = [
@@ -15,7 +16,20 @@ const codemirrorDedupe = [
 ]
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    {
+      name: 'markflow-copy-utools-assets',
+      writeBundle() {
+        const publicDir = resolve(__dirname, 'public')
+        const distDir = resolve(__dirname, 'dist')
+        mkdirSync(distDir, { recursive: true })
+        for (const file of ['plugin.json', 'preload.js', 'logo.png']) {
+          copyFileSync(resolve(publicDir, file), resolve(distDir, file))
+        }
+      },
+    },
+  ],
   base: './',
   resolve: {
     alias: {

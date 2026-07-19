@@ -76,7 +76,15 @@ function defaultSettings(): AppSettings {
     previewVisible: true,
     sidebarVisible: true,
     sidebarWidth: 240,
-    pdfExport: { pageSize: 'A4', margin: 'default', printBackground: true },
+    pdfExport: {
+      pageSize: 'A4',
+      margin: 'default',
+      printBackground: true,
+      landscape: 'portrait',
+      scale: 1,
+      displayHeaderFooter: false,
+      preferCssPageSize: true,
+    },
   }
 }
 

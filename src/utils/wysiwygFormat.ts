@@ -1,5 +1,15 @@
-import type { Editor } from '@milkdown/core'
-import { editorViewCtx, schemaCtx } from '@milkdown/core'
+import type { CmdKey, Editor } from '@milkdown/core'
+import { editorViewCtx, schemaCtx, commandsCtx } from '@milkdown/core'
+import {
+  insertTableCommand,
+  addRowAfterCommand,
+  addColAfterCommand,
+  selectRowCommand,
+  selectColCommand,
+  selectTableCommand,
+  deleteSelectedCellsCommand,
+  setAlignCommand,
+} from '@milkdown/preset-gfm'
 import { TextSelection } from '@milkdown/prose/state'
 import { setBlockType, toggleMark, wrapIn } from '@milkdown/prose/commands'
 import { wrapInList } from '@milkdown/prose/schema-list'
@@ -67,16 +77,6 @@ function wrapInListType(editor: Editor, listName: string) {
   })
 }
 
-function insertTextBlock(editor: Editor, text: string) {
-  runEditorCommand(editor, (view, schema) => {
-    const { from, to } = view.state.selection
-    const paragraph = schema.nodes.paragraph
-    if (!paragraph) return
-    const node = paragraph.create(null, schema.text(text))
-    view.dispatch(view.state.tr.replaceWith(from, to, node))
-  })
-}
-
 export function wysiwygToggleBold(editor: Editor | null) {
   if (!editor) return
   toggleNamedMark(editor, 'strong')
@@ -141,10 +141,90 @@ export function wysiwygInsertCodeBlock(editor: Editor | null) {
 
 export function wysiwygInsertTable(editor: Editor | null) {
   if (!editor) return
-  insertTextBlock(
-    editor,
-    '| 标题1 | 标题2 | 标题3 |\n| --- | --- | --- |\n| 内容 | 内容 | 内容 |'
-  )
+  editor.action((ctx) => {
+    ctx.get(commandsCtx).call(insertTableCommand.key)
+  })
+}
+
+function callGfmCommand<T>(editor: Editor, cmd: { key: CmdKey<T> }, payload?: T) {
+  editor.action((ctx) => {
+    const commands = ctx.get(commandsCtx)
+    if (payload !== undefined) {
+      commands.call(cmd.key, payload)
+    } else {
+      commands.call(cmd.key)
+    }
+  })
+}
+
+function getTableRowIndex(editor: Editor): number {
+  let index = -1
+  editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx)
+    const { $from } = view.state.selection
+    for (let depth = $from.depth; depth > 0; depth--) {
+      const node = $from.node(depth)
+      if (node.type.name === 'table_row') {
+        const parent = $from.node(depth - 1)
+        for (let i = 0; i < parent.childCount; i++) {
+          if (parent.child(i) === node) { index = i; break }
+        }
+        break
+      }
+    }
+  })
+  return index
+}
+
+function getTableColIndex(editor: Editor): number {
+  let index = -1
+  editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx)
+    const { $from } = view.state.selection
+    for (let depth = $from.depth; depth > 0; depth--) {
+      const node = $from.node(depth)
+      if (node.type.name === 'table_cell' || node.type.name === 'table_header') {
+        const parent = $from.node(depth - 1)
+        for (let i = 0; i < parent.childCount; i++) {
+          if (parent.child(i) === node) { index = i; break }
+        }
+        break
+      }
+    }
+  })
+  return index
+}
+
+export function wysiwygAddRowAfter(editor: Editor | null) {
+  if (!editor) return
+  callGfmCommand(editor, addRowAfterCommand)
+}
+
+export function wysiwygAddColAfter(editor: Editor | null) {
+  if (!editor) return
+  callGfmCommand(editor, addColAfterCommand)
+}
+
+export function wysiwygDeleteRow(editor: Editor | null) {
+  if (!editor) return
+  const index = getTableRowIndex(editor)
+  if (index < 0) return
+  callGfmCommand(editor, selectRowCommand, { index })
+  callGfmCommand(editor, deleteSelectedCellsCommand)
+}
+
+export function wysiwygDeleteCol(editor: Editor | null) {
+  if (!editor) return
+  const index = getTableColIndex(editor)
+  if (index < 0) return
+  callGfmCommand(editor, selectColCommand, { index })
+  callGfmCommand(editor, deleteSelectedCellsCommand)
+}
+
+export function wysiwygDeleteTable(editor: Editor | null) {
+  if (!editor) return
+  callGfmCommand(editor, selectTableCommand)
+  callGfmCommand(editor, deleteSelectedCellsCommand)
 }
 
 export function wysiwygInsertLink(editor: Editor | null) {
@@ -156,4 +236,12 @@ export function wysiwygInsertLink(editor: Editor | null) {
     if (!link) return
     toggleMark(link, { href })(view.state, view.dispatch)
   })
+}
+
+export function wysiwygSetColAlign(editor: Editor | null, alignment: 'left' | 'center' | 'right' = 'left') {
+  if (!editor) return
+  const index = getTableColIndex(editor)
+  if (index < 0) return
+  callGfmCommand(editor, selectColCommand, { index })
+  callGfmCommand(editor, setAlignCommand, alignment)
 }

@@ -8,6 +8,7 @@ import { getMarginCss, normalizePdfOptions } from './pdfOptions'
 export function buildPrintStyles(options?: Partial<PdfExportOptions>): string {
   const opts = normalizePdfOptions(options)
   const margin = getMarginCss(opts.margin)
+  const pageSize = opts.landscape === 'landscape' ? `${opts.pageSize} landscape` : opts.pageSize
   const noBg = !opts.printBackground
     ? `
 pre, code, blockquote, th, tr:nth-child(even), mark.highlight-mark,
@@ -19,7 +20,7 @@ pre, code, blockquote, th, tr:nth-child(even), mark.highlight-mark,
 
   return `
 @page {
-  size: ${opts.pageSize};
+  size: ${pageSize};
   margin: ${margin};
 }
 ${noBg}
@@ -39,6 +40,8 @@ body.print-root,
   max-width: 100%;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  orphans: 3;
+  widows: 3;
 }
 
 .markdown-body h1,
@@ -93,8 +96,6 @@ body.print-root,
 .markdown-body .code-block-wrapper {
   position: relative;
   margin: 1em 0;
-  break-inside: avoid;
-  page-break-inside: avoid;
 }
 
 .markdown-body pre {
@@ -106,18 +107,20 @@ body.print-root,
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
-  break-inside: avoid;
-  page-break-inside: avoid;
+  white-space: pre-wrap;
+  break-inside: auto;
+  page-break-inside: auto;
 }
 
 .markdown-body pre code {
   display: block;
-  white-space: pre;
+  white-space: pre-wrap;
   background: none;
   padding: 0;
   color: #1f2937;
   font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 /* 打印隐藏交互控件 */
@@ -135,6 +138,7 @@ body.print-root,
   background: #f8fafc;
   border-radius: 0 6px 6px 0;
   color: #6b7280;
+  break-inside: avoid-page;
 }
 
 .markdown-body ul,
@@ -167,8 +171,22 @@ body.print-root,
   border-collapse: collapse;
   margin: 1em 0;
   font-size: 13px;
-  break-inside: avoid;
-  page-break-inside: avoid;
+  break-inside: auto;
+  page-break-inside: auto;
+}
+
+.markdown-body thead {
+  display: table-header-group;
+}
+
+.markdown-body tfoot {
+  display: table-footer-group;
+}
+
+.markdown-body tr,
+.markdown-body th,
+.markdown-body td {
+  break-inside: avoid-page;
 }
 
 .markdown-body th,
@@ -232,6 +250,21 @@ body.print-root,
   color: inherit;
   padding: 0 2px;
   border-radius: 2px;
+}
+
+.markdown-body .math-block,
+.markdown-body .katex-display,
+.markdown-body .mermaid-diagram-wrapper,
+.markdown-body .mermaid-rendered,
+.markdown-body .markflow-image-wrapper {
+  break-inside: avoid-page;
+  page-break-inside: avoid;
+}
+
+.markdown-body .mermaid-rendered svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
 
 /* highlight.js 浅色 token（与预览常见配色接近） */
