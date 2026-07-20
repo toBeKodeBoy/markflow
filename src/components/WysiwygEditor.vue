@@ -21,20 +21,6 @@
     <NoteTagsBar v-if="!focusMode && isActive" />
     <div class="wysiwyg-body">
       <div ref="containerRef" :class="['milkdown-host', { 'milkdown-dark': isDark }]"></div>
-      <TableToolbar
-        v-if="!focusMode"
-        :visible="isInTable"
-        :position="toolbarPosition"
-        :context="tableContext"
-        @add-row-before="onTableAddRowBefore"
-        @add-row-after="onTableAddRowAfter"
-        @add-col-before="onTableAddColBefore"
-        @add-col-after="onTableAddColAfter"
-        @set-col-align="onTableSetColAlign"
-        @delete-row="onTableDeleteRow"
-        @delete-col="onTableDeleteCol"
-        @delete-table="onTableDeleteTable"
-      />
     </div>
     <FocusFormatToolbar
       v-if="focusMode"
@@ -75,6 +61,7 @@ import { htmlRenderPlugins } from '../plugins/htmlRender'
 import { codeBlockLabelPlugin, codeBlockExitPlugin } from '../plugins/codeBlockLabel'
 import { headingIdPlugins } from '../plugins/headingId'
 import { autoCloseBracketsPlugin } from '../plugins/autoCloseBrackets'
+import { tableToolbarPlugin } from '../plugins/tableToolbar'
 import { normalizeMarkdownForParse } from '../utils/markedSetup'
 import {
   handleCodeCopyCaptureClick,
@@ -85,10 +72,8 @@ import { handlePreviewFragmentClick } from '../utils/previewFragmentNav'
 import { resolveMarkdownForDisplay, persistMarkdownAssets } from '../utils/resolveMarkdownAssets'
 import FormatToolbar from './FormatToolbar.vue'
 import FocusFormatToolbar from './FocusFormatToolbar.vue'
-import TableToolbar from './TableToolbar.vue'
 import NoteTagsBar from './NoteTagsBar.vue'
 import { useFocusToolbarVisibility } from '../composables/useFocusToolbarVisibility'
-import { useTableToolbar } from '../composables/useTableToolbar'
 import {
   wysiwygToggleBold,
   wysiwygToggleItalic,
@@ -156,16 +141,6 @@ const focusModeEnabled = computed(() => props.focusMode === true)
 const { visible: focusToolbarVisible, onToolbarEnter: onFocusToolbarEnter, onToolbarLeave: onFocusToolbarLeave } =
   useFocusToolbarVisibility(focusModeEnabled)
 
-const {
-  isInTable,
-  tableContext,
-  toolbarPosition,
-  check: checkTableToolbar,
-  attach: attachTableToolbar,
-  detach: detachTableToolbar,
-} =
-  useTableToolbar(() => editor)
-
 function onToolbarBold() { wysiwygToggleBold(editor) }
 function onToolbarItalic() { wysiwygToggleItalic(editor) }
 function onToolbarStrike() { wysiwygToggleStrike(editor) }
@@ -178,22 +153,21 @@ function onToolbarOrderedList() { wysiwygWrapOrderedList(editor) }
 function onToolbarBlockquote() { wysiwygWrapBlockquote(editor) }
 function onToolbarInlineCode() { wysiwygToggleInlineCode(editor) }
 function onToolbarCodeBlock() { wysiwygInsertCodeBlock(editor) }
-function onToolbarTable() { runTableAction(() => wysiwygInsertTable(editor)) }
+function onToolbarTable() { runEditorAction(() => wysiwygInsertTable(editor)) }
 function onToolbarLink() { wysiwygInsertLink(editor) }
-function runTableAction(action: () => void) {
+function runEditorAction(action: () => void) {
   action()
-  checkTableToolbar()
 }
-function onTableAddRowBefore() { runTableAction(() => wysiwygAddRowBefore(editor)) }
-function onTableAddRowAfter() { runTableAction(() => wysiwygAddRowAfter(editor)) }
-function onTableAddColBefore() { runTableAction(() => wysiwygAddColBefore(editor)) }
-function onTableAddColAfter() { runTableAction(() => wysiwygAddColAfter(editor)) }
+function onTableAddRowBefore() { runEditorAction(() => wysiwygAddRowBefore(editor)) }
+function onTableAddRowAfter() { runEditorAction(() => wysiwygAddRowAfter(editor)) }
+function onTableAddColBefore() { runEditorAction(() => wysiwygAddColBefore(editor)) }
+function onTableAddColAfter() { runEditorAction(() => wysiwygAddColAfter(editor)) }
 function onTableSetColAlign(alignment: 'left' | 'center' | 'right') {
-  runTableAction(() => wysiwygSetColAlign(editor, alignment))
+  runEditorAction(() => wysiwygSetColAlign(editor, alignment))
 }
-function onTableDeleteRow() { runTableAction(() => wysiwygDeleteRow(editor)) }
-function onTableDeleteCol() { runTableAction(() => wysiwygDeleteCol(editor)) }
-function onTableDeleteTable() { runTableAction(() => wysiwygDeleteTable(editor)) }
+function onTableDeleteRow() { runEditorAction(() => wysiwygDeleteRow(editor)) }
+function onTableDeleteCol() { runEditorAction(() => wysiwygDeleteCol(editor)) }
+function onTableDeleteTable() { runEditorAction(() => wysiwygDeleteTable(editor)) }
 
 const isDark = computed(() => document.documentElement.getAttribute('data-theme') === 'dark')
 
@@ -267,6 +241,22 @@ async function initEditor(content: string) {
       .use(codeBlockLabelPlugin)
       .use(headingIdPlugins)
       .use(autoCloseBracketsPlugin)
+      .use(
+        tableToolbarPlugin({
+          editorRef: () => editor,
+          focusModeRef: () => focusModeEnabled.value,
+          actions: {
+            addRowBefore: onTableAddRowBefore,
+            addRowAfter: onTableAddRowAfter,
+            addColBefore: onTableAddColBefore,
+            addColAfter: onTableAddColAfter,
+            setColAlign: onTableSetColAlign,
+            deleteRow: onTableDeleteRow,
+            deleteCol: onTableDeleteCol,
+            deleteTable: onTableDeleteTable,
+          },
+        }),
+      )
       .use(listener)
       .use(history)
       .create()
@@ -277,9 +267,6 @@ async function initEditor(content: string) {
         tabsStore.setTabLiveContent(props.noteId, persisted)
       })
     })
-
-    detachTableToolbar()
-    attachTableToolbar()
 
     if (pendingEditorPush !== null) {
       const push = pendingEditorPush
@@ -322,7 +309,6 @@ function onWysiwygClick(e: MouseEvent) {
 onMounted(async () => {
   const tab = tabsStore.tabs.find((t) => t.noteId === props.noteId)
   await initEditor(tab?.liveContent ?? '')
-  attachTableToolbar()
   const host = containerRef.value
   if (host) {
     host.addEventListener('mousedown', handleCodeCopyCaptureMouseDown, true)
@@ -332,7 +318,6 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(async () => {
-  detachTableToolbar()
   const host = containerRef.value
   if (host) {
     host.removeEventListener('mousedown', handleCodeCopyCaptureMouseDown, true)

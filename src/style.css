@@ -2982,11 +2982,16 @@ img.ProseMirror-separator {
 }
 
 /* 表格浮动工具栏 */
+.table-toolbar-widget {
+  width: 100%;
+  margin: 0.8em 0 0;
+}
+
 .table-toolbar {
-  position: absolute;
-  z-index: 100;
+  position: relative;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 6px 8px;
   background: color-mix(in srgb, var(--bg-editor) 92%, var(--bg-sidebar));
@@ -2994,13 +2999,10 @@ img.ProseMirror-separator {
   border-bottom: none;
   border-radius: 10px 10px 0 0;
   font-size: 12px;
-  white-space: nowrap;
   pointer-events: auto;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
-  transition: top 150ms ease, left 150ms ease;
   box-sizing: border-box;
-  overflow-x: auto;
-  overflow-y: hidden;
+  width: 100%;
 }
 
 .table-toolbar button {

@@ -5,6 +5,8 @@ import type { EditorState } from '@milkdown/prose/state'
 
 const TOOLBAR_HEIGHT = 36
 const TOOLBAR_CONTEXT_SELECTOR = '.wysiwyg-body'
+const TABLE_TOOLBAR_OFFSET_VAR = '--table-toolbar-offset'
+const TABLE_TOOLBAR_OFFSET_CLASS = 'table-toolbar-offset'
 
 export interface TableToolbarContext {
   rowIndex: number
@@ -62,7 +64,7 @@ export function getTableToolbarContext(state: EditorState): TableToolbarContext 
   }
 }
 
-function getTableDomRect(state: EditorState, view: any): DOMRect | null {
+function getTableElement(state: EditorState, view: any): HTMLElement | null {
   const { $from } = state.selection
   let tableDepth = -1
   for (let depth = $from.depth; depth > 0; depth--) {
@@ -79,10 +81,14 @@ function getTableDomRect(state: EditorState, view: any): DOMRect | null {
       tableNode instanceof HTMLElement
         ? tableNode.closest('.tableWrapper') ?? tableNode
         : tableNode?.parentElement?.closest('.tableWrapper') ?? tableNode?.parentElement ?? null
-    return tableElement instanceof HTMLElement ? tableElement.getBoundingClientRect() : null
+    return tableElement instanceof HTMLElement ? tableElement : null
   } catch {
     return null
   }
+}
+
+function getTableDomRect(state: EditorState, view: any): DOMRect | null {
+  return getTableElement(state, view)?.getBoundingClientRect() ?? null
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -107,6 +113,32 @@ export function useTableToolbar(editorRef: () => Editor | null) {
   const toolbarPosition = ref<TableToolbarPosition>({ top: 0, left: 0, width: 0 })
   const tableContext = ref<TableToolbarContext | null>(null)
   let unsubscribe: (() => void) | null = null
+  let compensatedTable: HTMLElement | null = null
+
+  function clearTableOffset() {
+    if (!compensatedTable) return
+    compensatedTable.classList.remove(TABLE_TOOLBAR_OFFSET_CLASS)
+    compensatedTable.style.removeProperty(TABLE_TOOLBAR_OFFSET_VAR)
+    compensatedTable = null
+  }
+
+  function applyTableOffset(tableElement: HTMLElement, offset: number) {
+    if (offset <= 0) {
+      if (compensatedTable === tableElement) clearTableOffset()
+      return false
+    }
+    if (compensatedTable && compensatedTable !== tableElement) clearTableOffset()
+    tableElement.classList.add(TABLE_TOOLBAR_OFFSET_CLASS)
+    tableElement.style.setProperty(TABLE_TOOLBAR_OFFSET_VAR, `${offset}px`)
+    compensatedTable = tableElement
+    return true
+  }
+
+  function ensureToolbarClearance(tableElement: HTMLElement, tableRect: DOMRect, contextRect: DOMRect) {
+    const availableTop = tableRect.top - contextRect.top
+    const hiddenHeight = Math.max(TOOLBAR_HEIGHT - availableTop, 0)
+    return applyTableOffset(tableElement, hiddenHeight)
+  }
 
   function updatePosition() {
     const editor = editorRef()
@@ -115,11 +147,19 @@ export function useTableToolbar(editorRef: () => Editor | null) {
       const view = ctx.get(editorViewCtx)
       const tableContext = getTableToolbarContext(view.state)
       if (!tableContext) return
-      const tableRect = getTableDomRect(view.state, view)
+      const tableElement = getTableElement(view.state, view)
+      if (!tableElement) return
+      let tableRect = getTableDomRect(view.state, view)
       if (!tableRect) return
       const toolbarContext = view.dom.closest(TOOLBAR_CONTEXT_SELECTOR) ?? view.dom.closest('.wysiwyg-pane')
       if (!toolbarContext) return
       const contextRect = toolbarContext.getBoundingClientRect()
+      if (ensureToolbarClearance(tableElement, tableRect, contextRect)) {
+        tableRect = getTableDomRect(view.state, view)
+        if (!tableRect) return
+      } else if (compensatedTable && compensatedTable !== tableElement) {
+        clearTableOffset()
+      }
       toolbarPosition.value = resolveToolbarPosition(tableRect, contextRect)
     })
   }
@@ -130,6 +170,7 @@ export function useTableToolbar(editorRef: () => Editor | null) {
       isInTable.value = false
       tableContext.value = null
       toolbarPosition.value = { top: 0, left: 0, width: 0 }
+      clearTableOffset()
       return
     }
     editor.action((ctx) => {
@@ -141,6 +182,7 @@ export function useTableToolbar(editorRef: () => Editor | null) {
         updatePosition()
       } else {
         toolbarPosition.value = { top: 0, left: 0, width: 0 }
+        clearTableOffset()
       }
     })
   }
@@ -177,6 +219,7 @@ export function useTableToolbar(editorRef: () => Editor | null) {
   function detach() {
     unsubscribe?.()
     unsubscribe = null
+    clearTableOffset()
   }
 
   onBeforeUnmount(detach)
