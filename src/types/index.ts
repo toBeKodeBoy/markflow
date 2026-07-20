@@ -130,6 +130,15 @@ export interface EditorTab {
   savedContent: string
 }
 
+export interface TableToolbarContext {
+  rowIndex: number
+  colIndex: number
+  rowCount: number
+  colCount: number
+  canDeleteRow: boolean
+  canDeleteCol: boolean
+}
+
 export interface AppSettings {
   theme: 'light' | 'dark' | 'system'
   fontSize: number

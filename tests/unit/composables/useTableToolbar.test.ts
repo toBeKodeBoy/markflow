@@ -91,6 +91,7 @@ describe('getTableToolbarContext', () => {
 
 describe('useTableToolbar position tracking', () => {
   let milkdownHost: HTMLDivElement
+  let activeSelectionPos = 9
 
   beforeEach(() => {
     milkdownHost = document.createElement('div')
@@ -102,15 +103,26 @@ describe('useTableToolbar position tracking', () => {
     milkdownHost.remove()
   })
 
-  function makeEditorMock(tableRect: DOMRect, bodyRect: DOMRect) {
+  function makeEditorMock(
+    tableRect: DOMRect,
+    bodyRect: DOMRect,
+    options?: { selectionPos?: number }
+  ) {
     const doc = createTableDoc()
     const view = createView(doc)
-    view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, 9)))
+    activeSelectionPos = options?.selectionPos ?? 9
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, activeSelectionPos)))
 
     const tableEl = document.createElement('div')
-    tableEl.getBoundingClientRect = () => tableRect
+    tableEl.className = 'tableWrapper'
+    tableEl.getBoundingClientRect = () => {
+      const offset = Number.parseFloat(tableEl.style.getPropertyValue('--table-toolbar-offset') || '0') || 0
+      return new DOMRect(tableRect.x, tableRect.y + offset, tableRect.width, tableRect.height)
+    }
 
     return {
+      view,
+      tableEl,
       action: (runner: (ctx: { get: (key: unknown) => unknown }) => void) => {
         runner({
           get: () => ({
@@ -151,15 +163,31 @@ describe('useTableToolbar position tracking', () => {
     expect(toolbarPosition.value.width).toBe(400)
   })
 
-  it('clamps top to 0 when table top is above pane top', () => {
-    const tableRect = new DOMRect(10, 30, 300, 100)
+  it('adds top offset to the active table wrapper when the toolbar would cover previous content', () => {
+    const bodyRect = new DOMRect(0, 50, 600, 500)
+    const editorMock = makeEditorMock(new DOMRect(10, 70, 300, 100), bodyRect)
+    const { check, toolbarPosition } = useTableToolbar(() => editorMock as any)
+
+    check()
+
+    expect(editorMock.tableEl.classList.contains('table-toolbar-offset')).toBe(true)
+    expect(editorMock.tableEl.style.getPropertyValue('--table-toolbar-offset')).toBe('16px')
+    expect(toolbarPosition.value.top).toBe(0)
+    expect(toolbarPosition.value.left).toBe(10)
+    expect(toolbarPosition.value.width).toBe(300)
+  })
+
+  it('does not add offset when there is already enough top space', () => {
+    const tableRect = new DOMRect(10, 100, 300, 100)
     const bodyRect = new DOMRect(0, 50, 600, 500)
     const editorMock = makeEditorMock(tableRect, bodyRect)
     const { check, toolbarPosition } = useTableToolbar(() => editorMock as any)
 
     check()
 
-    expect(toolbarPosition.value.top).toBe(0)
+    expect(editorMock.tableEl.classList.contains('table-toolbar-offset')).toBe(false)
+    expect(editorMock.tableEl.style.getPropertyValue('--table-toolbar-offset')).toBe('')
+    expect(toolbarPosition.value.top).toBe(14)
     expect(toolbarPosition.value.left).toBe(10)
     expect(toolbarPosition.value.width).toBe(300)
   })
@@ -179,6 +207,23 @@ describe('useTableToolbar position tracking', () => {
   it('toolbarPosition is reset when editor is null', () => {
     const { check, toolbarPosition } = useTableToolbar(() => null as any)
     check()
+    expect(toolbarPosition.value).toEqual({ top: 0, left: 0, width: 0 })
+  })
+
+  it('clears the offset when selection leaves the table', () => {
+    const tableRect = new DOMRect(10, 70, 300, 100)
+    const bodyRect = new DOMRect(0, 50, 600, 500)
+    const editorMock = makeEditorMock(tableRect, bodyRect)
+    const { check, toolbarPosition } = useTableToolbar(() => editorMock as any)
+
+    check()
+    expect(editorMock.tableEl.classList.contains('table-toolbar-offset')).toBe(true)
+
+    editorMock.view.dispatch(editorMock.view.state.tr.setSelection(TextSelection.create(editorMock.view.state.doc, 1)))
+    check()
+
+    expect(editorMock.tableEl.classList.contains('table-toolbar-offset')).toBe(false)
+    expect(editorMock.tableEl.style.getPropertyValue('--table-toolbar-offset')).toBe('')
     expect(toolbarPosition.value).toEqual({ top: 0, left: 0, width: 0 })
   })
 })
