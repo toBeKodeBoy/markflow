@@ -3,13 +3,14 @@ import type { Editor } from '@milkdown/core'
 import { editorViewCtx, schemaCtx, commandsCtx } from '@milkdown/core'
 import {
   insertTableCommand,
+  addRowBeforeCommand,
   addRowAfterCommand,
+  addColBeforeCommand,
   addColAfterCommand,
   selectRowCommand,
   selectColCommand,
   selectTableCommand,
   deleteSelectedCellsCommand,
-  setAlignCommand,
 } from '@milkdown/preset-gfm'
 import { Schema } from '@milkdown/prose/model'
 import { EditorState, TextSelection } from '@milkdown/prose/state'
@@ -17,12 +18,14 @@ import { EditorView } from '@milkdown/prose/view'
 import {
   wysiwygToggleInlineCode,
   wysiwygInsertTable,
+  wysiwygInsertLink,
+  wysiwygAddRowBefore,
   wysiwygAddRowAfter,
+  wysiwygAddColBefore,
   wysiwygAddColAfter,
   wysiwygDeleteRow,
   wysiwygDeleteCol,
   wysiwygDeleteTable,
-  wysiwygSetColAlign,
 } from '../../../src/utils/wysiwygFormat'
 
 const schema = new Schema({
@@ -40,6 +43,11 @@ const schema = new Schema({
     inlineCode: {
       toDOM: () => ['code', 0] as const,
       parseDOM: [{ tag: 'code' }],
+    },
+    link: {
+      attrs: { href: {} },
+      toDOM: (mark) => ['a', { href: mark.attrs.href }, 0] as const,
+      parseDOM: [{ tag: 'a[href]' }],
     },
   },
 })
@@ -133,15 +141,17 @@ describe('wysiwygToggleInlineCode', () => {
 })
 
 describe('wysiwygInsertTable', () => {
-  it('calls insertTableCommand via commandsCtx', () => {
+  it('calls insertTableCommand via commandsCtx with default 3x3 size and focuses view', () => {
     const view = createView('hello')
+    const focusSpy = vi.spyOn(view, 'focus')
     const mockCall = vi.fn().mockReturnValue(true)
     const editor = createEditorWithCommands(view, mockCall)
 
     wysiwygInsertTable(editor)
 
     expect(mockCall).toHaveBeenCalledOnce()
-    expect(mockCall).toHaveBeenCalledWith(insertTableCommand.key)
+    expect(mockCall).toHaveBeenCalledWith(insertTableCommand.key, { row: 3, col: 3 })
+    expect(focusSpy).toHaveBeenCalledOnce()
     view.destroy()
   })
 
@@ -150,9 +160,44 @@ describe('wysiwygInsertTable', () => {
   })
 })
 
+describe('wysiwygInsertLink', () => {
+  it('inserts default markdown link text and href when selection is empty', () => {
+    const view = createView('hello')
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1)))
+    const editor = createEditorWithCommands(view, vi.fn())
+
+    wysiwygInsertLink(editor)
+
+    expect(view.state.doc.textContent).toContain('链接文字')
+    expect(view.state.doc.textContent).not.toBe('hello')
+    view.destroy()
+  })
+})
+
+describe('wysiwygAddRowBefore', () => {
+  it('calls addRowBeforeCommand via commandsCtx', () => {
+    const view = createView('hello')
+    const focusSpy = vi.spyOn(view, 'focus')
+    const mockCall = vi.fn().mockReturnValue(true)
+    const editor = createEditorWithCommands(view, mockCall)
+
+    wysiwygAddRowBefore(editor)
+
+    expect(mockCall).toHaveBeenCalledOnce()
+    expect(mockCall).toHaveBeenCalledWith(addRowBeforeCommand.key)
+    expect(focusSpy).toHaveBeenCalledOnce()
+    view.destroy()
+  })
+
+  it('does nothing when editor is null', () => {
+    wysiwygAddRowBefore(null)
+  })
+})
+
 describe('wysiwygAddRowAfter', () => {
   it('calls addRowAfterCommand via commandsCtx', () => {
     const view = createView('hello')
+    const focusSpy = vi.spyOn(view, 'focus')
     const mockCall = vi.fn().mockReturnValue(true)
     const editor = createEditorWithCommands(view, mockCall)
 
@@ -160,6 +205,7 @@ describe('wysiwygAddRowAfter', () => {
 
     expect(mockCall).toHaveBeenCalledOnce()
     expect(mockCall).toHaveBeenCalledWith(addRowAfterCommand.key)
+    expect(focusSpy).toHaveBeenCalledOnce()
     view.destroy()
   })
 
@@ -168,9 +214,30 @@ describe('wysiwygAddRowAfter', () => {
   })
 })
 
+describe('wysiwygAddColBefore', () => {
+  it('calls addColBeforeCommand via commandsCtx', () => {
+    const view = createView('hello')
+    const focusSpy = vi.spyOn(view, 'focus')
+    const mockCall = vi.fn().mockReturnValue(true)
+    const editor = createEditorWithCommands(view, mockCall)
+
+    wysiwygAddColBefore(editor)
+
+    expect(mockCall).toHaveBeenCalledOnce()
+    expect(mockCall).toHaveBeenCalledWith(addColBeforeCommand.key)
+    expect(focusSpy).toHaveBeenCalledOnce()
+    view.destroy()
+  })
+
+  it('does nothing when editor is null', () => {
+    wysiwygAddColBefore(null)
+  })
+})
+
 describe('wysiwygAddColAfter', () => {
   it('calls addColAfterCommand via commandsCtx', () => {
     const view = createView('hello')
+    const focusSpy = vi.spyOn(view, 'focus')
     const mockCall = vi.fn().mockReturnValue(true)
     const editor = createEditorWithCommands(view, mockCall)
 
@@ -178,6 +245,7 @@ describe('wysiwygAddColAfter', () => {
 
     expect(mockCall).toHaveBeenCalledOnce()
     expect(mockCall).toHaveBeenCalledWith(addColAfterCommand.key)
+    expect(focusSpy).toHaveBeenCalledOnce()
     view.destroy()
   })
 
@@ -244,38 +312,5 @@ describe('wysiwygDeleteTable', () => {
 
   it('does nothing when editor is null', () => {
     wysiwygDeleteTable(null)
-  })
-})
-
-describe('wysiwygSetColAlign', () => {
-  it('calls selectColCommand then setAlignCommand with alignment', () => {
-    const view = createTableView()
-    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 5)))
-    const mockCall = vi.fn().mockReturnValue(true)
-    const editor = createEditorWithCommands(view, mockCall, tableSchema)
-
-    wysiwygSetColAlign(editor, 'center')
-
-    expect(mockCall).toHaveBeenCalledTimes(2)
-    expect(mockCall).toHaveBeenNthCalledWith(1, selectColCommand.key, { index: 0 })
-    expect(mockCall).toHaveBeenNthCalledWith(2, setAlignCommand.key, 'center')
-    view.destroy()
-  })
-
-  it('defaults to left alignment when no alignment specified', () => {
-    const view = createTableView()
-    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 5)))
-    const mockCall = vi.fn().mockReturnValue(true)
-    const editor = createEditorWithCommands(view, mockCall, tableSchema)
-
-    wysiwygSetColAlign(editor)
-
-    expect(mockCall).toHaveBeenCalledTimes(2)
-    expect(mockCall).toHaveBeenNthCalledWith(2, setAlignCommand.key, 'left')
-    view.destroy()
-  })
-
-  it('does nothing when editor is null', () => {
-    wysiwygSetColAlign(null)
   })
 })

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
-import { isCursorInTable, useTableToolbar } from '../../../src/composables/useTableToolbar'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { getTableToolbarContext, isCursorInTable, useTableToolbar } from '../../../src/composables/useTableToolbar'
 import { Schema } from '@milkdown/prose/model'
 import { EditorState, TextSelection } from '@milkdown/prose/state'
 import { EditorView } from '@milkdown/prose/view'
@@ -68,62 +68,117 @@ describe('isCursorInTable', () => {
     expect(isCursorInTable(view.state)).toBe(false)
     view.destroy()
   })
+})
 
-  it('returns false for empty selection outside table', () => {
+describe('getTableToolbarContext', () => {
+  it('returns row and column context for the current cell', () => {
     const doc = createTableDoc()
     const view = createView(doc)
-    view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, 0)))
-    expect(isCursorInTable(view.state)).toBe(false)
-    view.destroy()
-  })
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, 15)))
 
-  it('returns true for any position inside table', () => {
-    const doc = createTableDoc()
-    const view = createView(doc)
-    view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, 47)))
-    expect(isCursorInTable(view.state)).toBe(true)
+    expect(getTableToolbarContext(view.state)).toEqual({
+      rowIndex: 0,
+      colIndex: 1,
+      rowCount: 3,
+      colCount: 3,
+      canDeleteRow: true,
+      canDeleteCol: true,
+    })
+
     view.destroy()
   })
 })
 
-describe('useTableToolbar toolbarPosition', () => {
-  it('updates position when cursor is inside table', () => {
-    const doc = createTableDoc()
-    const view = createView(doc)
-    view.dom.getBoundingClientRect = () => ({
-      top: 100, left: 200, width: 800, height: 600,
-      bottom: 700, right: 1000, x: 200, y: 100, toJSON: () => {},
-    } as DOMRect)
-    const editorMock = {
-      action: (runner: (ctx: { get: (key: unknown) => unknown }) => void) => {
-        runner({ get: () => view })
-      },
-    }
-    const { isInTable, toolbarPosition, check } = useTableToolbar(() => editorMock as any)
-    // trigger selection inside table cell, then check
-    view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, 9)))
-    check()
-    expect(isInTable.value).toBe(true)
-    expect(typeof toolbarPosition.value.top).toBe('number')
-    expect(typeof toolbarPosition.value.left).toBe('number')
-    view.destroy()
+describe('useTableToolbar position tracking', () => {
+  let milkdownHost: HTMLDivElement
+
+  beforeEach(() => {
+    milkdownHost = document.createElement('div')
+    milkdownHost.className = 'milkdown-host'
+    document.body.appendChild(milkdownHost)
   })
 
-  it('does not change position when cursor is outside table', () => {
+  afterEach(() => {
+    milkdownHost.remove()
+  })
+
+  function makeEditorMock(tableRect: DOMRect, bodyRect: DOMRect) {
     const doc = createTableDoc()
     const view = createView(doc)
-    const editorMock = {
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, 9)))
+
+    const tableEl = document.createElement('div')
+    tableEl.getBoundingClientRect = () => tableRect
+
+    return {
       action: (runner: (ctx: { get: (key: unknown) => unknown }) => void) => {
-        runner({ get: () => view })
+        runner({
+          get: () => ({
+            state: view.state,
+            dom: {
+              closest: (sel: string) => {
+                if (sel === '.milkdown-host') return milkdownHost
+                if (sel === '.wysiwyg-body') {
+                  return {
+                    getBoundingClientRect: () => bodyRect,
+                  }
+                }
+                if (sel === '.wysiwyg-pane') {
+                  return {
+                    getBoundingClientRect: () => bodyRect,
+                  }
+                }
+                return null
+              },
+            },
+            nodeDOM: () => tableEl,
+          }),
+        })
       },
     }
-    const { isInTable, toolbarPosition, check } = useTableToolbar(() => editorMock as any)
-    // cursor at doc start (outside table)
-    view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, 1)))
+  }
+
+  it('anchors toolbar to the table top-left and keeps the same width as table wrapper', () => {
+    const tableRect = new DOMRect(150, 200, 400, 120)
+    const bodyRect = new DOMRect(0, 50, 600, 500)
+    const editorMock = makeEditorMock(tableRect, bodyRect)
+    const { check, toolbarPosition } = useTableToolbar(() => editorMock as any)
+
     check()
-    expect(isInTable.value).toBe(false)
-    // toolbarPosition remains at initial {0,0}
-    expect(toolbarPosition.value).toEqual({ top: 0, left: 0 })
-    view.destroy()
+
+    expect(toolbarPosition.value.top).toBe(114)
+    expect(toolbarPosition.value.left).toBe(150)
+    expect(toolbarPosition.value.width).toBe(400)
+  })
+
+  it('clamps top to 0 when table top is above pane top', () => {
+    const tableRect = new DOMRect(10, 30, 300, 100)
+    const bodyRect = new DOMRect(0, 50, 600, 500)
+    const editorMock = makeEditorMock(tableRect, bodyRect)
+    const { check, toolbarPosition } = useTableToolbar(() => editorMock as any)
+
+    check()
+
+    expect(toolbarPosition.value.top).toBe(0)
+    expect(toolbarPosition.value.left).toBe(10)
+    expect(toolbarPosition.value.width).toBe(300)
+  })
+
+  it('clamps left within pane width when table is close to the right edge', () => {
+    const tableRect = new DOMRect(560, 200, 180, 100)
+    const bodyRect = new DOMRect(0, 50, 600, 500)
+    const editorMock = makeEditorMock(tableRect, bodyRect)
+    const { check, toolbarPosition } = useTableToolbar(() => editorMock as any)
+
+    check()
+
+    expect(toolbarPosition.value.left).toBe(420)
+    expect(toolbarPosition.value.width).toBe(180)
+  })
+
+  it('toolbarPosition is reset when editor is null', () => {
+    const { check, toolbarPosition } = useTableToolbar(() => null as any)
+    check()
+    expect(toolbarPosition.value).toEqual({ top: 0, left: 0, width: 0 })
   })
 })

@@ -2,7 +2,9 @@ import type { CmdKey, Editor } from '@milkdown/core'
 import { editorViewCtx, schemaCtx, commandsCtx } from '@milkdown/core'
 import {
   insertTableCommand,
+  addRowBeforeCommand,
   addRowAfterCommand,
+  addColBeforeCommand,
   addColAfterCommand,
   selectRowCommand,
   selectColCommand,
@@ -16,6 +18,9 @@ import { wrapInList } from '@milkdown/prose/schema-list'
 import type { EditorView } from '@milkdown/prose/view'
 import type { Schema } from '@milkdown/prose/model'
 import { INLINE_CODE_PLACEHOLDER } from './inlineCode'
+
+const LINK_PLACEHOLDER_TEXT = '链接文字'
+const LINK_PLACEHOLDER_URL = 'url'
 
 function runEditorCommand(editor: Editor, runner: (view: EditorView, schema: Schema) => void) {
   editor.action((ctx) => {
@@ -141,9 +146,7 @@ export function wysiwygInsertCodeBlock(editor: Editor | null) {
 
 export function wysiwygInsertTable(editor: Editor | null) {
   if (!editor) return
-  editor.action((ctx) => {
-    ctx.get(commandsCtx).call(insertTableCommand.key)
-  })
+  callGfmCommand(editor, insertTableCommand, { row: 3, col: 3 })
 }
 
 function callGfmCommand<T>(editor: Editor, cmd: { key: CmdKey<T> }, payload?: T) {
@@ -154,6 +157,7 @@ function callGfmCommand<T>(editor: Editor, cmd: { key: CmdKey<T> }, payload?: T)
     } else {
       commands.call(cmd.key)
     }
+    ctx.get(editorViewCtx).focus()
   })
 }
 
@@ -195,9 +199,19 @@ function getTableColIndex(editor: Editor): number {
   return index
 }
 
+export function wysiwygAddRowBefore(editor: Editor | null) {
+  if (!editor) return
+  callGfmCommand(editor, addRowBeforeCommand)
+}
+
 export function wysiwygAddRowAfter(editor: Editor | null) {
   if (!editor) return
   callGfmCommand(editor, addRowAfterCommand)
+}
+
+export function wysiwygAddColBefore(editor: Editor | null) {
+  if (!editor) return
+  callGfmCommand(editor, addColBeforeCommand)
 }
 
 export function wysiwygAddColAfter(editor: Editor | null) {
@@ -229,12 +243,22 @@ export function wysiwygDeleteTable(editor: Editor | null) {
 
 export function wysiwygInsertLink(editor: Editor | null) {
   if (!editor) return
-  const href = window.prompt('链接地址', 'https://')
-  if (!href) return
   runEditorCommand(editor, (view, schema) => {
     const link = schema.marks.link
     if (!link) return
-    toggleMark(link, { href })(view.state, view.dispatch)
+    const { from, to, empty } = view.state.selection
+    let tr = view.state.tr
+    const linkText = empty ? LINK_PLACEHOLDER_TEXT : view.state.doc.textBetween(from, to, '')
+    if (!linkText) return
+
+    if (empty) {
+      tr = tr.insertText(linkText, from, to)
+    }
+
+    const end = empty ? from + linkText.length : to
+    tr = tr.addMark(from, end, link.create({ href: LINK_PLACEHOLDER_URL }))
+    tr = tr.setSelection(TextSelection.create(tr.doc, from, end))
+    view.dispatch(tr)
   })
 }
 

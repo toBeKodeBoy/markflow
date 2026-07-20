@@ -19,18 +19,23 @@
       @link="onToolbarLink"
     />
     <NoteTagsBar v-if="!focusMode && isActive" />
-    <div ref="containerRef" :class="['milkdown-host', { 'milkdown-dark': isDark }]"></div>
-    <TableToolbar
-      v-if="!focusMode"
-      :visible="isInTable"
-      :position="toolbarPosition"
-      @add-row-after="onTableAddRowAfter"
-      @add-col-after="onTableAddColAfter"
-      @delete-row="onTableDeleteRow"
-      @delete-col="onTableDeleteCol"
-      @delete-table="onTableDeleteTable"
-      @set-col-align="onTableSetColAlign"
-    />
+    <div class="wysiwyg-body">
+      <div ref="containerRef" :class="['milkdown-host', { 'milkdown-dark': isDark }]"></div>
+      <TableToolbar
+        v-if="!focusMode"
+        :visible="isInTable"
+        :position="toolbarPosition"
+        :context="tableContext"
+        @add-row-before="onTableAddRowBefore"
+        @add-row-after="onTableAddRowAfter"
+        @add-col-before="onTableAddColBefore"
+        @add-col-after="onTableAddColAfter"
+        @set-col-align="onTableSetColAlign"
+        @delete-row="onTableDeleteRow"
+        @delete-col="onTableDeleteCol"
+        @delete-table="onTableDeleteTable"
+      />
+    </div>
     <FocusFormatToolbar
       v-if="focusMode"
       :visible="focusToolbarVisible"
@@ -97,12 +102,14 @@ import {
   wysiwygInsertCodeBlock,
   wysiwygInsertTable,
   wysiwygInsertLink,
+  wysiwygAddRowBefore,
   wysiwygAddRowAfter,
+  wysiwygAddColBefore,
   wysiwygAddColAfter,
+  wysiwygSetColAlign,
   wysiwygDeleteRow,
   wysiwygDeleteCol,
   wysiwygDeleteTable,
-  wysiwygSetColAlign,
 } from '../utils/wysiwygFormat'
 
 /** 粘贴 HTML 清洗：剥离 ProseMirror schema 不兼容的元素，防止 replaceSelection 异常触发静默粘贴失败 */
@@ -149,7 +156,15 @@ const focusModeEnabled = computed(() => props.focusMode === true)
 const { visible: focusToolbarVisible, onToolbarEnter: onFocusToolbarEnter, onToolbarLeave: onFocusToolbarLeave } =
   useFocusToolbarVisibility(focusModeEnabled)
 
-const { isInTable, toolbarPosition, attach: attachTableToolbar, detach: detachTableToolbar } = useTableToolbar(() => editor)
+const {
+  isInTable,
+  tableContext,
+  toolbarPosition,
+  check: checkTableToolbar,
+  attach: attachTableToolbar,
+  detach: detachTableToolbar,
+} =
+  useTableToolbar(() => editor)
 
 function onToolbarBold() { wysiwygToggleBold(editor) }
 function onToolbarItalic() { wysiwygToggleItalic(editor) }
@@ -163,14 +178,22 @@ function onToolbarOrderedList() { wysiwygWrapOrderedList(editor) }
 function onToolbarBlockquote() { wysiwygWrapBlockquote(editor) }
 function onToolbarInlineCode() { wysiwygToggleInlineCode(editor) }
 function onToolbarCodeBlock() { wysiwygInsertCodeBlock(editor) }
-function onToolbarTable() { wysiwygInsertTable(editor) }
+function onToolbarTable() { runTableAction(() => wysiwygInsertTable(editor)) }
 function onToolbarLink() { wysiwygInsertLink(editor) }
-function onTableAddRowAfter() { wysiwygAddRowAfter(editor) }
-function onTableAddColAfter() { wysiwygAddColAfter(editor) }
-function onTableDeleteRow() { wysiwygDeleteRow(editor) }
-function onTableDeleteCol() { wysiwygDeleteCol(editor) }
-function onTableDeleteTable() { wysiwygDeleteTable(editor) }
-function onTableSetColAlign(alignment: 'left' | 'center' | 'right') { wysiwygSetColAlign(editor, alignment) }
+function runTableAction(action: () => void) {
+  action()
+  checkTableToolbar()
+}
+function onTableAddRowBefore() { runTableAction(() => wysiwygAddRowBefore(editor)) }
+function onTableAddRowAfter() { runTableAction(() => wysiwygAddRowAfter(editor)) }
+function onTableAddColBefore() { runTableAction(() => wysiwygAddColBefore(editor)) }
+function onTableAddColAfter() { runTableAction(() => wysiwygAddColAfter(editor)) }
+function onTableSetColAlign(alignment: 'left' | 'center' | 'right') {
+  runTableAction(() => wysiwygSetColAlign(editor, alignment))
+}
+function onTableDeleteRow() { runTableAction(() => wysiwygDeleteRow(editor)) }
+function onTableDeleteCol() { runTableAction(() => wysiwygDeleteCol(editor)) }
+function onTableDeleteTable() { runTableAction(() => wysiwygDeleteTable(editor)) }
 
 const isDark = computed(() => document.documentElement.getAttribute('data-theme') === 'dark')
 
