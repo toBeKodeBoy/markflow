@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import TableToolbar from '../../../src/components/TableToolbar.vue'
 
-const defaultPosition = { top: 50, left: 100, width: 480 }
 const defaultContext = {
   rowIndex: 1,
   colIndex: 2,
@@ -15,7 +14,7 @@ const defaultContext = {
 describe('TableToolbar', () => {
   it('renders a single inline toolbar with all table actions', () => {
     const wrapper = mount(TableToolbar, {
-      props: { visible: true, position: defaultPosition, context: defaultContext },
+      props: { visible: true, context: defaultContext },
     })
     expect(wrapper.get('[data-testid="table-toolbar-status"]').text()).toContain('第2行 / 第3列')
     expect(wrapper.find('[data-testid="table-add-row-before"]').exists()).toBe(true)
@@ -33,14 +32,14 @@ describe('TableToolbar', () => {
 
   it('is not rendered when visible is false', () => {
     const wrapper = mount(TableToolbar, {
-      props: { visible: false, position: defaultPosition, context: defaultContext },
+      props: { visible: false, context: defaultContext },
     })
     expect(wrapper.find('.table-toolbar').exists()).toBe(false)
   })
 
   it('emits all action events directly from the inline toolbar', async () => {
     const wrapper = mount(TableToolbar, {
-      props: { visible: true, position: defaultPosition, context: defaultContext },
+      props: { visible: true, context: defaultContext },
     })
 
     await wrapper.get('[data-testid="table-add-row-before"]').trigger('click')
@@ -62,22 +61,18 @@ describe('TableToolbar', () => {
     expect(wrapper.emitted('deleteTable')).toHaveLength(1)
   })
 
-  it('applies top, left and width styles from props', () => {
-    const pos = { top: 42, left: 88, width: 360 }
+  it('does not use positional inline styles', () => {
     const wrapper = mount(TableToolbar, {
-      props: { visible: true, position: pos, context: defaultContext },
+      props: { visible: true, context: defaultContext },
     })
     const el = wrapper.find('.table-toolbar')
-    expect(el.attributes('style')).toContain('top: 42px')
-    expect(el.attributes('style')).toContain('left: 88px')
-    expect(el.attributes('style')).toContain('width: 360px')
+    expect(el.attributes('style')).toBeUndefined()
   })
 
   it('disables delete row when only one row remains', () => {
     const wrapper = mount(TableToolbar, {
       props: {
         visible: true,
-        position: defaultPosition,
         context: { ...defaultContext, rowCount: 1, canDeleteRow: false },
       },
     })
@@ -90,7 +85,6 @@ describe('TableToolbar', () => {
     const wrapper = mount(TableToolbar, {
       props: {
         visible: true,
-        position: defaultPosition,
         context: { ...defaultContext, colCount: 1, canDeleteCol: false },
       },
     })

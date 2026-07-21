@@ -3,7 +3,6 @@
     v-if="visible"
     class="table-toolbar"
     data-testid="table-toolbar"
-    :style="toolbarStyle"
   >
     <span v-if="context" class="table-toolbar-status" data-testid="table-toolbar-status">
       第{{ context.rowIndex + 1 }}行 / 第{{ context.colIndex + 1 }}列
@@ -50,11 +49,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { TableToolbarContext, TableToolbarPosition } from '../composables/useTableToolbar'
+import type { TableToolbarContext } from '../composables/useTableToolbar'
 
 const props = defineProps<{
   visible: boolean
-  position: TableToolbarPosition
   context: TableToolbarContext | null
 }>()
 
@@ -68,12 +66,6 @@ const emit = defineEmits<{
   deleteCol: []
   deleteTable: []
 }>()
-
-const toolbarStyle = computed(() => ({
-  top: `${props.position.top}px`,
-  left: `${props.position.left}px`,
-  width: `${props.position.width}px`,
-}))
 
 const deleteRowTitle = computed(() =>
   props.context?.canDeleteRow

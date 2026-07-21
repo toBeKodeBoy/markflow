@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { getTableToolbarContext, isCursorInTable, useTableToolbar } from '../../../src/composables/useTableToolbar'
+import {
+  findTableNodePos,
+  getTableToolbarContext,
+  getTableToolbarDecorations,
+  isCursorInTable,
+  useTableToolbar,
+} from '../../../src/composables/useTableToolbar'
 import { Schema } from '@milkdown/prose/model'
 import { EditorState, TextSelection } from '@milkdown/prose/state'
 import { EditorView } from '@milkdown/prose/view'
@@ -89,96 +95,92 @@ describe('getTableToolbarContext', () => {
   })
 })
 
-describe('useTableToolbar position tracking', () => {
-  let milkdownHost: HTMLDivElement
-
-  beforeEach(() => {
-    milkdownHost = document.createElement('div')
-    milkdownHost.className = 'milkdown-host'
-    document.body.appendChild(milkdownHost)
-  })
-
-  afterEach(() => {
-    milkdownHost.remove()
-  })
-
-  function makeEditorMock(tableRect: DOMRect, bodyRect: DOMRect) {
+describe('table toolbar decorations', () => {
+  it('creates a block widget decoration before the active table', () => {
     const doc = createTableDoc()
     const view = createView(doc)
     view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, 9)))
 
-    const tableEl = document.createElement('div')
-    tableEl.getBoundingClientRect = () => tableRect
+    const tablePos = findTableNodePos(view.state)
+    const decorations = getTableToolbarDecorations(view.state)
+    const widgets = decorations?.find() ?? []
 
+    expect(tablePos).not.toBeNull()
+    expect(widgets).toHaveLength(1)
+    expect(widgets[0].from).toBe(tablePos)
+    expect(widgets[0].spec.side).toBe(-1)
+    expect(widgets[0].spec.block).toBe(true)
+    expect(widgets[0].spec.key).toBe('markflow-table-toolbar-slot')
+
+    view.destroy()
+  })
+
+  it('returns null when the current selection is outside a table', () => {
+    const doc = createTableDoc()
+    const view = createView(doc)
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, 1)))
+
+    expect(findTableNodePos(view.state)).toBeNull()
+    expect(getTableToolbarDecorations(view.state)).toBeNull()
+
+    view.destroy()
+  })
+})
+
+describe('useTableToolbar slot tracking', () => {
+  let view: EditorView
+
+  beforeEach(() => {
+    view = createView(createTableDoc())
+  })
+
+  afterEach(() => {
+    view.destroy()
+  })
+
+  function makeEditorMock() {
     return {
       action: (runner: (ctx: { get: (key: unknown) => unknown }) => void) => {
         runner({
           get: () => ({
             state: view.state,
-            dom: {
-              closest: (sel: string) => {
-                if (sel === '.milkdown-host') return milkdownHost
-                if (sel === '.wysiwyg-body') {
-                  return {
-                    getBoundingClientRect: () => bodyRect,
-                  }
-                }
-                if (sel === '.wysiwyg-pane') {
-                  return {
-                    getBoundingClientRect: () => bodyRect,
-                  }
-                }
-                return null
-              },
-            },
-            nodeDOM: () => tableEl,
+            dom: view.dom,
           }),
         })
       },
     }
   }
 
-  it('anchors toolbar to the table top-left and keeps the same width as table wrapper', () => {
-    const tableRect = new DOMRect(150, 200, 400, 120)
-    const bodyRect = new DOMRect(0, 50, 600, 500)
-    const editorMock = makeEditorMock(tableRect, bodyRect)
-    const { check, toolbarPosition } = useTableToolbar(() => editorMock as any)
+  it('syncs the toolbar mount element from the document-flow slot', () => {
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 9)))
+    const slot = document.createElement('div')
+    slot.className = 'markflow-table-toolbar-slot'
+    view.dom.appendChild(slot)
 
+    const { check, toolbarMountEl } = useTableToolbar(() => makeEditorMock() as any)
     check()
 
-    expect(toolbarPosition.value.top).toBe(114)
-    expect(toolbarPosition.value.left).toBe(150)
-    expect(toolbarPosition.value.width).toBe(400)
+    expect(toolbarMountEl.value).toBe(slot)
   })
 
-  it('clamps top to 0 when table top is above pane top', () => {
-    const tableRect = new DOMRect(10, 30, 300, 100)
-    const bodyRect = new DOMRect(0, 50, 600, 500)
-    const editorMock = makeEditorMock(tableRect, bodyRect)
-    const { check, toolbarPosition } = useTableToolbar(() => editorMock as any)
+  it('clears the toolbar mount element when the selection leaves the table', () => {
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 9)))
+    const slot = document.createElement('div')
+    slot.className = 'markflow-table-toolbar-slot'
+    view.dom.appendChild(slot)
 
+    const { check, toolbarMountEl } = useTableToolbar(() => makeEditorMock() as any)
     check()
+    expect(toolbarMountEl.value).toBe(slot)
 
-    expect(toolbarPosition.value.top).toBe(0)
-    expect(toolbarPosition.value.left).toBe(10)
-    expect(toolbarPosition.value.width).toBe(300)
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1)))
+    check()
+    expect(toolbarMountEl.value).toBeNull()
   })
 
-  it('clamps left within pane width when table is close to the right edge', () => {
-    const tableRect = new DOMRect(560, 200, 180, 100)
-    const bodyRect = new DOMRect(0, 50, 600, 500)
-    const editorMock = makeEditorMock(tableRect, bodyRect)
-    const { check, toolbarPosition } = useTableToolbar(() => editorMock as any)
-
+  it('resets mount state when editor is null', () => {
+    const { check, toolbarMountEl } = useTableToolbar(() => null as any)
     check()
-
-    expect(toolbarPosition.value.left).toBe(420)
-    expect(toolbarPosition.value.width).toBe(180)
-  })
-
-  it('toolbarPosition is reset when editor is null', () => {
-    const { check, toolbarPosition } = useTableToolbar(() => null as any)
-    check()
-    expect(toolbarPosition.value).toEqual({ top: 0, left: 0, width: 0 })
+    expect(toolbarMountEl.value).toBeNull()
   })
 })

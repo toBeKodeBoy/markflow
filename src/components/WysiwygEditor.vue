@@ -21,20 +21,20 @@
     <NoteTagsBar v-if="!focusMode && isActive" />
     <div class="wysiwyg-body">
       <div ref="containerRef" :class="['milkdown-host', { 'milkdown-dark': isDark }]"></div>
-      <TableToolbar
-        v-if="!focusMode"
-        :visible="isInTable"
-        :position="toolbarPosition"
-        :context="tableContext"
-        @add-row-before="onTableAddRowBefore"
-        @add-row-after="onTableAddRowAfter"
-        @add-col-before="onTableAddColBefore"
-        @add-col-after="onTableAddColAfter"
-        @set-col-align="onTableSetColAlign"
-        @delete-row="onTableDeleteRow"
-        @delete-col="onTableDeleteCol"
-        @delete-table="onTableDeleteTable"
-      />
+      <Teleport v-if="!focusMode && isInTable && toolbarMountEl" :to="toolbarMountEl">
+        <TableToolbar
+          :visible="isInTable"
+          :context="tableContext"
+          @add-row-before="onTableAddRowBefore"
+          @add-row-after="onTableAddRowAfter"
+          @add-col-before="onTableAddColBefore"
+          @add-col-after="onTableAddColAfter"
+          @set-col-align="onTableSetColAlign"
+          @delete-row="onTableDeleteRow"
+          @delete-col="onTableDeleteCol"
+          @delete-table="onTableDeleteTable"
+        />
+      </Teleport>
     </div>
     <FocusFormatToolbar
       v-if="focusMode"
@@ -88,7 +88,7 @@ import FocusFormatToolbar from './FocusFormatToolbar.vue'
 import TableToolbar from './TableToolbar.vue'
 import NoteTagsBar from './NoteTagsBar.vue'
 import { useFocusToolbarVisibility } from '../composables/useFocusToolbarVisibility'
-import { useTableToolbar } from '../composables/useTableToolbar'
+import { getTableToolbarDecorations, useTableToolbar } from '../composables/useTableToolbar'
 import {
   wysiwygToggleBold,
   wysiwygToggleItalic,
@@ -159,7 +159,7 @@ const { visible: focusToolbarVisible, onToolbarEnter: onFocusToolbarEnter, onToo
 const {
   isInTable,
   tableContext,
-  toolbarPosition,
+  toolbarMountEl,
   check: checkTableToolbar,
   attach: attachTableToolbar,
   detach: detachTableToolbar,
@@ -246,6 +246,7 @@ async function initEditor(content: string) {
             ...(typeof prev.attributes === 'object' ? prev.attributes : {}),
             style: 'white-space: pre-wrap; word-wrap: break-word;',
           },
+          decorations: (state) => getTableToolbarDecorations(state),
           transformPastedHTML: (html: string) => {
             if (prev.transformPastedHTML) html = (prev.transformPastedHTML as (html: string) => string)(html)
             return sanitizePastedHTML(html)
