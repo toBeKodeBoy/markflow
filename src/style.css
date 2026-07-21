@@ -2944,6 +2944,10 @@ img.ProseMirror-separator {
   margin: 0.8em 0;
 }
 
+.ProseMirror .tableWrapper:has(.selectedCell) {
+  margin-top: 0;
+}
+
 .ProseMirror table {
   border-collapse: collapse;
   table-layout: fixed;
@@ -2981,28 +2985,30 @@ img.ProseMirror-separator {
   background: color-mix(in srgb, var(--primary) 18%, transparent);
 }
 
-/* 表格浮动工具栏 */
-.table-toolbar-widget {
+.markflow-table-toolbar-slot {
+  display: block;
   width: 100%;
-  margin: 0.8em 0 0;
 }
 
+/* 表格块级工具栏 */
 .table-toolbar {
-  position: relative;
+  position: static;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 6px;
   padding: 6px 8px;
+  width: 100%;
   background: color-mix(in srgb, var(--bg-editor) 92%, var(--bg-sidebar));
   border: 1px solid var(--border);
   border-bottom: none;
   border-radius: 10px 10px 0 0;
   font-size: 12px;
+  white-space: nowrap;
   pointer-events: auto;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+  box-shadow: none;
   box-sizing: border-box;
-  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .table-toolbar button {

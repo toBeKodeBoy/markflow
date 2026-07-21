@@ -2,11 +2,7 @@ import { ref, onBeforeUnmount } from 'vue'
 import { editorViewCtx } from '@milkdown/core'
 import type { Editor } from '@milkdown/core'
 import type { EditorState } from '@milkdown/prose/state'
-
-const TOOLBAR_HEIGHT = 36
-const TOOLBAR_CONTEXT_SELECTOR = '.wysiwyg-body'
-const TABLE_TOOLBAR_OFFSET_VAR = '--table-toolbar-offset'
-const TABLE_TOOLBAR_OFFSET_CLASS = 'table-toolbar-offset'
+import { Decoration, DecorationSet } from '@milkdown/prose/view'
 
 export interface TableToolbarContext {
   rowIndex: number
@@ -17,14 +13,18 @@ export interface TableToolbarContext {
   canDeleteCol: boolean
 }
 
-export interface TableToolbarPosition {
-  top: number
-  left: number
-  width: number
-}
-
 export function isCursorInTable(state: EditorState): boolean {
   return getTableToolbarContext(state) !== null
+}
+
+export function findTableNodePos(state: EditorState): number | null {
+  const { $from } = state.selection
+  for (let depth = $from.depth; depth > 0; depth--) {
+    if ($from.node(depth).type.name === 'table') {
+      return $from.before(depth)
+    }
+  }
+  return null
 }
 
 export function getTableToolbarContext(state: EditorState): TableToolbarContext | null {
@@ -64,104 +64,39 @@ export function getTableToolbarContext(state: EditorState): TableToolbarContext 
   }
 }
 
-function getTableElement(state: EditorState, view: any): HTMLElement | null {
-  const { $from } = state.selection
-  let tableDepth = -1
-  for (let depth = $from.depth; depth > 0; depth--) {
-    if ($from.node(depth).type.name === 'table') {
-      tableDepth = depth
-      break
-    }
-  }
-  if (tableDepth < 0) return null
-  try {
-    const tablePos = $from.before(tableDepth)
-    const tableNode = view.nodeDOM(tablePos) as Node | null
-    const tableElement =
-      tableNode instanceof HTMLElement
-        ? tableNode.closest('.tableWrapper') ?? tableNode
-        : tableNode?.parentElement?.closest('.tableWrapper') ?? tableNode?.parentElement ?? null
-    return tableElement instanceof HTMLElement ? tableElement : null
-  } catch {
-    return null
-  }
-}
+export function getTableToolbarDecorations(state: EditorState): DecorationSet | null {
+  const tablePos = findTableNodePos(state)
+  if (tablePos == null) return null
 
-function getTableDomRect(state: EditorState, view: any): DOMRect | null {
-  return getTableElement(state, view)?.getBoundingClientRect() ?? null
-}
+  const widget = Decoration.widget(
+    tablePos,
+    () => {
+      const slot = document.createElement('div')
+      slot.className = 'markflow-table-toolbar-slot'
+      slot.setAttribute('data-testid', 'table-toolbar-slot')
+      slot.setAttribute('contenteditable', 'false')
+      return slot
+    },
+    {
+      side: -1,
+      block: true,
+      key: 'markflow-table-toolbar-slot',
+      stopEvent: () => true,
+      ignoreSelection: true,
+    },
+  )
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max)
-}
-
-function resolveToolbarPosition(tableRect: DOMRect, contextRect: DOMRect): TableToolbarPosition {
-  const contextHeight = contextRect.height
-  const contextWidth = contextRect.width
-  const width = Math.min(tableRect.width, contextWidth)
-  const left = clamp(tableRect.left - contextRect.left, 0, Math.max(contextWidth - width, 0))
-  const maxTop = Math.max(contextHeight - TOOLBAR_HEIGHT, 0)
-  return {
-    top: clamp(tableRect.top - contextRect.top - TOOLBAR_HEIGHT, 0, maxTop),
-    left,
-    width,
-  }
+  return DecorationSet.create(state.doc, [widget])
 }
 
 export function useTableToolbar(editorRef: () => Editor | null) {
   const isInTable = ref(false)
-  const toolbarPosition = ref<TableToolbarPosition>({ top: 0, left: 0, width: 0 })
   const tableContext = ref<TableToolbarContext | null>(null)
+  const toolbarMountEl = ref<HTMLElement | null>(null)
   let unsubscribe: (() => void) | null = null
-  let compensatedTable: HTMLElement | null = null
 
-  function clearTableOffset() {
-    if (!compensatedTable) return
-    compensatedTable.classList.remove(TABLE_TOOLBAR_OFFSET_CLASS)
-    compensatedTable.style.removeProperty(TABLE_TOOLBAR_OFFSET_VAR)
-    compensatedTable = null
-  }
-
-  function applyTableOffset(tableElement: HTMLElement, offset: number) {
-    if (offset <= 0) {
-      if (compensatedTable === tableElement) clearTableOffset()
-      return false
-    }
-    if (compensatedTable && compensatedTable !== tableElement) clearTableOffset()
-    tableElement.classList.add(TABLE_TOOLBAR_OFFSET_CLASS)
-    tableElement.style.setProperty(TABLE_TOOLBAR_OFFSET_VAR, `${offset}px`)
-    compensatedTable = tableElement
-    return true
-  }
-
-  function ensureToolbarClearance(tableElement: HTMLElement, tableRect: DOMRect, contextRect: DOMRect) {
-    const availableTop = tableRect.top - contextRect.top
-    const hiddenHeight = Math.max(TOOLBAR_HEIGHT - availableTop, 0)
-    return applyTableOffset(tableElement, hiddenHeight)
-  }
-
-  function updatePosition() {
-    const editor = editorRef()
-    if (!editor) return
-    editor.action((ctx) => {
-      const view = ctx.get(editorViewCtx)
-      const tableContext = getTableToolbarContext(view.state)
-      if (!tableContext) return
-      const tableElement = getTableElement(view.state, view)
-      if (!tableElement) return
-      let tableRect = getTableDomRect(view.state, view)
-      if (!tableRect) return
-      const toolbarContext = view.dom.closest(TOOLBAR_CONTEXT_SELECTOR) ?? view.dom.closest('.wysiwyg-pane')
-      if (!toolbarContext) return
-      const contextRect = toolbarContext.getBoundingClientRect()
-      if (ensureToolbarClearance(tableElement, tableRect, contextRect)) {
-        tableRect = getTableDomRect(view.state, view)
-        if (!tableRect) return
-      } else if (compensatedTable && compensatedTable !== tableElement) {
-        clearTableOffset()
-      }
-      toolbarPosition.value = resolveToolbarPosition(tableRect, contextRect)
-    })
+  function syncToolbarMount(view: { dom: ParentNode }) {
+    toolbarMountEl.value = view.dom.querySelector<HTMLElement>('.markflow-table-toolbar-slot')
   }
 
   function syncState() {
@@ -169,8 +104,7 @@ export function useTableToolbar(editorRef: () => Editor | null) {
     if (!editor) {
       isInTable.value = false
       tableContext.value = null
-      toolbarPosition.value = { top: 0, left: 0, width: 0 }
-      clearTableOffset()
+      toolbarMountEl.value = null
       return
     }
     editor.action((ctx) => {
@@ -179,10 +113,9 @@ export function useTableToolbar(editorRef: () => Editor | null) {
       tableContext.value = context
       isInTable.value = context !== null
       if (context) {
-        updatePosition()
+        syncToolbarMount(view)
       } else {
-        toolbarPosition.value = { top: 0, left: 0, width: 0 }
-        clearTableOffset()
+        toolbarMountEl.value = null
       }
     })
   }
@@ -200,18 +133,10 @@ export function useTableToolbar(editorRef: () => Editor | null) {
       view.dom.addEventListener('mouseup', handler)
       view.dom.addEventListener('keyup', handler)
       view.dom.addEventListener('focusin', handler)
-      const scrollHandler = () => {
-        if (isInTable.value) updatePosition()
-      }
-      const scrollContainer = view.dom.closest('.milkdown-host')
-      scrollContainer?.addEventListener('scroll', scrollHandler)
-      window.addEventListener('resize', updatePosition)
       unsubscribe = () => {
         view.dom.removeEventListener('mouseup', handler)
         view.dom.removeEventListener('keyup', handler)
         view.dom.removeEventListener('focusin', handler)
-        scrollContainer?.removeEventListener('scroll', scrollHandler)
-        window.removeEventListener('resize', updatePosition)
       }
     })
   }
@@ -219,10 +144,9 @@ export function useTableToolbar(editorRef: () => Editor | null) {
   function detach() {
     unsubscribe?.()
     unsubscribe = null
-    clearTableOffset()
   }
 
   onBeforeUnmount(detach)
 
-  return { isInTable, tableContext, toolbarPosition, check, attach, detach }
+  return { isInTable, tableContext, toolbarMountEl, check, attach, detach }
 }

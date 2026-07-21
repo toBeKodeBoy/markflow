@@ -1,5 +1,9 @@
 <template>
-  <div class="table-toolbar" data-testid="table-toolbar">
+  <div
+    v-if="visible"
+    class="table-toolbar"
+    data-testid="table-toolbar"
+  >
     <span v-if="context" class="table-toolbar-status" data-testid="table-toolbar-status">
       第{{ context.rowIndex + 1 }}行 / 第{{ context.colIndex + 1 }}列
     </span>
@@ -45,9 +49,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { TableToolbarContext } from '../types'
+import type { TableToolbarContext } from '../composables/useTableToolbar'
 
 const props = defineProps<{
+  visible: boolean
   context: TableToolbarContext | null
 }>()
 
@@ -64,13 +69,13 @@ const emit = defineEmits<{
 
 const deleteRowTitle = computed(() =>
   props.context?.canDeleteRow
-    ? `删除当前行（第${props.context.rowIndex + 1}行，共${props.context.rowCount}行）`
-    : '至少保留一行；如需移除整张表，请使用“删除表格”',
+    ? `删除当前行（第 ${props.context.rowIndex + 1} 行，共 ${props.context.rowCount} 行）`
+    : '至少保留一行；如需移除整张表，请使用“删除表格”'
 )
 
 const deleteColTitle = computed(() =>
   props.context?.canDeleteCol
-    ? `删除当前列（第${props.context.colIndex + 1}列，共${props.context.colCount}列）`
-    : '至少保留一列；如需移除整张表，请使用“删除表格”',
+    ? `删除当前列（第 ${props.context.colIndex + 1} 列，共 ${props.context.colCount} 列）`
+    : '至少保留一列；如需移除整张表，请使用“删除表格”'
 )
 </script>
