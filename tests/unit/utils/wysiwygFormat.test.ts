@@ -26,6 +26,7 @@ import {
   wysiwygDeleteRow,
   wysiwygDeleteCol,
   wysiwygDeleteTable,
+  wysiwygToggleTaskItem,
 } from '../../../src/utils/wysiwygFormat'
 
 const schema = new Schema({
@@ -81,6 +82,39 @@ const tableSchema = new Schema({
   },
 })
 
+const taskSchema = new Schema({
+  nodes: {
+    doc: { content: 'block+', toDOM: () => ['div', 0] as const },
+    bullet_list: {
+      group: 'block',
+      content: 'list_item+',
+      toDOM: () => ['ul', 0] as const,
+      parseDOM: [{ tag: 'ul' }],
+    },
+    list_item: {
+      content: 'paragraph',
+      attrs: {
+        checked: { default: null },
+        label: { default: '•' },
+        listType: { default: 'bullet' },
+        spread: { default: 'false' },
+      },
+      toDOM: (node) => ['li', {
+        'data-item-type': node.attrs.checked == null ? null : 'task',
+        'data-checked': node.attrs.checked == null ? null : String(node.attrs.checked),
+      }, 0] as const,
+      parseDOM: [{ tag: 'li' }],
+    },
+    paragraph: {
+      group: 'block',
+      content: 'text*',
+      toDOM: () => ['p', 0] as const,
+      parseDOM: [{ tag: 'p' }],
+    },
+    text: { group: 'inline' },
+  },
+})
+
 function createView(text: string): EditorView {
   const parent = document.createElement('div')
   document.body.appendChild(parent)
@@ -98,6 +132,21 @@ function createTableView(): EditorView {
   const row = tableSchema.node('table_row', null, [cell('a'), cell('b'), cell('c')])
   const doc = tableSchema.node('doc', null, [
     tableSchema.node('table', null, [row, row, row]),
+  ])
+  return new EditorView(parent, {
+    state: EditorState.create({ doc }),
+  })
+}
+
+function createTaskListView(): EditorView {
+  const parent = document.createElement('div')
+  document.body.appendChild(parent)
+  const item = (checked: boolean, text: string) =>
+    taskSchema.node('list_item', { checked, label: '•', listType: 'bullet', spread: 'false' }, [
+      taskSchema.node('paragraph', null, [taskSchema.text(text)]),
+    ])
+  const doc = taskSchema.node('doc', null, [
+    taskSchema.node('bullet_list', null, [item(false, 'first'), item(true, 'second')]),
   ])
   return new EditorView(parent, {
     state: EditorState.create({ doc }),
@@ -312,5 +361,30 @@ describe('wysiwygDeleteTable', () => {
 
   it('does nothing when editor is null', () => {
     wysiwygDeleteTable(null)
+  })
+})
+
+describe('wysiwygToggleTaskItem', () => {
+  it('toggles the checked attribute for a task list item DOM node', () => {
+    const view = createTaskListView()
+    const focusSpy = vi.spyOn(view, 'focus')
+    const editor = createEditorWithCommands(view, vi.fn(), taskSchema)
+    const taskItem = view.dom.querySelector('li[data-item-type="task"]') as HTMLElement
+
+    const handled = wysiwygToggleTaskItem(editor, taskItem)
+
+    expect(handled).toBe(true)
+    expect(view.state.doc.child(0).child(0).attrs.checked).toBe(true)
+    expect(focusSpy).toHaveBeenCalledOnce()
+    view.destroy()
+  })
+
+  it('returns false when the target is not a task list item', () => {
+    const view = createView('hello')
+    const editor = createEditorWithCommands(view, vi.fn())
+    const paragraph = view.dom.querySelector('p') as HTMLElement
+
+    expect(wysiwygToggleTaskItem(editor, paragraph)).toBe(false)
+    view.destroy()
   })
 })

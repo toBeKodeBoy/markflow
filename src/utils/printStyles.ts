@@ -155,6 +155,10 @@ body.print-root,
 
 .markdown-body li.task-list-item {
   list-style-type: none;
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  margin-left: -1.4em;
 }
 
 .markdown-body li.task-list-item + li.task-list-item {
@@ -162,8 +166,11 @@ body.print-root,
 }
 
 .markdown-body .task-list-item-checkbox {
-  margin: 0 0.35em 0.1em -1.4em;
-  vertical-align: middle;
+  margin: 0;
+  flex: 0 0 auto;
+  width: 1em;
+  height: 1em;
+  transform: translateY(0.04em);
 }
 
 .markdown-body table {

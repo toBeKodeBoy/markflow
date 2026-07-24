@@ -155,4 +155,15 @@ describe('preview task list styles', () => {
   it('styles task-list-item-checkbox alignment in markdown-body', () => {
     expect(styleText).toMatch(/\.markdown-body\s+\.task-list-item-checkbox/)
   })
+
+  it('uses flex alignment so checkbox and text stay vertically centered on one row', () => {
+    const itemRule = styleText.match(/\.markdown-body\s+li\.task-list-item\s*\{[^}]+\}/)?.[0] ?? ''
+    const checkboxRule = styleText.match(/\.markdown-body\s+\.task-list-item-checkbox\s*\{[^}]+\}/)?.[0] ?? ''
+    expect(itemRule).toMatch(/display:\s*flex/)
+    expect(itemRule).toMatch(/align-items:\s*center/)
+    expect(checkboxRule).toMatch(/margin:\s*0[;\s}]/)
+    expect(checkboxRule).toMatch(/width:\s*1em/)
+    expect(checkboxRule).toMatch(/height:\s*1em/)
+    expect(checkboxRule).toMatch(/transform:\s*translateY\(/)
+  })
 })

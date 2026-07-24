@@ -135,6 +135,37 @@ export function wysiwygWrapOrderedList(editor: Editor | null) {
   wrapInListType(editor, 'ordered_list')
 }
 
+export function wysiwygToggleTaskItem(editor: Editor | null, target: HTMLElement): boolean {
+  if (!editor) return false
+  const taskItem = target.closest('li[data-item-type="task"]') as HTMLElement | null
+  if (!taskItem) return false
+
+  let handled = false
+
+  editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx)
+    const pos = view.posAtDOM(taskItem, 0)
+    const $pos = view.state.doc.resolve(pos)
+
+    for (let depth = $pos.depth; depth > 0; depth--) {
+      const node = $pos.node(depth)
+      if (node.type.name !== 'list_item' || node.attrs.checked == null) continue
+
+      const nodePos = $pos.before(depth)
+      const tr = view.state.tr.setNodeMarkup(nodePos, undefined, {
+        ...node.attrs,
+        checked: !node.attrs.checked,
+      })
+      view.dispatch(tr)
+      view.focus()
+      handled = true
+      return
+    }
+  })
+
+  return handled
+}
+
 export function wysiwygInsertCodeBlock(editor: Editor | null) {
   if (!editor) return
   runEditorCommand(editor, (view, schema) => {

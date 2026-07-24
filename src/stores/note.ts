@@ -292,6 +292,15 @@ export const useNoteStore = defineStore('note', () => {
     updateNoteContent(currentNote.value.id, content)
   }
 
+  function applyExternalContentUpdate(content: string) {
+    if (!currentNote.value) return false
+    liveContent.value = content
+    setTabContentCache(currentNote.value.id, content)
+    updateCurrentContent(content)
+    editorContentPush.value = { content, id: ++editorContentPushSeq }
+    return true
+  }
+
   /** 删除笔记：移除存储，若为当前笔记则导航到列表首项或清空 */
   function deleteNote(id: string) {
     storage.removeNote(id)
@@ -643,7 +652,7 @@ export const useNoteStore = defineStore('note', () => {
     contentSearchIndex,
     loadNoteList, openNote, createNote, createNoteWithContent, setLiveContent, setActiveNote, setTocVisible,
     importMarkdownFile,
-    updateCurrentContent, updateNoteContent, deleteNote, renameNote, moveNote, requestTocJump, insertAutoToc,
+    applyExternalContentUpdate, updateCurrentContent, updateNoteContent, deleteNote, renameNote, moveNote, requestTocJump, insertAutoToc,
     clearPendingLargeFileSwitch, applyLargeFilePolicy,
     createFolder, deleteFolder, renameFolder, moveFolder, getDeleteFolderImpact,
     setActiveTagFilter, setNoteTags, addTag, removeTag, toggleNotePinned, reorderNotes, getNoteContentById,
