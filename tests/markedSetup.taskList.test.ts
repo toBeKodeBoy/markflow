@@ -156,14 +156,21 @@ describe('preview task list styles', () => {
     expect(styleText).toMatch(/\.markdown-body\s+\.task-list-item-checkbox/)
   })
 
-  it('uses flex alignment so checkbox and text stay vertically centered on one row', () => {
-    const itemRule = styleText.match(/\.markdown-body\s+li\.task-list-item\s*\{[^}]+\}/)?.[0] ?? ''
+  it('uses custom checkbox wrapper with ::before pseudo-element', () => {
+    expect(styleText).toMatch(/\.markdown-body\s+\.task-checkbox-wrapper\s*\{[^}]*display:\s*inline-flex[^}]*\}/)
+    expect(styleText).toMatch(/\.markdown-body\s+\.task-checkbox-wrapper::before\s*\{[^}]*border:[^}]*\}/)
+    expect(styleText).toMatch(/\.markdown-body\s+\.task-checkbox-wrapper:has\(>\s*:checked\)::before/)
+  })
+
+  it('hides native checkbox input inside wrapper', () => {
     const checkboxRule = styleText.match(/\.markdown-body\s+\.task-list-item-checkbox\s*\{[^}]+\}/)?.[0] ?? ''
+    expect(checkboxRule).toMatch(/opacity:\s*0/)
+    expect(checkboxRule).toMatch(/position:\s*absolute/)
+  })
+
+  it('uses flex alignment so checkbox and text stay on one row', () => {
+    const itemRule = styleText.match(/\.markdown-body\s+li\.task-list-item\s*\{[^}]+\}/)?.[0] ?? ''
     expect(itemRule).toMatch(/display:\s*flex/)
     expect(itemRule).toMatch(/align-items:\s*center/)
-    expect(checkboxRule).toMatch(/margin:\s*0[;\s}]/)
-    expect(checkboxRule).toMatch(/width:\s*1em/)
-    expect(checkboxRule).toMatch(/height:\s*1em/)
-    expect(checkboxRule).toMatch(/transform:\s*translateY\(/)
   })
 })

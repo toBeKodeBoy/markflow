@@ -165,12 +165,40 @@ body.print-root,
   margin-top: 0.25em;
 }
 
-.markdown-body .task-list-item-checkbox {
-  margin: 0;
+.markdown-body .task-checkbox-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
   flex: 0 0 auto;
-  width: 1em;
-  height: 1em;
-  transform: translateY(0.04em);
+  width: 15px;
+  height: 15px;
+}
+
+.markdown-body .task-checkbox-wrapper::before {
+  content: '';
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid #6b7280;
+  border-radius: 3px;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.markdown-body .task-checkbox-wrapper:has(> :checked)::before {
+  background-color: #6366f1;
+  border-color: #6366f1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' d='M3.5 8.5L6.5 11.5L12.5 4.5'/%3E%3C/svg%3E");
+  background-size: 11px;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.markdown-body .task-list-item-checkbox {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
 }
 
 .markdown-body table {
