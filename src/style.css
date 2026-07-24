@@ -2140,6 +2140,10 @@ input:focus { border-color: var(--primary); }
 
 .markdown-body li.task-list-item {
   list-style-type: none;
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  margin-left: -1.4em;
 }
 
 .markdown-body li.task-list-item + li.task-list-item {
@@ -2147,8 +2151,11 @@ input:focus { border-color: var(--primary); }
 }
 
 .markdown-body .task-list-item-checkbox {
-  margin: 0 0.35em 0.1em -1.4em;
-  vertical-align: middle;
+  margin: 0;
+  flex: 0 0 auto;
+  width: 1em;
+  height: 1em;
+  transform: translateY(0.04em);
   accent-color: var(--primary);
 }
 
@@ -2901,7 +2908,7 @@ img.ProseMirror-separator {
 .ProseMirror li[data-item-type="task"] {
   list-style: none;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.35em;
 }
 
@@ -2910,12 +2917,13 @@ img.ProseMirror-separator {
   flex-shrink: 0;
   width: 14px;
   height: 14px;
-  margin-top: 0.35em;
+  margin-top: 0;
   border: 1.5px solid var(--text-muted);
   border-radius: 3px;
   background: var(--bg-editor);
   box-sizing: border-box;
   user-select: none;
+  transform: translateY(0.04em);
 }
 
 .ProseMirror li[data-item-type="task"][data-checked="true"]::before {

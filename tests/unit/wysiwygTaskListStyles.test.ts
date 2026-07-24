@@ -13,6 +13,14 @@ describe('WYSIWYG task list CSS', () => {
     expect(css).toMatch(/\.ProseMirror\s+li\[data-item-type="task"\][\s\S]*display:\s*flex/)
   })
 
+  it('vertically centers the task marker with the text in WYSIWYG mode', () => {
+    const itemRule = css.match(/\.ProseMirror\s+li\[data-item-type="task"\]\s*\{[^}]+\}/)?.[0] ?? ''
+    const markerRule = css.match(/\.ProseMirror\s+li\[data-item-type="task"\]::before\s*\{[^}]+\}/)?.[0] ?? ''
+    expect(itemRule).toMatch(/align-items:\s*center/)
+    expect(markerRule).toMatch(/margin-top:\s*0[;\s}]/)
+    expect(markerRule).toMatch(/transform:\s*translateY\(/)
+  })
+
   it('removes paragraph margin inside task list items', () => {
     expect(css).toMatch(/\.ProseMirror\s+li\[data-item-type="task"\]\s*>\s*p[\s\S]*margin:\s*0/)
   })

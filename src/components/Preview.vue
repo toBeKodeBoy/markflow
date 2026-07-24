@@ -16,6 +16,8 @@ import { resolveMarkdownForDisplay } from '../utils/resolveMarkdownAssets'
 import { handleCodeCopyCaptureClick } from '../utils/codeCopy'
 import { handleImageLightboxDblClick } from '../utils/imageLightbox'
 import { handlePreviewFragmentClick } from '../utils/previewFragmentNav'
+import { annotateTaskListHtml } from '../utils/taskListHtml'
+import { toggleTaskCheckedByLine } from '../utils/taskListMutations'
 import { writeClipboard } from '../utils/clipboard'
 import { hydrateMermaidBlocks, refreshMermaidBlocks } from '../utils/mermaidRender'
 import { useNoteStore } from '../stores/note'
@@ -64,7 +66,8 @@ function scheduleRender(content: string) {
     void resolveMarkdownForDisplay(content)
       .then((resolved) => {
         try {
-          renderedHtml.value = parseMarkdown(resolved) || '<p class="empty-preview">预览渲染失败</p>'
+          const html = parseMarkdown(resolved)
+          renderedHtml.value = annotateTaskListHtml(html, resolved) || '<p class="empty-preview">预览渲染失败</p>'
           void hydratePreviewMermaid()
         } catch {
           renderedHtml.value = '<p class="empty-preview">预览渲染失败</p>'
@@ -117,7 +120,25 @@ onBeforeUnmount(() => {
 /** 预览区点击：代码复制 + 页内目录锚点跳转 */
 function onPreviewClick(e: MouseEvent) {
   if (handlePreviewFragmentClick(e, previewContentEl.value)) return
+  if (handleTaskListToggle(e)) return
   handleCodeCopyCaptureClick(e)
+}
+
+function handleTaskListToggle(e: MouseEvent): boolean {
+  const target = e.target as HTMLElement | null
+  const checkbox = target?.closest?.('input.task-list-item-checkbox') as HTMLInputElement | null
+  if (!checkbox) return false
+
+  const line = Number(checkbox.getAttribute('data-task-line'))
+  if (!Number.isInteger(line) || line < 1) return false
+
+  const currentContent = store.liveContent || (store.currentNote?.content ?? '')
+  const next = toggleTaskCheckedByLine(currentContent, line)
+  if (next === currentContent) return true
+
+  e.preventDefault()
+  store.applyExternalContentUpdate(next)
+  return true
 }
 
 /** 复制当前渲染 HTML 到剪贴板 */

@@ -50,4 +50,22 @@ describe('WysiwygEditor 任务清单', () => {
     expect(items[2].textContent?.trim()).toBe('任务3')
     await wrapper.unmount()
   }, 15000)
+
+  it('点击任务勾选区后应切换 checked 状态并回写 Markdown', async () => {
+    const { wrapper, prose, store } = await mountWysiwygEditor(LOOSE_TASK_LIST)
+    const firstItem = prose.querySelector('li[data-item-type="task"]') as HTMLElement
+
+    firstItem.dispatchEvent(new MouseEvent('click', {
+      bubbles: true,
+      clientX: 2,
+      clientY: 8,
+    }))
+
+    await new Promise((resolve) => setTimeout(resolve, 400))
+
+    const items = [...prose.querySelectorAll('li[data-item-type="task"]')]
+    expect(items[0].getAttribute('data-checked')).toBe('false')
+    expect(store.liveContent).toContain('* [ ] 任务1')
+    await wrapper.unmount()
+  }, 15000)
 })

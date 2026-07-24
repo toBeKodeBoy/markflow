@@ -99,6 +99,7 @@ import {
   wysiwygWrapBlockquote,
   wysiwygWrapBulletList,
   wysiwygWrapOrderedList,
+  wysiwygToggleTaskItem,
   wysiwygInsertCodeBlock,
   wysiwygInsertTable,
   wysiwygInsertLink,
@@ -317,7 +318,24 @@ useTocJumpHandler(containerRef, store, () => isActive.value)
 /** WYSIWYG 点击：页内锚点跳转 + 代码复制 */
 function onWysiwygClick(e: MouseEvent) {
   if (handlePreviewFragmentClick(e, containerRef.value)) return
+  if (handleTaskItemToggle(e)) return
   handleCodeCopyCaptureClick(e)
+}
+
+function handleTaskItemToggle(e: MouseEvent): boolean {
+  const target = e.target as HTMLElement | null
+  const taskItem = target?.closest?.('li[data-item-type="task"]') as HTMLElement | null
+  if (!taskItem) return false
+
+  const rect = taskItem.getBoundingClientRect()
+  const style = window.getComputedStyle(taskItem)
+  const fontSize = Number.parseFloat(style.fontSize || '14')
+  const gap = Number.parseFloat(style.gap || '0')
+  const markerZoneRight = rect.left + 14 + gap + Math.max(4, fontSize * 0.2)
+  if (e.clientX > markerZoneRight) return false
+
+  e.preventDefault()
+  return wysiwygToggleTaskItem(editor, taskItem)
 }
 
 onMounted(async () => {
