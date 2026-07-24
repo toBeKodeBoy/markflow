@@ -199,7 +199,7 @@ const taskCheckboxRenderer: RendererExtension = {
   name: 'checkbox',
   renderer(token) {
     const checked = token.checked ? ' checked=""' : ''
-    return `<input class="task-list-item-checkbox" disabled="" type="checkbox"${checked}> `
+    return `<span class="task-checkbox-wrapper"><input class="task-list-item-checkbox" disabled="" type="checkbox"${checked}></span> `
   },
 }
 
