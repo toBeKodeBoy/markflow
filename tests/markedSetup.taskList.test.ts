@@ -178,7 +178,7 @@ describe('preview task list styles', () => {
     const checkedRule = styleText.match(/\.markdown-body\s+li\.task-list-item\[data-checked="true"\]\s*\{[^}]+\}/)?.[0] ?? ''
     const uncheckedRule = styleText.match(/\.markdown-body\s+li\.task-list-item\[data-checked="false"\]\s*\{[^}]+\}/)?.[0] ?? ''
     expect(checkedRule).toMatch(/text-decoration:\s*line-through/)
-    expect(uncheckedRule).not.toMatch(/text-decoration/)
+    expect(uncheckedRule).not.toMatch(/line-through/)
   })
 
   it('keeps preview task items on the document line-height rhythm', () => {

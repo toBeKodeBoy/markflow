@@ -8,7 +8,7 @@ describe('print task list styles', () => {
     const checkedRule = css.match(/\.markdown-body\s+li\.task-list-item\[data-checked="true"\]\s*\{[^}]+\}/)?.[0] ?? ''
     const uncheckedRule = css.match(/\.markdown-body\s+li\.task-list-item\[data-checked="false"\]\s*\{[^}]+\}/)?.[0] ?? ''
     expect(checkedRule).toMatch(/text-decoration:\s*line-through/)
-    expect(uncheckedRule).not.toMatch(/text-decoration/)
+    expect(uncheckedRule).not.toMatch(/line-through/)
   })
 
   it('keeps printed task items aligned to the same line-height rhythm', () => {

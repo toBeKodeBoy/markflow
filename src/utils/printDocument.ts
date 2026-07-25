@@ -4,6 +4,7 @@ import { parseMarkdown } from './markedSetup'
 import { encodeMermaidSource, renderMermaidToSvg } from './mermaidRender'
 import { buildPrintStyles } from './printStyles'
 import { normalizePdfOptions } from './pdfOptions'
+import { annotateTaskListHtml } from './taskListHtml'
 
 /** 将 Markdown（已 resolve asset）渲染为打印用完整 HTML 文档 */
 export function buildPrintDocument(
@@ -13,7 +14,7 @@ export function buildPrintDocument(
 ): string {
   let bodyHtml = ''
   try {
-    bodyHtml = parseMarkdown(markdown)
+    bodyHtml = renderPrintBodyHtml(markdown)
   } catch {
     bodyHtml = escapeHtml(markdown)
   }
@@ -28,12 +29,17 @@ export async function buildPdfDocument(
 ): Promise<string> {
   let bodyHtml = ''
   try {
-    bodyHtml = parseMarkdown(markdown)
+    bodyHtml = renderPrintBodyHtml(markdown)
   } catch {
     bodyHtml = escapeHtml(markdown)
   }
   const preparedBodyHtml = await preparePrintBodyHtml(bodyHtml)
   return assemblePrintDocument(preparedBodyHtml, title, options)
+}
+
+function renderPrintBodyHtml(markdown: string): string {
+  const html = parseMarkdown(markdown)
+  return annotateTaskListHtml(html, markdown)
 }
 
 /** 由已渲染的 body HTML 组装完整打印文档 */

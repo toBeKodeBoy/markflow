@@ -29,7 +29,7 @@ describe('WYSIWYG task list CSS', () => {
     const checkedRule = css.match(/\.ProseMirror\s+li\[data-item-type="task"\]\[data-checked="true"\]\s*\{[^}]+\}/)?.[0] ?? ''
     const uncheckedRule = css.match(/\.ProseMirror\s+li\[data-item-type="task"\]\[data-checked="false"\]\s*\{[^}]+\}/)?.[0] ?? ''
     expect(checkedRule).toMatch(/text-decoration:\s*line-through/)
-    expect(uncheckedRule).not.toMatch(/text-decoration/)
+    expect(uncheckedRule).not.toMatch(/line-through/)
   })
 
   it('keeps task items on the same line-height rhythm in WYSIWYG mode', () => {

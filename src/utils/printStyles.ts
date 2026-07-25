@@ -157,8 +157,17 @@ body.print-root,
   list-style-type: none;
   display: flex;
   align-items: center;
+  line-height: inherit;
   gap: 0.35em;
   margin-left: -1.4em;
+}
+
+.markdown-body li.task-list-item[data-checked="true"] {
+  text-decoration: line-through;
+}
+
+.markdown-body li.task-list-item[data-checked="false"] {
+  text-decoration: none;
 }
 
 .markdown-body li.task-list-item + li.task-list-item {

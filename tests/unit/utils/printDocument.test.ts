@@ -52,4 +52,11 @@ describe('buildPrintDocument', () => {
     expect(html).toContain('<svg')
     expect(html).not.toContain('<pre class="mermaid">')
   })
+  it('任务清单打印文档应保留 checked 状态标记供样式命中', () => {
+    const html = buildPrintDocument('* [x] 已完成\n* [ ] 待处理', '任务', {
+      scale: 1,
+    })
+    expect(html).toContain('li class="task-list-item" data-task-line="1" data-checked="true"')
+    expect(html).toContain('li class="task-list-item" data-task-line="2" data-checked="false"')
+  })
 })
