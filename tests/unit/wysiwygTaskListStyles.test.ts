@@ -24,4 +24,17 @@ describe('WYSIWYG task list CSS', () => {
   it('removes paragraph margin inside task list items', () => {
     expect(css).toMatch(/\.ProseMirror\s+li\[data-item-type="task"\]\s*>\s*p[\s\S]*margin:\s*0/)
   })
+
+  it('adds a strike-through only to checked task items in WYSIWYG mode', () => {
+    const checkedRule = css.match(/\.ProseMirror\s+li\[data-item-type="task"\]\[data-checked="true"\]\s*\{[^}]+\}/)?.[0] ?? ''
+    const uncheckedRule = css.match(/\.ProseMirror\s+li\[data-item-type="task"\]\[data-checked="false"\]\s*\{[^}]+\}/)?.[0] ?? ''
+    expect(checkedRule).toMatch(/text-decoration:\s*line-through/)
+    expect(uncheckedRule).not.toMatch(/text-decoration/)
+  })
+
+  it('keeps task items on the same line-height rhythm in WYSIWYG mode', () => {
+    const itemRule = css.match(/\.ProseMirror\s+li\[data-item-type="task"\]\s*\{[^}]+\}/)?.[0] ?? ''
+    expect(itemRule).toMatch(/line-height:\s*inherit/)
+    expect(itemRule).toMatch(/gap:\s*0\.35em/)
+  })
 })

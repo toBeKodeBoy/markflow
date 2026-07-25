@@ -173,4 +173,17 @@ describe('preview task list styles', () => {
     expect(itemRule).toMatch(/display:\s*flex/)
     expect(itemRule).toMatch(/align-items:\s*center/)
   })
+
+  it('adds a strike-through only to checked preview task items', () => {
+    const checkedRule = styleText.match(/\.markdown-body\s+li\.task-list-item\[data-checked="true"\]\s*\{[^}]+\}/)?.[0] ?? ''
+    const uncheckedRule = styleText.match(/\.markdown-body\s+li\.task-list-item\[data-checked="false"\]\s*\{[^}]+\}/)?.[0] ?? ''
+    expect(checkedRule).toMatch(/text-decoration:\s*line-through/)
+    expect(uncheckedRule).not.toMatch(/text-decoration/)
+  })
+
+  it('keeps preview task items on the document line-height rhythm', () => {
+    const itemRule = styleText.match(/\.markdown-body\s+li\.task-list-item\s*\{[^}]+\}/)?.[0] ?? ''
+    expect(itemRule).toMatch(/line-height:\s*inherit/)
+    expect(itemRule).toMatch(/gap:\s*0\.35em/)
+  })
 })
