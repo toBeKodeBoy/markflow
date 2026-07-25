@@ -72,6 +72,7 @@ import { highlightMarkPlugins } from '../plugins/highlightMark'
 import { mathPlugins } from '../plugins/math'
 import { underlineMarkPlugins } from '../plugins/underlineMark'
 import { htmlRenderPlugins } from '../plugins/htmlRender'
+import { strongMarkPlugins } from '../plugins/strongMark'
 import { codeBlockLabelPlugin, codeBlockExitPlugin } from '../plugins/codeBlockLabel'
 import { headingIdPlugins } from '../plugins/headingId'
 import { autoCloseBracketsPlugin } from '../plugins/autoCloseBrackets'
@@ -258,6 +259,7 @@ async function initEditor(content: string) {
       .use(commonmark)
       .use(gfm)
       .use(mathPlugins)
+      .use(strongMarkPlugins)
       .use(highlightMarkPlugins)
       .use(underlineMarkPlugins)
       .use(htmlRenderPlugins)
