@@ -8,6 +8,7 @@ describe('print task list styles', () => {
     const checkedRule = css.match(/\.markdown-body\s+li\.task-list-item\[data-checked="true"\]\s*\{[^}]+\}/)?.[0] ?? ''
     const uncheckedRule = css.match(/\.markdown-body\s+li\.task-list-item\[data-checked="false"\]\s*\{[^}]+\}/)?.[0] ?? ''
     expect(checkedRule).toMatch(/text-decoration:\s*line-through/)
+    expect(checkedRule).toMatch(/color:\s*#[0-9a-fA-F]{6}/)
     expect(uncheckedRule).not.toMatch(/line-through/)
   })
 

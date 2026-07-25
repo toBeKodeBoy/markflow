@@ -178,6 +178,7 @@ describe('preview task list styles', () => {
     const checkedRule = styleText.match(/\.markdown-body\s+li\.task-list-item\[data-checked="true"\]\s*\{[^}]+\}/)?.[0] ?? ''
     const uncheckedRule = styleText.match(/\.markdown-body\s+li\.task-list-item\[data-checked="false"\]\s*\{[^}]+\}/)?.[0] ?? ''
     expect(checkedRule).toMatch(/text-decoration:\s*line-through/)
+    expect(checkedRule).toMatch(/color:\s*var\(--text-task-done\)/)
     expect(uncheckedRule).not.toMatch(/line-through/)
   })
 
@@ -185,5 +186,12 @@ describe('preview task list styles', () => {
     const itemRule = styleText.match(/\.markdown-body\s+li\.task-list-item\s*\{[^}]+\}/)?.[0] ?? ''
     expect(itemRule).toMatch(/line-height:\s*inherit/)
     expect(itemRule).toMatch(/gap:\s*0\.35em/)
+  })
+
+  it('defines completed task text colors for both light and dark themes', () => {
+    const rootRule = styleText.match(/:root\s*\{[^}]+\}/)?.[0] ?? ''
+    const darkRule = styleText.match(/\[data-theme="dark"\]\s*\{[^}]+\}/)?.[0] ?? ''
+    expect(rootRule).toMatch(/--text-task-done:\s*#[0-9a-fA-F]{6}/)
+    expect(darkRule).toMatch(/--text-task-done:\s*#[0-9a-fA-F]{6}/)
   })
 })
