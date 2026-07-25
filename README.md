@@ -47,7 +47,7 @@ MarkFlow 是一个面向日常 Markdown 写作的 uTools 插件。解决本地�
 - 创建、重命名、删除笔记，自动从首个标题提取笔记名；**新建笔记/文件夹弹窗**（`CreateEntryModal`）支持一步创建
 - 文件夹创建、重命名与删除，多级文件夹树、拖拽移动、虚拟列表（>150 行）
 - **多文档页签**（`EditorTabBar`）：同时打开多个笔记，页签切换、拖拽排序、关闭，上限 10 个（`MAX_EDITOR_TABS`）
-- **全文搜索**：标题 + 正文 + 标签联合搜索，匹配摘要高亮，300ms 防抖（`SearchBar` / `SearchResultsList` / `SearchResultItem` / `SearchEmptyState`）
+- **全文搜索**：标题 + 正文 + 标签联合搜索，匹配摘要高亮，300ms 防抖（`SearchModal`）
 - **标签**：笔记标签编辑（`TagInput`）、顶栏展示（`NoteTagsBar`）、侧栏标签云过滤（`TagCloud` / `TagCloudPanel`）
 - **排序**：置顶/取消置顶，同文件夹内拖拽重排（`sortOrder`）
 - 导入/导出 `.md` 文件；**批量导入文件夹**（`ImportFolderModal`，可选保留目录结构与图片）
@@ -64,6 +64,9 @@ MarkFlow 是一个面向日常 Markdown 写作的 uTools 插件。解决本地�
 - **Mermaid 图示**：` ```mermaid ` 围栏，分屏预览 SVG + WYSIWYG 实时代码块预览
 - 下划线（`<u>`）、==高亮==、行内代码与反引号自动闭合
 - 代码块复制按钮、语言标签切换（含 `mermaid`）
+- **表格工具栏**（`TableToolbar`）：选中表格时浮动显示，支持插入/删除行列、合并单元格等快捷操作
+- **脚注**：`[^1]` 引用与 `[^1]: ` 定义语法，WYSIWYG 与分屏预览均支持
+- **任务列表增强**：支持勾选状态切换、完成态样式、列表项插入/删除
 - **图片**：粘贴/拖放入库（`markflow-asset://`）、压缩存储、比例缩放、**双击全屏预览**（`ImageLightbox`）
 - 格式化工具栏（`FormatToolbar`）支持加粗、斜体、标题、列表、引用、代码块等快捷插入；**专注模式浮动格式工具栏**（`FocusFormatToolbar`）
 - 按文档标题生成目录导航，点击可跳转
@@ -76,6 +79,7 @@ MarkFlow 是一个面向日常 Markdown 写作的 uTools 插件。解决本地�
 - 明暗主题快捷切换，或自动跟随 uTools / 系统深色模式
 - 可独立隐藏侧边栏与目录面板（侧边栏显隐会记住）
 - 专注模式隐藏工具栏与侧边栏，居中宽屏写作，按 `Esc` 退出
+- **全屏模式**（`useFullscreen`）：编辑区独立全屏，配合专注模式沉浸写作
 
 ## 环境依赖
 
@@ -155,6 +159,8 @@ npm run test:watch
 | 下划线 `<u>`、==高亮== | 支持 | 支持 |
 | LaTeX 数学 `$...$` / `$$...$$` | 支持 | 支持 |
 | Mermaid ` ```mermaid ` | 支持 | 支持 |
+| 脚注 `[^1]` | 支持 | 支持 |
+| 任务列表 `- [ ]` | 支持 | 支持 |
 
 ## 项目结构
 
@@ -174,23 +180,22 @@ markflow/
 │   ├── types/
 │   │   ├── index.ts         # TypeScript 核心类型定义
 │   │   ├── asset.ts         # 图片资源类型
-│   │   └── import.ts        # 导入功能类型
+│   │   ├── import.ts        # 导入功能类型
+│   │   └── task.ts          # 任务列表类型
 │   ├── extensions/
 │   │   └── autoCloseBrackets.ts  # CodeMirror 括号自动闭合扩展
-│   ├── components/          # 界面组件（24 个）
+│   ├── components/          # 界面组件（22 个）
 │   │   ├── Toolbar.vue          # 工具栏（视图切换/导入导出/主题）
 │   │   ├── Sidebar.vue          # 侧边栏（文件夹树/笔记/搜索/标签云）
 │   │   ├── EditorTabBar.vue     # 多文档页签栏
 │   │   ├── CreateEntryModal.vue # 新建笔记/文件夹弹窗
-│   │   ├── SearchBar.vue        # 全文搜索栏
-│   │   ├── SearchEmptyState.vue # 搜索空状态提示
-│   │   ├── SearchResultItem.vue # 搜索结果单项
-│   │   ├── SearchResultsList.vue# 搜索结果列表
+│   │   ├── SearchModal.vue      # 全文搜索弹窗
 │   │   ├── WysiwygEditor.vue    # Milkdown WYSIWYG 编辑器
 │   │   ├── Editor.vue           # CodeMirror 源码编辑器
 │   │   ├── Preview.vue          # marked 实时预览（含 Mermaid hydrate）
 │   │   ├── FormatToolbar.vue    # 文本格式化工具栏
 │   │   ├── FocusFormatToolbar.vue # 专注模式浮动格式工具栏
+│   │   ├── TableToolbar.vue     # 表格编辑工具栏
 │   │   ├── Toc.vue              # 文档目录导航
 │   │   ├── TagInput.vue         # 笔记标签编辑
 │   │   ├── NoteTagsBar.vue      # 顶栏笔记标签展示
@@ -207,7 +212,7 @@ markflow/
 │   │   ├── editorTabs.ts        # 多文档页签管理
 │   │   ├── editorTabsBridge.ts  # 页签与笔记同步桥接
 │   │   └── tabContentCache.ts   # 页签内容缓存
-│   ├── composables/         # 可复用组合式逻辑（16 个）
+│   ├── composables/         # 可复用组合式逻辑（17 个）
 │   │   ├── useStorage.ts        # 存储抽象（utools / localStorage）
 │   │   ├── useTheme.ts          # 主题切换（明/暗/跟随系统）
 │   │   ├── useAppSettings.ts    # 应用设置读写
@@ -216,27 +221,31 @@ markflow/
 │   │   ├── useTocScroll.ts      # 目录滚动监听
 │   │   ├── useTocScrollSpy.ts   # 目录滚动跟踪
 │   │   ├── useTocJumpHandler.ts # 目录跳转处理
-│   │   ├── useDebouncedSearch.ts# 防抖搜索
 │   │   ├── useNoteSort.ts       # 笔记排序逻辑
 │   │   ├── useAssetStorage.ts   # 图片资源存储
 │   │   ├── useImageLightbox.ts  # 图片灯箱控制
 │   │   ├── useAutoBackup.ts     # 自动备份
 │   │   ├── useBackup.ts         # 手动备份/恢复
 │   │   ├── useFocusToolbarVisibility.ts # 专注模式工具栏显隐
-│   │   └── useTagCloudLayout.ts # 标签云布局计算
-│   ├── plugins/             # Milkdown 插件（11 个）
+│   │   ├── useTagCloudLayout.ts # 标签云布局计算
+│   │   ├── useFullscreen.ts     # 全屏状态管理
+│   │   └── useTableToolbar.ts   # 表格工具栏逻辑
+│   ├── plugins/             # Milkdown 插件（14 个）
 │   │   ├── math.ts              # LaTeX 数学公式支持
 │   │   ├── codeBlockLabel.ts    # 代码块语言标签
 │   │   ├── headingId.ts         # 标题自动编号
 │   │   ├── underlineMark.ts     # 下划线 `<u>` 语法
 │   │   ├── highlightMark.ts     # ==高亮== 语法
+│   │   ├── strongMark.ts        # 加粗/Strong 标记定制
 │   │   ├── imagePaste.ts        # 粘贴图片入库
 │   │   ├── imageScale.ts        # 图片比例缩放
 │   │   ├── markdownPaste.ts     # Markdown 粘贴解析
 │   │   ├── htmlRender.ts        # HTML 自定义渲染
 │   │   ├── autoCloseBrackets.ts # 括号自动闭合
-│   │   └── plainTextFallback.ts # 纯文本回退保护
-│   └── utils/               # 工具函数（40+ 个）
+│   │   ├── plainTextFallback.ts # 纯文本回退保护
+│   │   ├── tableToolbar.ts      # 表格编辑工具栏
+│   │   └── footnoteDisplay.ts   # 脚注渲染
+│   └── utils/               # 工具函数（50 个）
 │       ├── markedSetup.ts       # marked 解析器配置
 │       ├── mathRender.ts        # KaTeX 数学渲染
 │       ├── mermaidRender.ts     # Mermaid 图示渲染
@@ -282,7 +291,11 @@ markflow/
 │       ├── storageStats.ts      # 存储用量统计
 │       ├── inlineCode.ts        # 行内代码处理
 │       ├── notify.ts            # 通知提示
-│       └── wysiwygFormat.ts     # WYSIWYG 格式化
+│       ├── wysiwygFormat.ts     # WYSIWYG 格式化
+│       ├── taskListParse.ts     # 任务列表解析
+│       ├── taskListMutations.ts # 任务列表状态变更
+│       ├── taskListHtml.ts      # 任务列表 HTML 渲染
+│       └── footnoteFallback.ts  # 脚注回退渲染
 ├── tests/
 │   ├── unit/                   # 单元测试
 │   │   ├── components/             # 组件测试
@@ -297,6 +310,7 @@ markflow/
 │   ├── setup.ts                # 测试环境配置
 │   └── tsconfig.json           # 测试 TypeScript 配置
 ├── vite.config.ts
+├── vitest.config.ts
 ├── tsconfig.json
 └── package.json
 ```

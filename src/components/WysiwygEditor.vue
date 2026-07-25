@@ -75,6 +75,8 @@ import { htmlRenderPlugins } from '../plugins/htmlRender'
 import { strongMarkPlugins } from '../plugins/strongMark'
 import { codeBlockLabelPlugin, codeBlockExitPlugin } from '../plugins/codeBlockLabel'
 import { headingIdPlugins } from '../plugins/headingId'
+import { footnoteDisplayPlugins } from '../plugins/footnoteDisplay'
+import { footnoteAutoConvertPlugins } from '../plugins/footnoteAutoConvert'
 import { autoCloseBracketsPlugin } from '../plugins/autoCloseBrackets'
 import { normalizeMarkdownForParse } from '../utils/markedSetup'
 import {
@@ -270,6 +272,8 @@ async function initEditor(content: string) {
       .use(plainTextFallback)
       .use(codeBlockLabelPlugin)
       .use(headingIdPlugins)
+      .use(footnoteAutoConvertPlugins)
+      .use(footnoteDisplayPlugins)
       .use(autoCloseBracketsPlugin)
       .use(listener)
       .use(history)
@@ -376,5 +380,11 @@ onBeforeUnmount(async () => {
     await editor.destroy()
     editor = null
   }
+})
+
+defineExpose({
+  get editor() {
+    return editor
+  },
 })
 </script>
