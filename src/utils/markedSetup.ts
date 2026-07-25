@@ -3,6 +3,11 @@ import hljs from 'highlight.js'
 import { escapeHtml } from './escapeHtml'
 import { sanitizeRenderedHtml } from './sanitizeHtml'
 import { COPY_TEXT } from './codeCopy'
+import {
+  buildFootnoteFallback,
+  materializeFootnotePlaceholders,
+  renderFootnoteSection,
+} from './footnoteFallback'
 import { renderImageHtml } from './imageScale'
 import { HeadingSlugger } from './headingSlug'
 import { renderBlockMath, renderInlineMath } from './mathRender'
@@ -23,10 +28,13 @@ export function normalizeHtmlMarkdown(md: string): string {
 }
 
 import { normalizeBlockMathMarkdown } from './normalizeBlockMath'
+import { normalizeFootnoteMarkdownEscapes } from './footnoteFallback'
 
 /** 编辑器 / 预览解析前统一规范化 */
 export function normalizeMarkdownForParse(md: string): string {
-  return normalizeBlockMathMarkdown(normalizeHtmlMarkdown(normalizeUnderlineMarkdown(md)))
+  return normalizeFootnoteMarkdownEscapes(
+    normalizeBlockMathMarkdown(normalizeHtmlMarkdown(normalizeUnderlineMarkdown(md))),
+  )
 }
 
 /** marked 内联扩展：支持 ==高亮== 语法 */
@@ -268,9 +276,17 @@ marked.setOptions({
 export function parseMarkdown(content: string): string {
   headingSlugger.reset()
   const normalized = normalizeMarkdownForParse(content)
-  const html = marked.parse(normalized, { async: false })
+  const { content: withPlaceholders, footnotes } = buildFootnoteFallback(normalized, (value) => {
+    const html = marked.parse(value, { async: false })
+    return typeof html === 'string' ? html : ''
+  })
+  const footnoteSection = renderFootnoteSection(footnotes)
+  const html = marked.parse(
+    footnoteSection ? `${withPlaceholders}\n\n${footnoteSection}` : withPlaceholders,
+    { async: false },
+  )
   const raw = typeof html === 'string' ? html : ''
-  return sanitizeRenderedHtml(raw)
+  return sanitizeRenderedHtml(materializeFootnotePlaceholders(raw))
 }
 
 export { marked }

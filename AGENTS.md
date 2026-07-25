@@ -14,7 +14,8 @@
    - `src/composables/` 放可复用组合式逻辑
    - `src/stores/` 放全局状态、业务编排、跨组件协同
    - `src/utils/` 放纯函数、解析/转换/渲染辅助逻辑，避免耦合 UI 状态
-   - `src/plugins/` 放 Milkdown / CodeMirror 扩展插件，禁止把编辑器插件逻辑散落到页面层
+   - `src/plugins/` 放 Milkdown 扩展插件，禁止把编辑器插件逻辑散落到页面层
+   - `src/extensions/` 放 CodeMirror 扩展配置（如括号自动闭合），与 `plugins/` 按编辑器引擎区分
 5. Markdown、HTML、数学公式、Mermaid 等渲染能力优先复用现有 `utils/` 与 `plugins/` 实现，不重复造轮子，不绕过既有渲染链路
 6. uTools 平台桥接统一收口到 `public/preload.js`，前端通过 `window.markflow` 访问宿主能力；禁止在 Vue 代码中直接扩散 Node/utools 专属调用
 7. 构建与测试保持现有工具链：Vite 负责开发与打包，Vitest 负责测试；非必要不引入平行构建工具、状态库或测试框架

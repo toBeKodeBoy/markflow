@@ -1956,6 +1956,49 @@ input:focus { border-color: var(--primary); }
   opacity: 0.85;
 }
 
+.markdown-body sup.footnote-ref {
+  font-size: 0.75em;
+  line-height: 1;
+  vertical-align: super;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.markdown-body sup.footnote-ref a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.markdown-body sup.footnote-ref.unresolved {
+  opacity: 0.7;
+}
+
+.markdown-body section.footnotes {
+  margin-top: 2em;
+  padding-top: 1em;
+  border-top: 1px solid var(--border);
+  font-size: 0.92em;
+  color: var(--text-muted);
+}
+
+.markdown-body section.footnotes > ol {
+  margin: 0;
+  padding-left: 1.5em;
+}
+
+.markdown-body section.footnotes .footnote-backref {
+  display: inline;
+  color: var(--primary);
+  text-decoration: none;
+  margin-left: 0.35em;
+  font-family: "Segoe UI Symbol", "Apple Symbols", "Noto Sans Symbols", "DejaVu Sans", sans-serif;
+  font-weight: 600;
+  font-size: 0.95em;
+  line-height: 1;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+
 .markdown-body :not(pre) > code,
 .ProseMirror :not(pre) > code {
   display: inline;
@@ -2745,6 +2788,60 @@ img.ProseMirror-separator {
   cursor: pointer;
 }
 .ProseMirror a:hover { color: var(--primary-hover); }
+
+.ProseMirror sup[data-type="footnote_reference"] {
+  font-size: 0;
+  line-height: 1;
+  vertical-align: super;
+  color: var(--primary);
+  user-select: none;
+}
+
+.ProseMirror sup[data-type="footnote_reference"]::after {
+  content: attr(data-footnote-index);
+  font-size: 0.75rem;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.ProseMirror dl[data-type="footnote_definition"] {
+  display: grid;
+  grid-template-columns: 2.5em minmax(0, 1fr);
+  gap: 0.25em 0.75em;
+  margin: 0.75em 0;
+  align-items: baseline;
+}
+
+.ProseMirror dl[data-type="footnote_definition"]::before {
+  content: attr(data-footnote-index) ".";
+  grid-column: 1;
+  grid-row: 1;
+  color: var(--primary);
+  font-size: var(--editor-font-size, 15px);
+  line-height: inherit;
+  font-weight: 600;
+  text-align: end;
+  user-select: none;
+}
+
+.ProseMirror dl[data-type="footnote_definition"] > dt {
+  display: none;
+}
+
+.ProseMirror dl[data-type="footnote_definition"] > dd {
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0;
+  min-width: 0;
+}
+
+.ProseMirror dl[data-type="footnote_definition"] > dd > :first-child {
+  margin-top: 0;
+}
+
+.ProseMirror dl[data-type="footnote_definition"] > dd > :last-child {
+  margin-bottom: 0;
+}
 
 .ProseMirror pre {
   white-space: pre-wrap;

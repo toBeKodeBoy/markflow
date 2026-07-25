@@ -2,7 +2,7 @@
  * @file tests/unit/utils/markedSetup.test.ts
  */
 import { describe, it, expect } from 'vitest'
-import { parseMarkdown } from '../../../src/utils/markedSetup'
+import { normalizeMarkdownForParse, parseMarkdown } from '../../../src/utils/markedSetup'
 
 describe('parseMarkdown', () => {
   it('应渲染基础 Markdown', () => {
@@ -84,5 +84,11 @@ describe('parseMarkdown', () => {
     const html = parseMarkdown('## Same\n\n## Same\n')
     expect(html).toContain('id="same"')
     expect(html).toContain('id="same-1"')
+  })
+})
+
+describe('normalizeMarkdownForParse', () => {
+  it('还原脚注转义且不影响普通链接转义', () => {
+    expect(normalizeMarkdownForParse('正文\\[^0] 与 \\[链接](x)')).toBe('正文[^0] 与 \\[链接](x)')
   })
 })
