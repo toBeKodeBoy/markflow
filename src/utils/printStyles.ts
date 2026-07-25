@@ -164,10 +164,16 @@ body.print-root,
 
 .markdown-body li.task-list-item[data-checked="true"] {
   text-decoration: line-through;
+  text-decoration-color: currentColor;
+  color: #9ca3af;
 }
 
 .markdown-body li.task-list-item[data-checked="false"] {
   text-decoration: none;
+}
+
+.markdown-body li.task-list-item[data-checked="true"] :where(a, strong, em, code, mark, u, span) {
+  color: inherit;
 }
 
 .markdown-body li.task-list-item + li.task-list-item {

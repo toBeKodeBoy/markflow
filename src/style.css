@@ -9,6 +9,7 @@
   --border: #e5e7eb;
   --text: #1f2937;
   --text-muted: #6b7280;
+  --text-task-done: #9ca3af;
   --text-placeholder: #9ca3af;
   --primary: #6366f1;
   --primary-hover: #4f46e5;
@@ -32,6 +33,7 @@
   --border: #313244;
   --text: #cdd6f4;
   --text-muted: #7f849c;
+  --text-task-done: #a6adc8;
   --text-placeholder: #585b70;
   --primary: #89b4fa;
   --primary-hover: #b4befe;
@@ -2149,10 +2151,16 @@ input:focus { border-color: var(--primary); }
 
 .markdown-body li.task-list-item[data-checked="true"] {
   text-decoration: line-through;
+  text-decoration-color: currentColor;
+  color: var(--text-task-done);
 }
 
 .markdown-body li.task-list-item[data-checked="false"] {
   text-decoration: none;
+}
+
+.markdown-body li.task-list-item[data-checked="true"] :where(a, strong, em, code, mark, u, span) {
+  color: inherit;
 }
 
 .markdown-body li.task-list-item + li.task-list-item {
@@ -2955,10 +2963,16 @@ img.ProseMirror-separator {
 
 .ProseMirror li[data-item-type="task"][data-checked="true"] {
   text-decoration: line-through;
+  text-decoration-color: currentColor;
+  color: var(--text-task-done);
 }
 
 .ProseMirror li[data-item-type="task"][data-checked="false"] {
   text-decoration: none;
+}
+
+.ProseMirror li[data-item-type="task"][data-checked="true"] :where(a, strong, em, code, mark, u, span) {
+  color: inherit;
 }
 
 .ProseMirror li[data-item-type="task"]::before {
