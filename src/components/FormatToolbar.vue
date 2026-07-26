@@ -34,6 +34,23 @@
       <button type="button" @click="$emit('codeBlock')" title="代码块" aria-label="代码块">&lt;/&gt;</button>
       <button type="button" data-testid="toolbar-table" @click="$emit('table')" title="插入表格" aria-label="插入表格">⊞</button>
       <button type="button" @click="$emit('link')" title="插入链接" aria-label="插入链接">🔗</button>
+      <button
+        type="button"
+        data-testid="toolbar-image-button"
+        title="上传图片"
+        aria-label="上传图片"
+        @click="triggerImageUpload"
+      >
+        📷
+      </button>
+      <input
+        ref="imageInputRef"
+        data-testid="toolbar-image-input"
+        type="file"
+        accept="image/*"
+        class="settings-hidden-input"
+        @change="onImageFileChange"
+      >
     </div>
 
     <span class="sep" aria-hidden="true">|</span>
@@ -42,8 +59,10 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
+
 defineProps<{ charCount?: number }>()
-defineEmits<{
+const emit = defineEmits<{
   bold: []
   italic: []
   strike: []
@@ -58,5 +77,19 @@ defineEmits<{
   codeBlock: []
   table: []
   link: []
+  imageUpload: [file: File]
 }>()
+
+const imageInputRef = ref<HTMLInputElement>()
+
+function triggerImageUpload() {
+  imageInputRef.value?.click()
+}
+
+function onImageFileChange(event: Event) {
+  const input = event.target as HTMLInputElement | null
+  const file = input?.files?.[0]
+  if (file) emit('imageUpload', file)
+  if (input) input.value = ''
+}
 </script>
