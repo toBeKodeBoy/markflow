@@ -4,6 +4,11 @@ export type ViewMode = 'live' | 'split' | 'source' | 'focus'
 import type { AssetIndexItem, AssetRecord } from './asset'
 export type { AssetIndexItem, AssetRecord } from './asset'
 export type {
+  ImageExportMode,
+  ImageExportOverwriteStrategy,
+  ImageExportSettings,
+} from './imageExport'
+export type {
   ImportFolderFile,
   ImportFolderImage,
   ImportFolderScanResult,
@@ -13,6 +18,7 @@ export type {
   PersistedImportFolderOptions,
 } from './import'
 import type { ImportFolderImage, ImportFolderScanResult } from './import'
+import type { ImageExportSettings } from './imageExport'
 
 export interface Note {
   id: string
@@ -26,6 +32,12 @@ export interface Note {
   importSourcePath?: string
   /** 单文件导入时的源文件绝对路径 */
   sourceFilePath?: string
+  workingFilePath?: string
+  assetDirectoryPath?: string
+  assetDirectoryTemplate?: string
+  assetPathMode?: 'internal' | 'file-bound'
+  assetLinkStyle?: 'absolute' | 'relative'
+  managedAssetIds?: string[]
   /** 导入来源标题锁定；存在时编辑正文不自动改标题 */
   titleLockedFromSource?: boolean
   createdAt: number
@@ -159,6 +171,7 @@ export interface AppSettings {
   autoBackup?: AutoBackupSettings
   /** 上次打开的编辑器 Tab（启动时恢复） */
   editorTabs?: EditorTabsSettings
+  imageExport?: ImageExportSettings
 }
 
 // uTools preload bridge type
@@ -174,6 +187,13 @@ export interface MarkFlowBridge {
   saveSettings: (settings: AppSettings) => void
   showNotification: (msg: string) => void
   saveMarkdownFile: (filename: string, content: string) => boolean
+  selectMarkdownSavePath?: (
+    filename: string
+  ) => { ok: true; path: string } | { ok: false; reason: 'cancel' | 'error' }
+  writeTextFile?: (
+    filePath: string,
+    content: string
+  ) => { ok: true } | { ok: false; reason: 'error' }
   /** Typora 路线：完整 HTML → Chromium printToPDF */
   savePdfFromHtml: (
     filename: string,
@@ -215,6 +235,16 @@ export interface MarkFlowBridge {
   getAsset: (id: string) => AssetRecord | null
   saveAsset: (id: string, record: AssetRecord) => void
   removeAsset: (id: string) => void
+  ensureDirectory?: (dirPath: string) => { ok: true } | { ok: false; reason: 'error' }
+  writeAssetFile?: (
+    filePath: string,
+    base64: string
+  ) => { ok: true; path: string } | { ok: false; reason: 'error' }
+  movePath?: (
+    fromPath: string,
+    toPath: string
+  ) => { ok: true } | { ok: false; reason: 'error' }
+  pathExists?: (targetPath: string) => boolean
 }
 
 declare global {

@@ -148,6 +148,39 @@ describe('useNoteStore', () => {
       expect(store.currentNote!.title).toBe('改名了')
       expect(store.noteList[0].title).toBe('改名了')
     })
+    it('renames bound markdown file and asset directory when filename-based export is enabled', () => {
+      const store = useNoteStore()
+      const note = store.createNoteWithContent('![图](./old-note.assets/demo-1.png)', {
+        title: 'old note',
+        workingFilePath: 'D:\\docs\\old-note.md',
+        assetDirectoryPath: 'D:\\docs\\old-note.assets',
+        assetDirectoryTemplate: './${filename}.assets',
+        assetPathMode: 'file-bound',
+        assetLinkStyle: 'relative',
+      } as never)
+
+      vi.mocked(window.markflow.pathExists).mockReturnValue(false)
+      vi.mocked(window.markflow.movePath).mockReturnValue({ ok: true })
+      vi.mocked(window.markflow.writeTextFile).mockReturnValue({ ok: true })
+
+      store.renameNote(note.id, 'new note')
+
+      expect(window.markflow.movePath).toHaveBeenCalledWith(
+        'D:\\docs\\old-note.assets',
+        'D:\\docs\\new note.assets'
+      )
+      expect(window.markflow.movePath).toHaveBeenCalledWith(
+        'D:\\docs\\old-note.md',
+        'D:\\docs\\new note.md'
+      )
+      expect(window.markflow.writeTextFile).toHaveBeenCalledWith(
+        'D:\\docs\\new note.md',
+        '![图](./new note.assets/demo-1.png)'
+      )
+      expect(store.currentNote?.workingFilePath).toBe('D:\\docs\\new note.md')
+      expect(store.currentNote?.assetDirectoryPath).toBe('D:\\docs\\new note.assets')
+      expect(store.currentNote?.content).toBe('![图](./new note.assets/demo-1.png)')
+    })
   })
 
   describe('imported note title', () => {

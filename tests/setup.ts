@@ -55,6 +55,8 @@ window.markflow = {
   }),
   showNotification: vi.fn(),
   saveMarkdownFile: vi.fn(() => true),
+  selectMarkdownSavePath: vi.fn(() => ({ ok: true as const, path: 'D:\\mock\\export.md' })),
+  writeTextFile: vi.fn(() => ({ ok: true as const })),
   savePdfFromHtml: vi.fn(() => Promise.resolve({ ok: true })),
   openMarkdownFile: vi.fn(() => ({
     content: '# Test content\n',
@@ -88,6 +90,10 @@ window.markflow = {
   removeAsset: vi.fn((id: string) => {
     mockStorage.deleteItem(`markflow_asset_${id}`)
   }),
+  ensureDirectory: vi.fn(() => ({ ok: true as const })),
+  writeAssetFile: vi.fn((filePath: string) => ({ ok: true as const, path: filePath })),
+  movePath: vi.fn(() => ({ ok: true as const })),
+  pathExists: vi.fn(() => false),
 }
 
 class LocalStorageMock {

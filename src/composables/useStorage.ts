@@ -85,6 +85,16 @@ function defaultSettings(): AppSettings {
       displayHeaderFooter: false,
       preferCssPageSize: true,
     },
+    imageExport: {
+      mode: 'note-assets-folder',
+      customTemplate: './${filename}.assets',
+      fileNameTemplate: '${filename}-${index}',
+      overwriteStrategy: 'rename',
+      bindNoteOnExport: true,
+      downloadRemoteImages: true,
+      syncUnusedAssets: true,
+      unusedAssetsFolderName: '_unused',
+    },
   }
 }
 

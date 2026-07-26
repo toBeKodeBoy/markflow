@@ -7,6 +7,28 @@ import { useEditorTabsStore } from '../../../src/stores/editorTabs'
 
 let pinia: Pinia
 
+const { exportMarkdownAssetsMock } = vi.hoisted(() => ({
+  exportMarkdownAssetsMock: vi.fn(async ({ markdown }: { markdown: string }) => ({
+    markdown: `${markdown}\nexported`,
+    exportedCount: 1,
+    warnings: [],
+  })),
+}))
+
+vi.mock('../../../src/utils/exportMarkdownAssets', () => ({
+  DEFAULT_IMAGE_EXPORT_SETTINGS: {
+    mode: 'note-assets-folder',
+    customTemplate: './${filename}.assets',
+    fileNameTemplate: '${filename}-${index}',
+    overwriteStrategy: 'rename',
+    bindNoteOnExport: true,
+    downloadRemoteImages: true,
+    syncUnusedAssets: true,
+    unusedAssetsFolderName: '_unused',
+  },
+  exportMarkdownAssets: exportMarkdownAssetsMock,
+}))
+
 function mountToolbar() {
   return mount(Toolbar, {
     props: {
@@ -211,6 +233,103 @@ describe('Toolbar', () => {
     expect(settings.sidebarActiveFolderId).toBe(createdFolder?.id)
     expect(settings.sidebarExpandedFolderIds).toEqual(
       expect.arrayContaining([parentFolder.id, createdFolder!.id])
+    )
+  })
+  it('uTools 导出 Markdown 时应先导出图片并写入最终内容', async () => {
+    vi.mocked(window.markflow.selectMarkdownSavePath).mockReturnValue({
+      ok: true,
+      path: 'D:\\docs\\note.md',
+    })
+
+    const wrapper = mountToolbar()
+    const noteStore = useNoteStore()
+    const note = noteStore.createNote()
+    noteStore.currentNote = note
+    noteStore.liveContent = '![图](markflow-asset://asset-1)'
+
+    await wrapper.find('.btn-icon.btn-icon-text').trigger('click')
+    await wrapper
+      .findAll('[role="menuitem"]')
+      .find((button) => button.text().includes('导出 Markdown'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(window.markflow.selectMarkdownSavePath).toHaveBeenCalled()
+    expect(exportMarkdownAssetsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        markdown: '![图](markflow-asset://asset-1)',
+        markdownFilePath: 'D:\\docs\\note.md',
+      })
+    )
+    expect(window.markflow.writeTextFile).toHaveBeenCalledWith(
+      'D:\\docs\\note.md',
+      '![图](markflow-asset://asset-1)\nexported'
+    )
+  })
+  it('导出成功后应将当前笔记回写为文件路径并绑定工作文件', async () => {
+    exportMarkdownAssetsMock.mockResolvedValueOnce({
+      markdown: '![图](./note.assets/demo-1.png)',
+      exportedCount: 1,
+      warnings: [],
+    })
+    vi.mocked(window.markflow.selectMarkdownSavePath).mockReturnValue({
+      ok: true,
+      path: 'D:\\docs\\note.md',
+    })
+
+    const wrapper = mountToolbar()
+    const noteStore = useNoteStore()
+    const note = noteStore.createNote()
+    noteStore.currentNote = note
+    noteStore.liveContent = '![图](markflow-asset://asset-1)'
+
+    await wrapper.find('.btn-icon.btn-icon-text').trigger('click')
+    await wrapper
+      .findAll('[role="menuitem"]')
+      .find((button) => button.text().includes('导出 Markdown'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(noteStore.currentNote?.content).toBe('![图](./note.assets/demo-1.png)')
+    expect(noteStore.currentNote?.workingFilePath).toBe('D:\\docs\\note.md')
+    expect(noteStore.currentNote?.assetDirectoryPath).toBe('D:\\docs\\note.assets')
+    expect(noteStore.currentNote?.assetPathMode).toBe('file-bound')
+
+    const saved = window.markflow.getNote(note.id)
+    expect(saved?.content).toBe('![图](./note.assets/demo-1.png)')
+    expect(saved?.workingFilePath).toBe('D:\\docs\\note.md')
+    expect(saved?.assetDirectoryPath).toBe('D:\\docs\\note.assets')
+    expect(saved?.assetPathMode).toBe('file-bound')
+  })
+  it('外链图片下载失败时应给出明确提示并保留原链接说明', async () => {
+    exportMarkdownAssetsMock.mockResolvedValueOnce({
+      markdown: '![remote](https://example.com/a.png)',
+      exportedCount: 0,
+      warnings: [
+        '外链图片下载失败：https://example.com/a.png（HTTP 404）',
+        '外链图片下载失败：https://example.com/b.png（HTTP 403）',
+      ],
+    })
+    vi.mocked(window.markflow.selectMarkdownSavePath).mockReturnValue({
+      ok: true,
+      path: 'D:\\docs\\note.md',
+    })
+
+    const wrapper = mountToolbar()
+    const noteStore = useNoteStore()
+    const note = noteStore.createNote()
+    noteStore.currentNote = note
+    noteStore.liveContent = '![remote](https://example.com/a.png)'
+
+    await wrapper.find('.btn-icon.btn-icon-text').trigger('click')
+    await wrapper
+      .findAll('[role="menuitem"]')
+      .find((button) => button.text().includes('导出 Markdown'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(window.markflow.showNotification).toHaveBeenCalledWith(
+      '导出完成，但有 2 张外链图片下载失败，已保留原链接。外链图片下载失败：https://example.com/a.png（HTTP 404）；另有 1 条同类问题'
     )
   })
 })

@@ -260,6 +260,8 @@ import { useEditorTabsStore } from '../stores/editorTabs'
 import { useTheme } from '../composables/useTheme'
 
 import { exportPdf, pdfExporting, sanitizeFilename } from '../utils/exportPdf'
+import { DEFAULT_IMAGE_EXPORT_SETTINGS, exportMarkdownAssets } from '../utils/exportMarkdownAssets'
+import { resolveImageExportTarget } from '../utils/imageExportPath'
 
 import { showAppNotification } from '../utils/notify'
 
@@ -382,6 +384,8 @@ function onSettingsConfirm(settings: AppSettings) {
 
     editorFontFamily: settings.editorFontFamily,
 
+    imageExport: settings.imageExport,
+
   })
 
   showAppNotification('设置已保存')
@@ -402,6 +406,23 @@ function closeFileMenu() {
 
   fileMenuOpen.value = false
 
+}
+
+function buildExportWarningMessage(warnings: string[]): string {
+
+  if (warnings.length === 0) return ''
+
+  const remoteWarnings = warnings.filter((warning) => warning.startsWith('外链图片下载失败'))
+
+  if (remoteWarnings.length > 0) {
+    const firstRemoteWarning = remoteWarnings[0]
+    const suffix = remoteWarnings.length > 1 ? `；另有 ${remoteWarnings.length - 1} 条同类问题` : ''
+    return `导出完成，但有 ${remoteWarnings.length} 张外链图片下载失败，已保留原链接。${firstRemoteWarning}${suffix}`
+  }
+
+  const firstWarning = warnings[0]
+  const suffix = warnings.length > 1 ? `；另有 ${warnings.length - 1} 条警告` : ''
+  return `导出完成，但图片处理有警告：${firstWarning}${suffix}`
 }
 
 
@@ -452,7 +473,7 @@ function handleCreated(payload: { kind: 'note' | 'folder'; id: string; parentId?
 
 /** 导出当前笔记为 .md 文件（uTools 环境或浏览器下载） */
 
-function exportNote() {
+async function exportNote() {
 
   closeFileMenu()
 
@@ -470,9 +491,67 @@ function exportNote() {
 
   if (typeof window.markflow !== 'undefined') {
 
-    const ok = window.markflow.saveMarkdownFile(filename, content)
+    const bridge = window.markflow
 
-    if (ok) window.markflow.showNotification('导出成功：' + filename)
+    if (bridge.selectMarkdownSavePath && bridge.writeTextFile) {
+      const selected = bridge.selectMarkdownSavePath(filename)
+      if (selected.ok) {
+        try {
+          const exported = await exportMarkdownAssets({
+            markdown: content,
+            markdownFilePath: selected.path,
+            noteTitle: store.currentNote.title,
+            managedAssetIds: store.currentNote.managedAssetIds,
+            settings: {
+              ...DEFAULT_IMAGE_EXPORT_SETTINGS,
+              ...(appSettings.get().imageExport ?? {}),
+            },
+          })
+          const writeResult = bridge.writeTextFile(selected.path, exported.markdown)
+          if (!writeResult.ok) {
+            bridge.showNotification('Markdown 导出失败')
+            return
+          }
+          const exportSettings = {
+            ...DEFAULT_IMAGE_EXPORT_SETTINGS,
+            ...(appSettings.get().imageExport ?? {}),
+          }
+          if (exportSettings.bindNoteOnExport) {
+            const target = resolveImageExportTarget({
+              markdownFilePath: selected.path,
+              noteTitle: store.currentNote.title,
+              mode: exportSettings.mode,
+              customTemplate: exportSettings.customTemplate,
+              typoraRootDir: exportSettings.typoraRootDir,
+            })
+            store.bindNoteToWorkingFile(store.currentNote.id, {
+              workingFilePath: selected.path,
+              assetDirectoryPath: target.assetDirAbsPath,
+              assetDirectoryTemplate:
+                exportSettings.mode === 'note-assets-folder'
+                  ? './${filename}.assets'
+                  : exportSettings.customTemplate,
+              assetLinkStyle: target.markdownPathStyle,
+              content: exported.markdown,
+            })
+          }
+          if (exported.warnings.length > 0) {
+            bridge.showNotification(buildExportWarningMessage(exported.warnings))
+            return
+          }
+          bridge.showNotification('导出成功：' + filename)
+          return
+        } catch (err) {
+          bridge.showNotification(err instanceof Error ? err.message : 'Markdown 导出失败')
+          return
+        }
+      }
+      if (selected.reason === 'cancel') return
+    }
+
+    const ok = bridge.saveMarkdownFile(filename, content)
+
+    if (ok) bridge.showNotification('导出成功：' + filename)
 
   } else {
 
