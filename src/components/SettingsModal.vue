@@ -152,6 +152,46 @@
       </div>
 
       <div class="settings-section">
+        <div class="settings-section-title">Markdown 图片导出</div>
+        <label class="settings-option-row">
+          <span class="settings-option-label">模式</span>
+          <select v-model="imageExportDraft.mode" class="settings-option-select">
+            <option value="same-folder">同级目录 ./</option>
+            <option value="note-assets-folder">同名资源目录 ./${filename}.assets</option>
+            <option value="custom-template">自定义目录模板</option>
+            <option value="typora-cache-absolute">Typora 缓存目录绝对路径</option>
+          </select>
+        </label>
+        <label
+          v-if="imageExportDraft.mode === 'custom-template'"
+          class="settings-option-row"
+        >
+          <span class="settings-option-label">模板</span>
+          <input
+            v-model.trim="imageExportDraft.customTemplate"
+            type="text"
+            class="settings-path-display"
+            placeholder="./assets/${filename}"
+          />
+        </label>
+        <label
+          v-if="imageExportDraft.mode === 'typora-cache-absolute'"
+          class="settings-option-row"
+        >
+          <span class="settings-option-label">Typora 根目录</span>
+          <input
+            v-model.trim="imageExportDraft.typoraRootDir"
+            type="text"
+            class="settings-path-display"
+            placeholder="C:\\Users\\用户名\\AppData\\Roaming\\Typora"
+          />
+        </label>
+        <p class="settings-tip">
+          支持变量：${filename}、${noteTitle}、${date}、${time}。该设置仅在导出 Markdown 到本地文件时生效。
+        </p>
+      </div>
+
+      <div class="settings-section">
         <div class="settings-section-title">数据管理</div>
         <p v-if="storageStatsLabel" class="settings-storage-stats">{{ storageStatsLabel }}</p>
         <button type="button" class="settings-action-btn" @click="emit('import-folder')">
@@ -208,6 +248,7 @@ import {
   normalizeAutoBackupSettings,
 } from '../utils/autoBackup'
 import { showAppNotification } from '../utils/notify'
+import { DEFAULT_IMAGE_EXPORT_SETTINGS } from '../utils/exportMarkdownAssets'
 
 const props = defineProps<{ visible: boolean }>()
 
@@ -230,6 +271,17 @@ const autoBackupBrowserMode = ref(false)
 const autoBackupUtoolsMode = ref(false)
 const autoBackupSnapshot = ref<AutoBackupSettings>(normalizeAutoBackupSettings())
 const draft = reactive<AppSettings>(storage.getSettings())
+draft.imageExport = {
+  ...DEFAULT_IMAGE_EXPORT_SETTINGS,
+  ...(draft.imageExport ?? {}),
+}
+const imageExportDraft = computed(() => {
+  draft.imageExport = {
+    ...DEFAULT_IMAGE_EXPORT_SETTINGS,
+    ...(draft.imageExport ?? {}),
+  }
+  return draft.imageExport
+})
 const autoBackupDraft = reactive<AutoBackupSettings>(normalizeAutoBackupSettings(draft.autoBackup))
 
 const autoBackupBusy = computed(
@@ -295,6 +347,10 @@ watch(
     draft.previewVisible = loaded.previewVisible
     draft.sidebarVisible = loaded.sidebarVisible
     draft.pdfExport = loaded.pdfExport
+    draft.imageExport = {
+      ...DEFAULT_IMAGE_EXPORT_SETTINGS,
+      ...(loaded.imageExport ?? {}),
+    }
     syncAutoBackupDraft(autoBackupSnapshot.value)
     void refreshStorageStats()
   }
@@ -353,6 +409,10 @@ function saveSettings() {
     theme: draft.theme,
     fontSize: clampFontSize(draft.fontSize),
     editorFontFamily: draft.editorFontFamily,
+    imageExport: {
+      ...DEFAULT_IMAGE_EXPORT_SETTINGS,
+      ...imageExportDraft.value,
+    },
   })
 }
 

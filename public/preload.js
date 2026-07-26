@@ -82,6 +82,25 @@ window.markflow = {
     return false;
   },
 
+  selectMarkdownSavePath: function (filename) {
+    var path = utools.showSaveDialog({
+      title: '瀵煎嚭 Markdown 鏂囦欢',
+      defaultPath: filename,
+      filters: [{ name: 'Markdown', extensions: ['md'] }]
+    });
+    if (!path) return { ok: false, reason: 'cancel' };
+    return { ok: true, path: path };
+  },
+
+  writeTextFile: function (filePath, content) {
+    try {
+      require('fs').writeFileSync(filePath, content, 'utf-8');
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, reason: 'error' };
+    }
+  },
+
   // 读取本地 .md 文件（导入）
   openMarkdownFile: function () {
     var paths = utools.showOpenDialog({
@@ -398,6 +417,49 @@ window.markflow = {
 
   removeAsset: function (id) {
     utools.dbStorage.removeItem('markflow_asset_' + id);
+  },
+
+  ensureDirectory: function (dirPath) {
+    try {
+      require('fs').mkdirSync(dirPath, { recursive: true });
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, reason: 'error' };
+    }
+  },
+
+  writeAssetFile: function (filePath, base64) {
+    try {
+      var fs = require('fs');
+      var buffer = Buffer.from(base64, 'base64');
+      fs.writeFileSync(filePath, buffer);
+      return { ok: true, path: filePath };
+    } catch (e) {
+      return { ok: false, reason: 'error' };
+    }
+  },
+
+  movePath: function (fromPath, toPath) {
+    try {
+      var fs = require('fs');
+      var path = require('path');
+      var parent = path.dirname(toPath);
+      if (!fs.existsSync(parent)) {
+        fs.mkdirSync(parent, { recursive: true });
+      }
+      fs.renameSync(fromPath, toPath);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, reason: 'error' };
+    }
+  },
+
+  pathExists: function (targetPath) {
+    try {
+      return require('fs').existsSync(targetPath);
+    } catch (e) {
+      return false;
+    }
   },
 
   saveBackupFile: function (jsonString, defaultName) {

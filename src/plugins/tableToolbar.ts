@@ -72,7 +72,7 @@ function createToolbarDom(context: TableToolbarContext, actions: TableToolbarAct
   container.contentEditable = 'false'
 
   render(
-    h(TableToolbar, {
+    h(TableToolbar as any, {
       context,
       onAddRowBefore: actions.addRowBefore,
       onAddRowAfter: actions.addRowAfter,

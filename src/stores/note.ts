@@ -13,6 +13,9 @@ import { planSortOrderMigration } from '../utils/migrateNoteSortOrder'
 import { sortNotes } from '../utils/noteSort'
 import { runFolderImport, saveImportImageAsAsset } from '../utils/importFolderService'
 import { importMarkdownImages } from '../utils/importMarkdownImages'
+import { extractAssetIds } from '../utils/assetUri'
+import { sanitizeFilename } from '../utils/exportPdf'
+import { renderPathTemplate } from '../utils/pathTemplate'
 import type { ImportFolderOptions, ImportFolderProgress, ImportFolderResult, ImportFolderScanResult } from '../types/import'
 import type { Note, NoteListItem, Folder, TocJumpTarget, EditorContentPush, ImportedMarkdownFile } from '../types'
 import { extractNoteTitle } from '../utils/noteTitle'
@@ -35,6 +38,11 @@ const extractTitle = extractNoteTitle
 interface CreateNoteWithContentOptions {
   folderId?: string
   sourceFilePath?: string
+  workingFilePath?: string
+  assetDirectoryPath?: string
+  assetDirectoryTemplate?: string
+  assetPathMode?: 'internal' | 'file-bound'
+  assetLinkStyle?: 'absolute' | 'relative'
   title?: string
   titleLockedFromSource?: boolean
 }
@@ -47,6 +55,51 @@ interface ImportMarkdownFileResult {
 
 function shouldKeepImportedTitle(note: Pick<Note, 'titleLockedFromSource' | 'importSourcePath' | 'sourceFilePath'>): boolean {
   return !!(note.titleLockedFromSource || note.importSourcePath || note.sourceFilePath)
+}
+
+function mergeManagedAssetIds(note: Note, content: string): void {
+  const next = new Set(note.managedAssetIds ?? [])
+  for (const assetId of extractAssetIds(content)) {
+    next.add(assetId)
+  }
+  note.managedAssetIds = [...next]
+}
+
+function dirname(path: string): string {
+  const normalized = path.replace(/\//g, '\\')
+  const idx = normalized.lastIndexOf('\\')
+  return idx > 0 ? normalized.slice(0, idx) : normalized
+}
+
+function joinWindowsPath(base: string, name: string): string {
+  return `${base.replace(/[\\/]+$/, '')}\\${name.replace(/^[\\/]+/, '')}`
+}
+
+function buildWorkingFilePath(currentPath: string, title: string): string {
+  return joinWindowsPath(dirname(currentPath), `${sanitizeFilename(title)}.md`)
+}
+
+function buildAssetDirectoryPath(
+  workingFilePath: string,
+  template: string,
+  title: string
+): string {
+  const rendered = renderPathTemplate(template, {
+    filename: workingFilePath.replace(/\//g, '\\').split('\\').pop()?.replace(/\.md$/i, '') ?? '',
+    noteTitle: title,
+    date: new Date().toISOString().slice(0, 10),
+    time: new Date().toTimeString().slice(0, 8).replace(/:/g, ''),
+  })
+  if (/^[A-Za-z]:[\\/]/.test(rendered)) {
+    return rendered.replace(/\//g, '\\')
+  }
+  const normalizedRelative = rendered.replace(/^\.\//, '').replace(/^\.[\\]/, '')
+  return joinWindowsPath(dirname(workingFilePath), normalizedRelative)
+}
+
+function rewriteAssetDirectoryRefs(content: string, oldDirName: string, newDirName: string): string {
+  const escaped = oldDirName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return content.replace(new RegExp(escaped, 'g'), newDirName)
 }
 
 export const useNoteStore = defineStore('note', () => {
@@ -196,6 +249,7 @@ export const useNoteStore = defineStore('note', () => {
     const title = keepImportedTitle ? note.title : extractTitle(content)
     note.content = content
     note.title = title
+    mergeManagedAssetIds(note, content)
     note.updatedAt = Date.now()
     storage.saveNote(note)
     updateSearchIndex(noteId, content)
@@ -220,6 +274,7 @@ export const useNoteStore = defineStore('note', () => {
       title: '无标题',
       content: '# 无标题\n\n',
       folderId,
+      assetPathMode: 'internal',
       tags: [],
       createdAt: now,
       updatedAt: now
@@ -246,6 +301,12 @@ export const useNoteStore = defineStore('note', () => {
       content,
       folderId: options.folderId,
       sourceFilePath: options.sourceFilePath,
+      workingFilePath: options.workingFilePath,
+      assetDirectoryPath: options.assetDirectoryPath,
+      assetDirectoryTemplate: options.assetDirectoryTemplate,
+      assetPathMode: options.assetPathMode ?? 'internal',
+      assetLinkStyle: options.assetLinkStyle,
+      managedAssetIds: extractAssetIds(content),
       titleLockedFromSource: options.titleLockedFromSource,
       tags: [],
       createdAt: now,
@@ -320,18 +381,96 @@ export const useNoteStore = defineStore('note', () => {
   function renameNote(id: string, title: string) {
     const note = storage.getNote(id)
     if (!note) return
+    const oldAssetDirectoryPath = note.assetDirectoryPath
     note.title = title
     note.updatedAt = Date.now()
     delete note.importSourcePath
     delete note.sourceFilePath
     note.titleLockedFromSource = false
+
+    const shouldMigrateBoundPaths =
+      note.assetPathMode === 'file-bound'
+      && !!note.workingFilePath
+      && !!note.assetDirectoryPath
+      && !!note.assetDirectoryTemplate
+      && note.assetDirectoryTemplate.includes('${filename}')
+      && !!window.markflow.movePath
+
+    if (shouldMigrateBoundPaths) {
+      const nextWorkingFilePath = buildWorkingFilePath(note.workingFilePath!, title)
+      const nextAssetDirectoryPath = buildAssetDirectoryPath(
+        nextWorkingFilePath,
+        note.assetDirectoryTemplate!,
+        title
+      )
+      const workingConflict = window.markflow.pathExists?.(nextWorkingFilePath) ?? false
+      const assetConflict = window.markflow.pathExists?.(nextAssetDirectoryPath) ?? false
+
+      if (
+        !workingConflict
+        && !assetConflict
+        && nextWorkingFilePath !== note.workingFilePath
+        && nextAssetDirectoryPath !== note.assetDirectoryPath
+      ) {
+        const moveAssetResult = window.markflow.movePath?.(note.assetDirectoryPath!, nextAssetDirectoryPath)
+        const moveFileResult = window.markflow.movePath?.(note.workingFilePath!, nextWorkingFilePath)
+        if (moveAssetResult?.ok && moveFileResult?.ok) {
+          const oldDirName = oldAssetDirectoryPath!.replace(/\//g, '\\').split('\\').pop() ?? ''
+          const newDirName = nextAssetDirectoryPath.replace(/\//g, '\\').split('\\').pop() ?? ''
+          note.content = rewriteAssetDirectoryRefs(note.content, oldDirName, newDirName)
+          note.workingFilePath = nextWorkingFilePath
+          note.assetDirectoryPath = nextAssetDirectoryPath
+          if (window.markflow.writeTextFile) {
+            window.markflow.writeTextFile(nextWorkingFilePath, note.content)
+          }
+        }
+      }
+    }
+
     storage.saveNote(note)
     noteList.value = storage.getNoteList()
     if (currentNote.value?.id === id) {
       currentNote.value.title = title
+      currentNote.value.content = note.content
+      currentNote.value.workingFilePath = note.workingFilePath
+      currentNote.value.assetDirectoryPath = note.assetDirectoryPath
+      currentNote.value.assetDirectoryTemplate = note.assetDirectoryTemplate
       delete currentNote.value.importSourcePath
       delete currentNote.value.sourceFilePath
       currentNote.value.titleLockedFromSource = false
+    }
+  }
+
+  function bindNoteToWorkingFile(
+    noteId: string,
+    payload: {
+      workingFilePath: string
+      assetDirectoryPath: string
+      assetDirectoryTemplate?: string
+      assetLinkStyle: 'absolute' | 'relative'
+      content: string
+    }
+  ) {
+    const note = storage.getNote(noteId)
+    if (!note) return
+    note.workingFilePath = payload.workingFilePath
+    note.assetDirectoryPath = payload.assetDirectoryPath
+    note.assetDirectoryTemplate = payload.assetDirectoryTemplate
+    note.assetPathMode = 'file-bound'
+    note.assetLinkStyle = payload.assetLinkStyle
+    note.content = payload.content
+    mergeManagedAssetIds(note, payload.content)
+    note.updatedAt = Date.now()
+    storage.saveNote(note)
+    updateSearchIndex(noteId, payload.content)
+    const idx = noteList.value.findIndex((n) => n.id === noteId)
+    if (idx >= 0) {
+      noteList.value[idx].title = note.title
+      noteList.value[idx].updatedAt = note.updatedAt
+    }
+    if (currentNote.value?.id === noteId) {
+      currentNote.value = { ...note }
+      liveContent.value = payload.content
     }
   }
 
@@ -658,5 +797,6 @@ export const useNoteStore = defineStore('note', () => {
     setActiveTagFilter, setNoteTags, addTag, removeTag, toggleNotePinned, reorderNotes, getNoteContentById,
     exportLibraryBackup, downloadLibraryBackup, restoreLibraryBackup, notifySidebarStateChanged,
     batchImportFromFolder, clearAllLibraryData
+    , bindNoteToWorkingFile
   }
 })
