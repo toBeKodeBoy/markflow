@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import FormatToolbar from '../../../src/components/FormatToolbar.vue'
 
@@ -21,5 +21,43 @@ describe('FormatToolbar', () => {
     const wrapper = mount(FormatToolbar)
     await wrapper.get('[data-testid="toolbar-table"]').trigger('click')
     expect(wrapper.emitted('table')).toHaveLength(1)
+  })
+
+  it('renders the image upload trigger and hidden file input', () => {
+    const wrapper = mount(FormatToolbar)
+    expect(wrapper.find('[data-testid="toolbar-image-button"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="toolbar-image-input"]').exists()).toBe(true)
+  })
+
+  it('opens file picker when image upload button is clicked', async () => {
+    const wrapper = mount(FormatToolbar)
+    const input = wrapper.get('[data-testid="toolbar-image-input"]')
+    const clickSpy = vi.spyOn(input.element as HTMLInputElement, 'click')
+
+    await wrapper.get('[data-testid="toolbar-image-button"]').trigger('click')
+
+    expect(clickSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('emits imageUpload after selecting a local image and resets the input', async () => {
+    const wrapper = mount(FormatToolbar)
+    const input = wrapper.get('[data-testid="toolbar-image-input"]')
+    const file = new File(['demo'], 'demo.png', { type: 'image/png' })
+
+    Object.defineProperty(input.element, 'files', {
+      configurable: true,
+      value: [file],
+    })
+    Object.defineProperty(input.element, 'value', {
+      configurable: true,
+      writable: true,
+      value: 'C:\\fakepath\\demo.png',
+    })
+
+    await input.trigger('change')
+
+    expect(wrapper.emitted('imageUpload')).toHaveLength(1)
+    expect(wrapper.emitted('imageUpload')?.[0]?.[0]).toBe(file)
+    expect((input.element as HTMLInputElement).value).toBe('')
   })
 })

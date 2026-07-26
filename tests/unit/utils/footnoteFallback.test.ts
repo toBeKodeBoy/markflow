@@ -229,4 +229,73 @@ describe('footnoteFallback', () => {
       { id: 'tab', index: 1, content: '<p>第一行||第二行|第三行</p>' },
     ])
   })
+
+  it('不把代码块内的 [^id]: 行当作脚注定义剥离', () => {
+    const markdown = [
+      '正文引用[^real]。',
+      '',
+      '```md',
+      '[^sample]: 示例定义不应被剥离',
+      '正文[^sample]',
+      '```',
+      '',
+      '[^real]: 真实脚注',
+    ].join('\n')
+
+    const result = buildFootnoteFallback(markdown, (content) => `<p>${content}</p>`)
+    const html = parseMarkdown(markdown)
+
+    expect(result.content).toContain('```md\n[^sample]: 示例定义不应被剥离\n正文[^sample]\n```')
+    expect(result.footnotes).toEqual([
+      { id: 'real', index: 1, content: '<p>真实脚注</p>' },
+    ])
+    expect(html).toContain('language-md')
+    expect(html).toContain('示例定义不应被剥离')
+    expect(html).toContain('真实脚注')
+    // 示例定义只应出现在代码高亮区，不应成为文末脚注条目
+    expect(html).not.toMatch(/id="fn-2"/)
+    expect(html.match(/示例定义不应被剥离/g)).toHaveLength(1)
+  })
+
+  it('未引用的脚注定义仍进入文末区块，编号接在已引用之后', () => {
+    const markdown = [
+      '只引用了 a[^a]。',
+      '',
+      '[^b]: 未引用定义',
+      '[^a]: 已引用定义',
+    ].join('\n')
+
+    const result = buildFootnoteFallback(markdown, (content) => `<p>${content}</p>`)
+    const html = parseMarkdown(markdown)
+
+    expect(result.footnotes).toEqual([
+      { id: 'a', index: 1, content: '<p>已引用定义</p>' },
+      { id: 'b', index: 2, content: '<p>未引用定义</p>' },
+    ])
+    expect(html).toContain('id="fn-1"')
+    expect(html).toContain('id="fn-2"')
+    expect(html).toContain('已引用定义')
+    expect(html).toContain('未引用定义')
+  })
+
+  it('label 含 @ 时占位符仍能还原为上标', () => {
+    const markdown = [
+      '邮箱脚注[^user@host]。',
+      '',
+      '[^user@host]: 含 at 的定义',
+    ].join('\n')
+
+    const result = buildFootnoteFallback(markdown, (content) => `<p>${content}</p>`)
+    const html = parseMarkdown(markdown)
+
+    expect(result.content).toMatch(/@@FNREF:1:1:[^@]+@@/)
+    expect(result.content).not.toContain('@@FNREF:1:1:user@host@@')
+    expect(result.footnotes).toEqual([
+      { id: 'user@host', index: 1, content: '<p>含 at 的定义</p>' },
+    ])
+    expect(html).toContain('<sup class="footnote-ref"><a href="#fn-1" id="fnref-1">1</a></sup>')
+    expect(html).toContain('含 at 的定义')
+    expect(html).not.toContain('@@FNREF:')
+    expect(html).not.toContain('[^user@host]')
+  })
 })

@@ -62,19 +62,53 @@
     >
       1.
     </button>
+    <span class="sep" aria-hidden="true">|</span>
+    <button
+      type="button"
+      data-testid="focus-toolbar-image-button"
+      title="上传图片"
+      aria-label="上传图片"
+      @click="triggerImageUpload"
+    >
+      📷
+    </button>
+    <input
+      ref="imageInputRef"
+      data-testid="focus-toolbar-image-input"
+      type="file"
+      accept="image/*"
+      class="settings-hidden-input"
+      @change="onImageFileChange"
+    >
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
+
 defineProps<{ visible: boolean }>()
-defineEmits<{
+const emit = defineEmits<{
   bold: []
   italic: []
   h1: []
   h2: []
   bulletList: []
   orderedList: []
+  imageUpload: [file: File]
   mouseenter: []
   mouseleave: []
 }>()
+
+const imageInputRef = ref<HTMLInputElement>()
+
+function triggerImageUpload() {
+  imageInputRef.value?.click()
+}
+
+function onImageFileChange(event: Event) {
+  const input = event.target as HTMLInputElement | null
+  const file = input?.files?.[0]
+  if (file) emit('imageUpload', file)
+  if (input) input.value = ''
+}
 </script>

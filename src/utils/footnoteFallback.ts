@@ -1,6 +1,7 @@
 const FOOTNOTE_DEF_RE = /^\[\^([^\]\s]+)\]:[ \t]*(.*)$/
 const FOOTNOTE_REF_RE = /\[\^([^\]\s]+)\]/g
 const FOOTNOTE_REF_TEST_RE = /\[\^([^\]\s]+)\]/
+const FENCE_LINE_RE = /^(`{3,}|~{3,})/
 const FENCED_BLOCK_RE = /(```[\s\S]*?```|~~~[\s\S]*?~~~)/g
 const INLINE_CODE_RE = /(`[^`\n]+`)/g
 /** 仅还原脚注引用/定义前的 `\[`，不影响普通链接转义 */
@@ -29,9 +30,26 @@ function collectFootnoteDefinitions(markdown: string): { body: string; definitio
   const lines = markdown.split('\n')
   const definitions = new Map<string, string>()
   const body: string[] = []
+  let fenceMarker: string | null = null
 
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i]
+    const fenceMatch = FENCE_LINE_RE.exec(line)
+
+    if (fenceMarker) {
+      body.push(line)
+      if (fenceMatch && line.startsWith(fenceMarker) && /^[`~]*\s*$/.test(line.slice(fenceMarker.length))) {
+        fenceMarker = null
+      }
+      continue
+    }
+
+    if (fenceMatch) {
+      fenceMarker = fenceMatch[1]
+      body.push(line)
+      continue
+    }
+
     const match = FOOTNOTE_DEF_RE.exec(line)
     if (!match) {
       body.push(line)
@@ -68,7 +86,8 @@ function collectFootnoteDefinitions(markdown: string): { body: string; definitio
 }
 
 function makePlaceholder(index: number, resolved: boolean, id: string): string {
-  return `@@FNREF:${index}:${resolved ? '1' : '0'}:${id}@@`
+  // encodeURIComponent 去掉 @ 等分隔冲突字符，materialize 时再 decode
+  return `@@FNREF:${index}:${resolved ? '1' : '0'}:${encodeURIComponent(id)}@@`
 }
 
 function replaceRefs(segment: string, definitions: Map<string, string>, order: string[]): string {
@@ -120,8 +139,12 @@ export function buildFootnoteFallback(
 
   const order: string[] = []
   const content = transformRefs(body, definitions, order)
-  // order 仅含已定义 id，与占位符编号共用同一套序号
-  const footnotes = order.map((id, idx) => ({
+  // 先按首次引用编号，未引用定义接在后面（与 WYSIWYG buildFootnoteIndexMap 一致）
+  const footnoteIds = [
+    ...order,
+    ...[...definitions.keys()].filter((id) => !order.includes(id)),
+  ]
+  const footnotes = footnoteIds.map((id, idx) => ({
     id,
     index: idx + 1,
     content: renderMarkdown(definitions.get(id) ?? '').trim(),
@@ -151,7 +174,8 @@ export function appendFootnoteBackref(content: string, backref: string): string 
 
 /** 将 marked 输出中的脚注占位符替换为真实 <sup> HTML */
 export function materializeFootnotePlaceholders(html: string): string {
-  return html.replace(PLACEHOLDER_RE, (_, index: string, resolved: string, id: string) => {
+  return html.replace(PLACEHOLDER_RE, (_, index: string, resolved: string, encodedId: string) => {
+    const id = decodeURIComponent(encodedId)
     if (resolved === '1') {
       return `<sup class="footnote-ref"><a href="#fn-${index}" id="fnref-${index}">${index}</a></sup>`
     }

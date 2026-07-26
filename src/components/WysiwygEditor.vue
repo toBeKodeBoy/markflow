@@ -17,6 +17,7 @@
       @code-block="onToolbarCodeBlock"
       @table="onToolbarTable"
       @link="onToolbarLink"
+      @image-upload="onToolbarImageUpload"
     />
     <NoteTagsBar v-if="!focusMode && isActive" />
     <div class="wysiwyg-body">
@@ -47,13 +48,14 @@
       @h2="onToolbarH2"
       @bullet-list="onToolbarBulletList"
       @ordered-list="onToolbarOrderedList"
+      @image-upload="onToolbarImageUpload"
     />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { Editor, rootCtx, defaultValueCtx } from '@milkdown/core'
+import { Editor, rootCtx, defaultValueCtx, editorViewCtx } from '@milkdown/core'
 import { commonmark } from '@milkdown/preset-commonmark'
 import { gfm } from '@milkdown/preset-gfm'
 import { clipboard } from '@milkdown/plugin-clipboard'
@@ -65,7 +67,7 @@ import { useNoteStore } from '../stores/note'
 import { useEditorTabsStore } from '../stores/editorTabs'
 import { useTocJumpHandler } from '../composables/useTocJumpHandler'
 import { markdownPaste } from '../plugins/markdownPaste'
-import { imagePaste } from '../plugins/imagePaste'
+import { imagePaste, insertWysiwygImage } from '../plugins/imagePaste'
 import { imageScalePlugin } from '../plugins/imageScale'
 import { plainTextFallback } from '../plugins/plainTextFallback'
 import { highlightMarkPlugins } from '../plugins/highlightMark'
@@ -184,6 +186,15 @@ function onToolbarInlineCode() { wysiwygToggleInlineCode(editor) }
 function onToolbarCodeBlock() { wysiwygInsertCodeBlock(editor) }
 function onToolbarTable() { runTableAction(() => wysiwygInsertTable(editor)) }
 function onToolbarLink() { wysiwygInsertLink(editor) }
+function onToolbarImageUpload(file: File) {
+  if (!editor) return
+  let task: Promise<boolean> | null = null
+  editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx)
+    task = insertWysiwygImage(ctx, view, file)
+  })
+  if (task) void task
+}
 function runTableAction(action: () => void) {
   action()
   checkTableToolbar()

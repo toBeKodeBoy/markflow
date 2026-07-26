@@ -16,6 +16,7 @@
       @code-block="insertCodeBlock()"
       @table="insertTable()"
       @link="insertMarkdown('[', '](url)', '链接文字')"
+      @image-upload="onToolbarImageUpload"
     />
     <NoteTagsBar v-if="isActive" />
     <div ref="editorEl" class="cm-host"></div>
@@ -302,6 +303,10 @@ function insertMarkdownAtCursor(markdown: string) {
     selection: { anchor: sel.from + insert.length },
   })
   view.focus()
+}
+
+function onToolbarImageUpload(file: File) {
+  void handleImageInsert(file, insertMarkdownAtCursor)
 }
 
 function onPasteImage(e: ClipboardEvent) {

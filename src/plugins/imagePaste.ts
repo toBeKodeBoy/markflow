@@ -58,6 +58,14 @@ async function insertImageMarkdown(
   }
 }
 
+export async function insertWysiwygImage(
+  ctx: Ctx,
+  view: EditorView,
+  file: File
+): Promise<boolean> {
+  return insertImageMarkdown(ctx, view, file)
+}
+
 /// 粘贴/拖拽图片时保存为本地 asset 并插入 Markdown 引用
 export const imagePaste = $prose((ctx) => {
   return new Plugin({
