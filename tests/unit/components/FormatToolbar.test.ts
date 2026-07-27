@@ -23,6 +23,16 @@ describe('FormatToolbar', () => {
     expect(wrapper.emitted('table')).toHaveLength(1)
   })
 
+  it('renders the highlight action and emits highlight when clicked', async () => {
+    const wrapper = mount(FormatToolbar)
+
+    expect(wrapper.find('[data-testid="toolbar-highlight"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="toolbar-highlight"]').trigger('click')
+
+    expect(wrapper.emitted('highlight')).toHaveLength(1)
+  })
+
   it('renders the image upload trigger and hidden file input', () => {
     const wrapper = mount(FormatToolbar)
     expect(wrapper.find('[data-testid="toolbar-image-button"]').exists()).toBe(true)

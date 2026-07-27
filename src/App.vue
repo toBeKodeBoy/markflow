@@ -145,8 +145,8 @@ tabsStore.bootstrapAfterLoad()
 
 function setViewMode(mode: ViewMode) {
   tabsStore.flushActiveTab()
+  if (mode === 'focus') prevMode.value = viewMode.value
   if (mode === 'focus') {
-    prevMode.value = viewMode.value
     enterFullscreen()
   } else if (viewMode.value === 'focus' && isFullscreen.value) {
     exitFullscreen()
