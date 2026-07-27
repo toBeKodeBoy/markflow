@@ -16,9 +16,13 @@ import { Schema } from '@milkdown/prose/model'
 import { EditorState, TextSelection } from '@milkdown/prose/state'
 import { EditorView } from '@milkdown/prose/view'
 import {
+  readWysiwygHighlightSelection,
+  wysiwygApplyHighlight,
   wysiwygToggleInlineCode,
   wysiwygInsertTable,
   wysiwygInsertLink,
+  wysiwygApplyLink,
+  readWysiwygLinkSelection,
   wysiwygAddRowBefore,
   wysiwygAddRowAfter,
   wysiwygAddColBefore,
@@ -45,9 +49,13 @@ const schema = new Schema({
       toDOM: () => ['code', 0] as const,
       parseDOM: [{ tag: 'code' }],
     },
+    highlight: {
+      toDOM: () => ['mark', { class: 'highlight-mark' }, 0] as const,
+      parseDOM: [{ tag: 'mark.highlight-mark' }],
+    },
     link: {
-      attrs: { href: {} },
-      toDOM: (mark) => ['a', { href: mark.attrs.href }, 0] as const,
+      attrs: { href: {}, title: { default: null } },
+      toDOM: (mark) => ['a', { href: mark.attrs.href, title: mark.attrs.title ?? null }, 0] as const,
       parseDOM: [{ tag: 'a[href]' }],
     },
   },
@@ -219,6 +227,140 @@ describe('wysiwygInsertLink', () => {
 
     expect(view.state.doc.textContent).toContain('链接文字')
     expect(view.state.doc.textContent).not.toBe('hello')
+    view.destroy()
+  })
+})
+
+describe('wysiwyg highlight helpers', () => {
+  it('reads the current text selection for highlight operations', () => {
+    const view = createView('hello world')
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1, 6)))
+    const editor = createEditorWithCommands(view, vi.fn())
+
+    const snapshot = readWysiwygHighlightSelection(editor)
+
+    expect(snapshot).toEqual({
+      from: 1,
+      to: 6,
+      text: 'hello',
+      empty: false,
+    })
+    view.destroy()
+  })
+
+  it('applies highlight mark to the selected text', () => {
+    const view = createView('hello world')
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1, 6)))
+    const editor = createEditorWithCommands(view, vi.fn())
+    const snapshot = readWysiwygHighlightSelection(editor)
+
+    expect(snapshot).toBeTruthy()
+    if (!snapshot) return
+
+    wysiwygApplyHighlight(editor, snapshot, 'hello')
+
+    const marks = view.state.doc.resolve(1).marks()
+    expect(marks.some((mark) => mark.type.name === 'highlight')).toBe(true)
+    expect(view.state.doc.textContent).toBe('hello world')
+    view.destroy()
+  })
+
+  it('inserts new highlight text for a collapsed selection', () => {
+    const view = createView('world')
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1)))
+    const editor = createEditorWithCommands(view, vi.fn())
+    const snapshot = readWysiwygHighlightSelection(editor)
+
+    expect(snapshot).toBeTruthy()
+    if (!snapshot) return
+
+    wysiwygApplyHighlight(editor, snapshot, '重点')
+
+    expect(view.state.doc.textContent).toBe('重点world')
+    const marks = view.state.doc.resolve(1).marks()
+    expect(marks.some((mark) => mark.type.name === 'highlight')).toBe(true)
+    view.destroy()
+  })
+})
+
+describe('readWysiwygLinkSelection', () => {
+  it('应在空选区时返回默认链接文本', () => {
+    const view = createView('hello')
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1)))
+    const editor = createEditorWithCommands(view, vi.fn())
+
+    const snapshot = readWysiwygLinkSelection(editor)
+
+    expect(snapshot?.text).toBe('链接文字')
+    expect(snapshot?.editingExistingLink).toBe(false)
+    view.destroy()
+  })
+
+  it('光标位于已有链接中时应返回现有链接草稿', () => {
+    const view = createView('hello world')
+    const link = schema.marks.link.create({ href: 'https://old.example', title: '旧标题' })
+    let tr = view.state.tr.addMark(1, 6, link)
+    tr = tr.setSelection(TextSelection.create(tr.doc, 2))
+    view.dispatch(tr)
+    const editor = createEditorWithCommands(view, vi.fn())
+
+    const snapshot = readWysiwygLinkSelection(editor)
+
+    expect(snapshot?.editingExistingLink).toBe(true)
+    expect(snapshot?.text).toBe('hello')
+    expect(snapshot?.url).toBe('https://old.example')
+    expect(snapshot?.title).toBe('旧标题')
+    view.destroy()
+  })
+})
+
+describe('wysiwygApplyLink', () => {
+  it('应在空选区时插入带 title 的链接', () => {
+    const view = createView('hello')
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1)))
+    const editor = createEditorWithCommands(view, vi.fn())
+    const snapshot = readWysiwygLinkSelection(editor)
+
+    expect(snapshot).toBeTruthy()
+    if (!snapshot) return
+
+    wysiwygApplyLink(editor, snapshot, {
+      text: 'OpenAI',
+      url: 'https://openai.com',
+      title: '官网',
+    })
+
+    expect(view.state.doc.textContent.startsWith('OpenAI')).toBe(true)
+    const marks = view.state.doc.resolve(1).marks()
+    const linkMark = marks.find((mark) => mark.type.name === 'link')
+    expect(linkMark?.attrs.href).toBe('https://openai.com')
+    expect(linkMark?.attrs.title).toBe('官网')
+    view.destroy()
+  })
+
+  it('应更新已有链接的 href、title 和文本', () => {
+    const view = createView('hello world')
+    const link = schema.marks.link.create({ href: 'https://old.example', title: '旧标题' })
+    let tr = view.state.tr.addMark(1, 6, link)
+    tr = tr.setSelection(TextSelection.create(tr.doc, 3))
+    view.dispatch(tr)
+    const editor = createEditorWithCommands(view, vi.fn())
+    const snapshot = readWysiwygLinkSelection(editor)
+
+    expect(snapshot).toBeTruthy()
+    if (!snapshot) return
+
+    wysiwygApplyLink(editor, snapshot, {
+      text: 'OpenAI',
+      url: 'https://openai.com',
+      title: '官网',
+    })
+
+    expect(view.state.doc.textContent).toBe('OpenAI world')
+    const marks = view.state.doc.resolve(1).marks()
+    const linkMark = marks.find((mark) => mark.type.name === 'link')
+    expect(linkMark?.attrs.href).toBe('https://openai.com')
+    expect(linkMark?.attrs.title).toBe('官网')
     view.destroy()
   })
 })

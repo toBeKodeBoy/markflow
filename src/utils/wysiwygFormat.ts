@@ -16,11 +16,27 @@ import { TextSelection } from '@milkdown/prose/state'
 import { setBlockType, toggleMark, wrapIn } from '@milkdown/prose/commands'
 import { wrapInList } from '@milkdown/prose/schema-list'
 import type { EditorView } from '@milkdown/prose/view'
-import type { Schema } from '@milkdown/prose/model'
+import type { Mark, Schema } from '@milkdown/prose/model'
 import { INLINE_CODE_PLACEHOLDER } from './inlineCode'
+import { DEFAULT_LINK_TEXT, type LinkDraft } from './linkEditing'
 
-const LINK_PLACEHOLDER_TEXT = '链接文字'
 const LINK_PLACEHOLDER_URL = 'url'
+
+export interface WysiwygLinkSelection {
+  from: number
+  to: number
+  text: string
+  url: string
+  title: string
+  editingExistingLink: boolean
+}
+
+export interface WysiwygHighlightSelection {
+  from: number
+  to: number
+  text: string
+  empty: boolean
+}
 
 function runEditorCommand(editor: Editor, runner: (view: EditorView, schema: Schema) => void) {
   editor.action((ctx) => {
@@ -82,6 +98,141 @@ function wrapInListType(editor: Editor, listName: string) {
   })
 }
 
+function findActiveLinkMarkRange(view: EditorView, schema: Schema): WysiwygLinkSelection | null {
+  const link = schema.marks.link
+  if (!link) return null
+
+  const { selection, doc } = view.state
+  const { from, to, empty, $from } = selection
+
+  if (!empty) {
+    const mark = link.isInSet(doc.resolve(from).marks())
+    if (!mark) return null
+    return {
+      from,
+      to,
+      text: doc.textBetween(from, to, ''),
+      url: mark.attrs.href ?? '',
+      title: mark.attrs.title ?? '',
+      editingExistingLink: true,
+    }
+  }
+
+  const parent = $from.parent
+  const parentStart = $from.start()
+  let active: WysiwygLinkSelection | null = null
+
+  parent.forEach((node, offset) => {
+    if (active) return
+    const mark = link.isInSet(node.marks)
+    if (!mark) return
+    const start = parentStart + offset
+    const end = start + node.nodeSize
+    if (from < start || from > end) return
+    active = {
+      from: start,
+      to: end,
+      text: doc.textBetween(start, end, ''),
+      url: mark.attrs.href ?? '',
+      title: mark.attrs.title ?? '',
+      editingExistingLink: true,
+    }
+  })
+
+  return active
+}
+
+function replaceTextAndMark(
+  view: EditorView,
+  linkMark: Mark,
+  from: number,
+  to: number,
+  nextText: string,
+) {
+  let tr = view.state.tr.insertText(nextText, from, to)
+  const end = from + nextText.length
+  tr = tr.removeMark(from, end, linkMark.type)
+  tr = tr.addMark(from, end, linkMark)
+  tr = tr.setSelection(TextSelection.create(tr.doc, from, end))
+  view.dispatch(tr)
+}
+
+function applyTextMark(
+  view: EditorView,
+  mark: Mark,
+  from: number,
+  to: number,
+  nextText: string,
+) {
+  let tr = view.state.tr.insertText(nextText, from, to)
+  const end = from + nextText.length
+  tr = tr.removeMark(from, end, mark.type)
+  tr = tr.addMark(from, end, mark)
+  tr = tr.setSelection(TextSelection.create(tr.doc, from, end))
+  view.dispatch(tr)
+}
+
+export function wysiwygApplyHighlight(
+  editor: Editor | null,
+  snapshot: WysiwygHighlightSelection,
+  text: string,
+) {
+  if (!editor) return
+  runEditorCommand(editor, (view, schema) => {
+    const highlight = schema.marks.highlight
+    if (!highlight) return
+    const nextText = text.trim() || snapshot.text
+    if (!nextText) return
+    applyTextMark(view, highlight.create(), snapshot.from, snapshot.to, nextText)
+  })
+}
+
+export function readWysiwygLinkSelection(editor: Editor | null): WysiwygLinkSelection | null {
+  if (!editor) return null
+  let snapshot: WysiwygLinkSelection | null = null
+
+  editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx)
+    const schema = ctx.get(schemaCtx)
+    const activeLink = findActiveLinkMarkRange(view, schema)
+    if (activeLink) {
+      snapshot = activeLink
+      return
+    }
+
+    const { from, to, empty } = view.state.selection
+    const selectedText = empty ? DEFAULT_LINK_TEXT : view.state.doc.textBetween(from, to, '')
+    snapshot = {
+      from,
+      to,
+      text: selectedText || DEFAULT_LINK_TEXT,
+      url: '',
+      title: '',
+      editingExistingLink: false,
+    }
+  })
+
+  return snapshot
+}
+
+export function readWysiwygHighlightSelection(editor: Editor | null): WysiwygHighlightSelection | null {
+  if (!editor) return null
+  let snapshot: WysiwygHighlightSelection | null = null
+
+  editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx)
+    const { from, to, empty } = view.state.selection
+    snapshot = {
+      from,
+      to,
+      text: empty ? '' : view.state.doc.textBetween(from, to, ''),
+      empty,
+    }
+  })
+
+  return snapshot
+}
+
 export function wysiwygToggleBold(editor: Editor | null) {
   if (!editor) return
   toggleNamedMark(editor, 'strong')
@@ -100,6 +251,11 @@ export function wysiwygToggleStrike(editor: Editor | null) {
 export function wysiwygToggleUnderline(editor: Editor | null) {
   if (!editor) return
   toggleNamedMark(editor, 'underline')
+}
+
+export function wysiwygToggleHighlight(editor: Editor | null) {
+  if (!editor) return
+  toggleNamedMark(editor, 'highlight')
 }
 
 export function wysiwygToggleInlineCode(editor: Editor | null) {
@@ -272,24 +428,33 @@ export function wysiwygDeleteTable(editor: Editor | null) {
   callGfmCommand(editor, deleteSelectedCellsCommand)
 }
 
-export function wysiwygInsertLink(editor: Editor | null) {
+export function wysiwygApplyLink(
+  editor: Editor | null,
+  snapshot: WysiwygLinkSelection,
+  draft: LinkDraft,
+) {
   if (!editor) return
   runEditorCommand(editor, (view, schema) => {
     const link = schema.marks.link
     if (!link) return
-    const { from, to, empty } = view.state.selection
-    let tr = view.state.tr
-    const linkText = empty ? LINK_PLACEHOLDER_TEXT : view.state.doc.textBetween(from, to, '')
-    if (!linkText) return
 
-    if (empty) {
-      tr = tr.insertText(linkText, from, to)
-    }
+    const nextText = draft.text.trim() || snapshot.text || DEFAULT_LINK_TEXT
+    const nextUrl = draft.url
+    const nextTitle = draft.title.trim() || null
+    const linkMark = link.create({ href: nextUrl, title: nextTitle })
 
-    const end = empty ? from + linkText.length : to
-    tr = tr.addMark(from, end, link.create({ href: LINK_PLACEHOLDER_URL }))
-    tr = tr.setSelection(TextSelection.create(tr.doc, from, end))
-    view.dispatch(tr)
+    replaceTextAndMark(view, linkMark, snapshot.from, snapshot.to, nextText)
+  })
+}
+
+export function wysiwygInsertLink(editor: Editor | null) {
+  if (!editor) return
+  const snapshot = readWysiwygLinkSelection(editor)
+  if (!snapshot) return
+  wysiwygApplyLink(editor, snapshot, {
+    text: snapshot.text,
+    url: snapshot.url || LINK_PLACEHOLDER_URL,
+    title: snapshot.title,
   })
 }
 

@@ -6,6 +6,7 @@
       @italic="insertMarkdown('*', '*', '斜体')"
       @strike="insertMarkdown('~~', '~~', '删除线')"
       @underline="insertUnderline()"
+      @highlight="onToolbarHighlight"
       @h1="insertLine('# ')"
       @h2="insertLine('## ')"
       @h3="insertLine('### ')"
@@ -15,28 +16,51 @@
       @inline-code="insertInlineCode()"
       @code-block="insertCodeBlock()"
       @table="insertTable()"
-      @link="insertMarkdown('[', '](url)', '链接文字')"
+      @link="openLinkDialog()"
       @image-upload="onToolbarImageUpload"
     />
     <NoteTagsBar v-if="isActive" />
     <div ref="editorEl" class="cm-host"></div>
+    <LinkDialog
+      :visible="linkDialogVisible"
+      :draft="linkDraft"
+      @confirm="confirmLinkDialog"
+      @cancel="closeLinkDialog"
+    />
+    <HighlightTextModal
+      :visible="highlightDialogVisible"
+      :initial-text="highlightDialogText"
+      @confirm="confirmHighlightDialog"
+      @cancel="closeHighlightDialog"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
-import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } from '@codemirror/view'
-import { EditorState, Compartment, Prec } from '@codemirror/state'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { closeBracketsKeymap } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
+import { EditorSelection, EditorState, Compartment, Prec } from '@codemirror/state'
 import { oneDark } from '@codemirror/theme-one-dark'
+import { EditorView, drawSelection, highlightActiveLine, keymap, lineNumbers } from '@codemirror/view'
 import { autoCloseBracketsExtensions } from '../extensions/autoCloseBrackets'
+import { useScrollSync } from '../composables/useScrollSync'
+import { useEditorTabsStore } from '../stores/editorTabs'
+import { useNoteStore } from '../stores/note'
 import { buildInlineCodeInsert } from '../utils/inlineCode'
 import { getImageFileFromDataTransfer, handleImageInsert } from '../utils/imageInsert'
-import { useNoteStore } from '../stores/note'
-import { useEditorTabsStore } from '../stores/editorTabs'
-import { useScrollSync } from '../composables/useScrollSync'
+import {
+  getInitialLinkDraft,
+  isLinkEditFailure,
+  readSourceLinkSelection,
+  replaceMarkdownSelectionWithLink,
+  type LinkDraft,
+  type SourceLinkSelection,
+} from '../utils/linkEditing'
+import { showAppNotification } from '../utils/notify'
 import FormatToolbar from './FormatToolbar.vue'
+import HighlightTextModal from './HighlightTextModal.vue'
+import LinkDialog from './LinkDialog.vue'
 import NoteTagsBar from './NoteTagsBar.vue'
 
 const props = defineProps<{ noteId: string }>()
@@ -48,29 +72,30 @@ const editorEl = ref<HTMLElement>()
 let view: EditorView | null = null
 
 const isActive = computed(() => tabsStore.activeTabId === props.noteId)
-
 const isDark = computed(() => document.documentElement.getAttribute('data-theme') === 'dark')
-
 const charCount = computed(() => {
   const tab = tabsStore.tabs.find((t) => t.noteId === props.noteId)
   return tab?.liveContent.length ?? 0
 })
 
+const linkDialogVisible = ref(false)
+const linkDraft = ref<LinkDraft>(getInitialLinkDraft(''))
+const highlightDialogVisible = ref(false)
+const highlightDialogText = ref('')
+let pendingLinkSelection: SourceLinkSelection | null = null
+let pendingHighlightSelection: { from: number; to: number } | null = null
 let updateTimer: ReturnType<typeof setTimeout> | null = null
-/** 编辑器未就绪时暂存外部写入（如插入目录），初始化后自动应用 */
 let pendingEditorPush: string | null = null
+let scrollerEl: HTMLElement | null = null
+
+const themeCompartment = new Compartment()
 
 function applyEditorPush(content: string) {
   if (!view) return
   if (view.state.doc.toString() === content) return
-  view.dispatch({
-    changes: { from: 0, to: view.state.doc.length, insert: content },
-  })
+  view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: content } })
 }
-/** 主题切换 Compartment：动态更新 oneDark 扩展，无需重建编辑器实例 */
-const themeCompartment = new Compartment()
 
-/** 构建 CodeMirror 扩展集合（历史/行号/高亮/Markdown/快捷键/主题） */
 function buildExtensions() {
   const exts = [
     history(),
@@ -91,38 +116,40 @@ function buildExtensions() {
       indentWithTab,
     ]),
     EditorView.updateListener.of((update) => {
-      if (update.docChanged) {
-        const content = update.state.doc.toString()
-        tabsStore.setTabLiveContent(props.noteId, content)
-        if (updateTimer) clearTimeout(updateTimer)
-        updateTimer = setTimeout(() => {
-          store.updateNoteContent(props.noteId, content)
-          const tab = tabsStore.tabs.find((t) => t.noteId === props.noteId)
-          if (tab) tab.savedContent = content
-        }, 300)
-      }
+      if (!update.docChanged) return
+      const content = update.state.doc.toString()
+      tabsStore.setTabLiveContent(props.noteId, content)
+      if (updateTimer) clearTimeout(updateTimer)
+      updateTimer = setTimeout(() => {
+        store.updateNoteContent(props.noteId, content)
+        const tab = tabsStore.tabs.find((t) => t.noteId === props.noteId)
+        if (tab) tab.savedContent = content
+      }, 300)
     }),
     EditorView.theme({
       '&': { height: '100%', fontSize: 'var(--editor-font-size, 14px)' },
       '.cm-scroller': { fontFamily: 'var(--editor-font-family, var(--font-mono))', overflow: 'auto' },
       '.cm-content': { padding: '16px' },
-    })
+    }),
   ]
-  // 使用 Compartment 动态切换主题，避免销毁重建编辑器
   exts.push(themeCompartment.of(isDark.value ? oneDark : []))
   return exts
 }
 
-/** 初始化 CodeMirror 编辑器实例，销毁旧实例并绑定滚动监听 */
 function initEditor(content: string) {
-  if (view) { view.destroy(); view = null }
+  if (view) {
+    view.destroy()
+    view = null
+  }
   scrollerEl?.removeEventListener('scroll', onEditorScroll)
   if (!editorEl.value) return
-  const state = EditorState.create({
-    doc: content ?? '',
-    extensions: buildExtensions()
+  view = new EditorView({
+    state: EditorState.create({
+      doc: content ?? '',
+      extensions: buildExtensions(),
+    }),
+    parent: editorEl.value,
   })
-  view = new EditorView({ state, parent: editorEl.value })
   attachScrollListener()
   if (pendingEditorPush !== null) {
     const push = pendingEditorPush
@@ -142,41 +169,35 @@ watch(
       return
     }
     applyEditorPush(push.content)
-  }
+  },
 )
 
 watch(
   () => store.tocJumpTarget?.id,
   () => {
-    if (!isActive.value) return
+    if (!isActive.value || !view) return
     const target = store.tocJumpTarget
-    if (!target || !view) return
+    if (!target) return
     const docLine = target.line + 1
     if (docLine < 1 || docLine > view.state.doc.lines) return
     const line = view.state.doc.line(docLine)
     view.dispatch({
-      effects: EditorView.scrollIntoView(line.from, { y: 'start', yMargin: 16 })
+      effects: EditorView.scrollIntoView(line.from, { y: 'start', yMargin: 16 }),
     })
-  }
+  },
 )
 
 watch(isDark, () => {
   if (!view) return
-  view.dispatch({
-    effects: themeCompartment.reconfigure(isDark.value ? oneDark : [])
-  })
+  view.dispatch({ effects: themeCompartment.reconfigure(isDark.value ? oneDark : []) })
 })
 
-let scrollerEl: HTMLElement | null = null
-
-/** 为 .cm-scroller 绑定滚动同步事件 */
 function attachScrollListener() {
   scrollerEl = editorEl.value?.querySelector('.cm-scroller') ?? null
   if (!scrollerEl) return
   scrollerEl.addEventListener('scroll', onEditorScroll)
 }
 
-/** 编辑器滚动回调：计算滚动比例并同步到 useScrollSync（仅激活 Tab） */
 function onEditorScroll() {
   if (!isActive.value || !scrollerEl) return
   const { scrollTop, scrollHeight, clientHeight } = scrollerEl
@@ -189,11 +210,10 @@ onMounted(() => {
   initEditor(tab?.liveContent ?? '')
   attachScrollListener()
   const host = editorEl.value
-  if (host) {
-    host.addEventListener('paste', onPasteImage)
-    host.addEventListener('dragover', onDragOverImage)
-    host.addEventListener('drop', onDropImage)
-  }
+  if (!host) return
+  host.addEventListener('paste', onPasteImage)
+  host.addEventListener('dragover', onDragOverImage)
+  host.addEventListener('drop', onDropImage)
 })
 
 onBeforeUnmount(() => {
@@ -218,39 +238,67 @@ onBeforeUnmount(() => {
   view?.destroy()
 })
 
-// Toolbar helpers
-/** 工具栏：在选中文本前后插入 Markdown 标记（加粗/斜体/链接等） */
 function insertMarkdown(before: string, after: string, placeholder: string) {
   if (!view) return
   const sel = view.state.selection.main
   const selected = view.state.sliceDoc(sel.from, sel.to) || placeholder
   view.dispatch({
     changes: { from: sel.from, to: sel.to, insert: before + selected + after },
-    selection: { anchor: sel.from + before.length, head: sel.from + before.length + selected.length }
+    selection: {
+      anchor: sel.from + before.length,
+      head: sel.from + before.length + selected.length,
+    },
   })
   view.focus()
 }
 
-/** 快捷键：Ctrl+U 插入下划线标签，作为 CodeMirror Command 返回 boolean */
 function insertUnderline(): boolean {
   if (!view) return false
   insertMarkdown('<u>', '</u>', '下划线')
   return true
 }
 
-/** 工具栏：在当前行首插入前缀（标题/列表/引用等） */
+function onToolbarHighlight() {
+  if (!view) return
+  const { from, to, empty } = view.state.selection.main
+  if (!empty) {
+    insertMarkdown('==', '==', '高亮文本')
+    return
+  }
+  pendingHighlightSelection = { from, to }
+  highlightDialogText.value = ''
+  highlightDialogVisible.value = true
+}
+
+function closeHighlightDialog() {
+  highlightDialogVisible.value = false
+  highlightDialogText.value = ''
+  pendingHighlightSelection = null
+}
+
+function confirmHighlightDialog(text: string) {
+  if (!view || !pendingHighlightSelection) return
+  const { from, to } = pendingHighlightSelection
+  const insert = `==${text}==`
+  view.dispatch({
+    changes: { from, to, insert },
+    selection: EditorSelection.single(from + insert.length),
+  })
+  closeHighlightDialog()
+  view.focus()
+}
+
 function insertLine(prefix: string) {
   if (!view) return
   const sel = view.state.selection.main
   const line = view.state.doc.lineAt(sel.from)
   view.dispatch({
     changes: { from: line.from, to: line.from, insert: prefix },
-    selection: { anchor: line.from + prefix.length + (sel.from - line.from) }
+    selection: { anchor: line.from + prefix.length + (sel.from - line.from) },
   })
   view.focus()
 }
 
-/** 工具栏 / 快捷键：插入行内代码（单个反引号包裹，与文字同行） */
 function insertInlineCode() {
   if (!view) return
   const sel = view.state.selection.main
@@ -263,14 +311,12 @@ function insertInlineCode() {
   view.focus()
 }
 
-/** 快捷键：Ctrl+E 插入行内代码 */
 function insertInlineCodeCommand(): boolean {
   if (!view) return false
   insertInlineCode()
   return true
 }
 
-/** 工具栏：插入代码块，默认带 language 占位符便于用户替换 */
 function insertCodeBlock() {
   if (!view) return
   const sel = view.state.selection.main
@@ -279,12 +325,11 @@ function insertCodeBlock() {
   const block = `\`\`\`${lang}\n${selected || '// 代码'}\n\`\`\``
   view.dispatch({
     changes: { from: sel.from, to: sel.to, insert: block },
-    selection: { anchor: sel.from + 4, head: sel.from + 4 + lang.length }
+    selection: { anchor: sel.from + 4, head: sel.from + 4 + lang.length },
   })
   view.focus()
 }
 
-/** 工具栏：插入 Markdown 表格模板 */
 function insertTable() {
   if (!view) return
   const table = '\n| 标题1 | 标题2 | 标题3 |\n| --- | --- | --- |\n| 内容 | 内容 | 内容 |\n'
@@ -305,27 +350,71 @@ function insertMarkdownAtCursor(markdown: string) {
   view.focus()
 }
 
+function openLinkDialog() {
+  if (!view) return
+  const selection = readSourceLinkSelection(view.state.doc.toString(), {
+    from: view.state.selection.main.from,
+    to: view.state.selection.main.to,
+  })
+  if (isLinkEditFailure(selection)) {
+    showAppNotification(selection.reason)
+    return
+  }
+  pendingLinkSelection = selection
+  linkDraft.value = {
+    text: selection.text,
+    url: selection.url,
+    title: selection.title,
+  }
+  linkDialogVisible.value = true
+}
+
+function closeLinkDialog() {
+  linkDialogVisible.value = false
+}
+
+function confirmLinkDialog(draft: LinkDraft) {
+  if (!view || !pendingLinkSelection) return
+  const result = replaceMarkdownSelectionWithLink(view.state.doc.toString(), pendingLinkSelection, draft)
+  if (!result.ok) {
+    showAppNotification(result.reason)
+    return
+  }
+  view.dispatch({
+    changes: { from: 0, to: view.state.doc.length, insert: result.content },
+    selection: { anchor: result.selection.from, head: result.selection.to },
+  })
+  linkDialogVisible.value = false
+  view.focus()
+}
+
 function onToolbarImageUpload(file: File) {
   void handleImageInsert(file, insertMarkdownAtCursor)
 }
 
-function onPasteImage(e: ClipboardEvent) {
-  const file = e.clipboardData ? getImageFileFromDataTransfer(e.clipboardData) : null
+function onPasteImage(event: ClipboardEvent) {
+  const file = event.clipboardData ? getImageFileFromDataTransfer(event.clipboardData) : null
   if (!file) return
-  e.preventDefault()
+  event.preventDefault()
   void handleImageInsert(file, insertMarkdownAtCursor)
 }
 
-function onDragOverImage(e: DragEvent) {
-  const file = e.dataTransfer ? getImageFileFromDataTransfer(e.dataTransfer) : null
+function onDragOverImage(event: DragEvent) {
+  const file = event.dataTransfer ? getImageFileFromDataTransfer(event.dataTransfer) : null
   if (!file) return
-  e.preventDefault()
+  event.preventDefault()
 }
 
-function onDropImage(e: DragEvent) {
-  const file = e.dataTransfer ? getImageFileFromDataTransfer(e.dataTransfer) : null
+function onDropImage(event: DragEvent) {
+  const file = event.dataTransfer ? getImageFileFromDataTransfer(event.dataTransfer) : null
   if (!file) return
-  e.preventDefault()
+  event.preventDefault()
   void handleImageInsert(file, insertMarkdownAtCursor)
 }
+
+defineExpose({
+  get view() {
+    return view
+  },
+})
 </script>

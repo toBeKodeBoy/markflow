@@ -24,6 +24,15 @@
     >
       <i>I</i>
     </button>
+    <button
+      type="button"
+      data-testid="focus-toolbar-highlight"
+      title="高亮显示"
+      aria-label="高亮显示"
+      @click="$emit('highlight')"
+    >
+      高亮
+    </button>
     <span class="sep" aria-hidden="true">|</span>
     <button
       type="button"
@@ -87,9 +96,11 @@
 import { ref } from 'vue'
 
 defineProps<{ visible: boolean }>()
+
 const emit = defineEmits<{
   bold: []
   italic: []
+  highlight: []
   h1: []
   h2: []
   bulletList: []

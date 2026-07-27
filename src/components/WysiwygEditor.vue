@@ -7,6 +7,7 @@
       @italic="onToolbarItalic"
       @strike="onToolbarStrike"
       @underline="onToolbarUnderline"
+      @highlight="onToolbarHighlight"
       @h1="onToolbarH1"
       @h2="onToolbarH2"
       @h3="onToolbarH3"
@@ -44,11 +45,24 @@
       @mouseleave="onFocusToolbarLeave"
       @bold="onToolbarBold"
       @italic="onToolbarItalic"
+      @highlight="onToolbarHighlight"
       @h1="onToolbarH1"
       @h2="onToolbarH2"
       @bullet-list="onToolbarBulletList"
       @ordered-list="onToolbarOrderedList"
       @image-upload="onToolbarImageUpload"
+    />
+    <LinkDialog
+      :visible="linkDialogVisible"
+      :draft="linkDraft"
+      @confirm="confirmLinkDialog"
+      @cancel="closeLinkDialog"
+    />
+    <HighlightTextModal
+      :visible="highlightDialogVisible"
+      :initial-text="highlightDialogText"
+      @confirm="confirmHighlightDialog"
+      @cancel="closeHighlightDialog"
     />
   </div>
 </template>
@@ -81,6 +95,7 @@ import { footnoteDisplayPlugins } from '../plugins/footnoteDisplay'
 import { footnoteAutoConvertPlugins } from '../plugins/footnoteAutoConvert'
 import { autoCloseBracketsPlugin } from '../plugins/autoCloseBrackets'
 import { normalizeMarkdownForParse } from '../utils/markedSetup'
+import { showAppNotification } from '../utils/notify'
 import {
   handleCodeCopyCaptureClick,
   handleCodeCopyCaptureMouseDown,
@@ -90,11 +105,17 @@ import { handlePreviewFragmentClick } from '../utils/previewFragmentNav'
 import { resolveMarkdownForDisplay, persistMarkdownAssets } from '../utils/resolveMarkdownAssets'
 import FormatToolbar from './FormatToolbar.vue'
 import FocusFormatToolbar from './FocusFormatToolbar.vue'
+import HighlightTextModal from './HighlightTextModal.vue'
+import LinkDialog from './LinkDialog.vue'
 import TableToolbar from './TableToolbar.vue'
 import NoteTagsBar from './NoteTagsBar.vue'
 import { useFocusToolbarVisibility } from '../composables/useFocusToolbarVisibility'
 import { getTableToolbarDecorations, useTableToolbar } from '../composables/useTableToolbar'
 import {
+  readWysiwygHighlightSelection,
+  wysiwygApplyHighlight,
+  readWysiwygLinkSelection,
+  wysiwygApplyLink,
   wysiwygToggleBold,
   wysiwygToggleItalic,
   wysiwygToggleStrike,
@@ -107,7 +128,6 @@ import {
   wysiwygToggleTaskItem,
   wysiwygInsertCodeBlock,
   wysiwygInsertTable,
-  wysiwygInsertLink,
   wysiwygAddRowBefore,
   wysiwygAddRowAfter,
   wysiwygAddColBefore,
@@ -116,7 +136,9 @@ import {
   wysiwygDeleteRow,
   wysiwygDeleteCol,
   wysiwygDeleteTable,
+  type WysiwygLinkSelection,
 } from '../utils/wysiwygFormat'
+import { getInitialLinkDraft, type LinkDraft } from '../utils/linkEditing'
 
 /** 粘贴 HTML 清洗：剥离 ProseMirror schema 不兼容的元素，防止 replaceSelection 异常触发静默粘贴失败 */
 function sanitizePastedHTML(html: string): string {
@@ -150,6 +172,12 @@ const store = useNoteStore()
 const tabsStore = useEditorTabsStore()
 const containerRef = ref<HTMLDivElement>()
 let editor: Editor | null = null
+const linkDialogVisible = ref(false)
+const linkDraft = ref<LinkDraft>(getInitialLinkDraft(''))
+const highlightDialogVisible = ref(false)
+const highlightDialogText = ref('')
+let pendingLinkSelection: WysiwygLinkSelection | null = null
+let pendingHighlightSelection: ReturnType<typeof readWysiwygHighlightSelection> = null
 
 const isActive = computed(() => tabsStore.activeTabId === props.noteId)
 
@@ -176,6 +204,17 @@ function onToolbarBold() { wysiwygToggleBold(editor) }
 function onToolbarItalic() { wysiwygToggleItalic(editor) }
 function onToolbarStrike() { wysiwygToggleStrike(editor) }
 function onToolbarUnderline() { wysiwygToggleUnderline(editor) }
+function onToolbarHighlight() {
+  const snapshot = readWysiwygHighlightSelection(editor)
+  if (!snapshot) return
+  if (!snapshot.empty) {
+    wysiwygApplyHighlight(editor, snapshot, snapshot.text)
+    return
+  }
+  pendingHighlightSelection = snapshot
+  highlightDialogText.value = ''
+  highlightDialogVisible.value = true
+}
 function onToolbarH1() { wysiwygSetHeading(editor, 1) }
 function onToolbarH2() { wysiwygSetHeading(editor, 2) }
 function onToolbarH3() { wysiwygSetHeading(editor, 3) }
@@ -185,7 +224,43 @@ function onToolbarBlockquote() { wysiwygWrapBlockquote(editor) }
 function onToolbarInlineCode() { wysiwygToggleInlineCode(editor) }
 function onToolbarCodeBlock() { wysiwygInsertCodeBlock(editor) }
 function onToolbarTable() { runTableAction(() => wysiwygInsertTable(editor)) }
-function onToolbarLink() { wysiwygInsertLink(editor) }
+function onToolbarLink() {
+  const selection = readWysiwygLinkSelection(editor)
+  if (!selection) {
+    showAppNotification('请选择单一连续文本后再插入链接')
+    return
+  }
+  pendingLinkSelection = selection
+  linkDraft.value = {
+    text: selection.text,
+    url: selection.url,
+    title: selection.title,
+  }
+  linkDialogVisible.value = true
+}
+
+function closeLinkDialog() {
+  linkDialogVisible.value = false
+}
+
+function confirmLinkDialog(draft: LinkDraft) {
+  if (!pendingLinkSelection) return
+  wysiwygApplyLink(editor, pendingLinkSelection, draft)
+  closeLinkDialog()
+}
+
+function closeHighlightDialog() {
+  highlightDialogVisible.value = false
+  highlightDialogText.value = ''
+  pendingHighlightSelection = null
+}
+
+function confirmHighlightDialog(text: string) {
+  if (!pendingHighlightSelection) return
+  wysiwygApplyHighlight(editor, pendingHighlightSelection, text)
+  closeHighlightDialog()
+}
+
 function onToolbarImageUpload(file: File) {
   if (!editor) return
   let task: Promise<boolean> | null = null

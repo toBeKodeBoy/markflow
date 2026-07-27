@@ -38,6 +38,18 @@ describe('FocusFormatToolbar', () => {
     expect(wrapper.emitted('bulletList')).toHaveLength(1)
   })
 
+  it('renders highlight action and emits highlight when clicked', async () => {
+    const wrapper = mount(FocusFormatToolbar, {
+      props: { visible: true },
+    })
+
+    expect(wrapper.find('[data-testid="focus-toolbar-highlight"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="focus-toolbar-highlight"]').trigger('click')
+
+    expect(wrapper.emitted('highlight')).toHaveLength(1)
+  })
+
   it('forwards mouseenter and mouseleave for hover pinning', async () => {
     const wrapper = mount(FocusFormatToolbar, {
       props: { visible: true },

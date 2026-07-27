@@ -125,6 +125,26 @@ if (typeof Element !== 'undefined' && !Element.prototype.getBoundingClientRect) 
     width: 100, height: 20, toJSON: () => ({}),
   })
 }
+if (typeof Range !== 'undefined' && !Range.prototype.getClientRects) {
+  Object.defineProperty(Range.prototype, 'getClientRects', {
+    configurable: true,
+    value() {
+      const rect = {
+        x: 0, y: 0, width: 100, height: 20,
+        top: 0, left: 0, bottom: 20, right: 100,
+        toJSON: () => ({}),
+      }
+      return {
+        0: rect,
+        length: 1,
+        item: () => rect,
+        [Symbol.iterator]: function* iterator() {
+          yield rect
+        },
+      }
+    },
+  })
+}
 /** jsdom 下 mermaid htmlLabels:false 依赖 SVG 文本度量 */
 const svgTextProto =
   typeof SVGTextElement !== 'undefined'

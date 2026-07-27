@@ -12,6 +12,7 @@ interface MdastNode {
   type: string
   value?: string
   url?: string
+  title?: string
   children?: MdastNode[]
 }
 
@@ -109,7 +110,7 @@ function serializeInlineNode(node: MdastNode): string {
     case 'inlineCode':
       return `<code>${node.value ?? ''}</code>`
     case 'link':
-      return `<a href="${node.url ?? ''}">${serializeInlineNodesToHtml(node.children ?? [])}</a>`
+      return `<a href="${node.url ?? ''}"${node.title ? ` title="${node.title}"` : ''}>${serializeInlineNodesToHtml(node.children ?? [])}</a>`
     default:
       return serializeInlineNodesToHtml(node.children ?? [])
   }
