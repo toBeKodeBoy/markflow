@@ -1,4 +1,4 @@
-/** WYSIWYG 所见即所得（UI 标签「编辑」）| split 分屏 | source 源码 | focus 专注 */
+/** WYSIWYG 所见即所得（UI 标签「预览」）| split 分屏 | source 源码 | focus 专注 */
 export type ViewMode = 'live' | 'split' | 'source' | 'focus'
 
 import type { AssetIndexItem, AssetRecord } from './asset'

@@ -25,8 +25,8 @@ export function buildTreeIndex(folders: Folder[], notes: NoteListItem[]): TreeIn
     if (list) list.push(note)
     else notesByFolder.set(key, [note])
   }
-  for (const list of notesByFolder.values()) {
-    sortNotes(list)
+  for (const [key, list] of notesByFolder) {
+    notesByFolder.set(key, sortNotes(list))
   }
 
   return { folders, notes, childrenMap, folderById, notesByFolder }

@@ -291,6 +291,33 @@ export function wysiwygWrapOrderedList(editor: Editor | null) {
   wrapInListType(editor, 'ordered_list')
 }
 
+export function wysiwygInsertTaskList(editor: Editor | null) {
+  if (!editor) return
+  runEditorCommand(editor, (view, schema) => {
+    const bulletList = schema.nodes.bullet_list
+    const listItem = schema.nodes.list_item
+    const paragraph = schema.nodes.paragraph
+    if (!bulletList || !listItem || !paragraph) return
+
+    const createTaskItem = () => listItem.create(
+      { checked: false, listType: 'bullet', spread: 'false' },
+      paragraph.create(),
+    )
+
+    const taskList = bulletList.create(null, [
+      createTaskItem(),
+      createTaskItem(),
+      createTaskItem(),
+    ])
+
+    const { from, to } = view.state.selection
+    let tr = view.state.tr.replaceRangeWith(from, to, taskList)
+    const cursor = Math.min(from + 3, tr.doc.content.size)
+    tr = tr.setSelection(TextSelection.create(tr.doc, cursor))
+    view.dispatch(tr)
+  })
+}
+
 export function wysiwygToggleTaskItem(editor: Editor | null, target: HTMLElement): boolean {
   if (!editor) return false
   const taskItem = target.closest('li[data-item-type="task"]') as HTMLElement | null

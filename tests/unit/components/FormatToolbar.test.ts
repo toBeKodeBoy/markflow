@@ -39,6 +39,26 @@ describe('FormatToolbar', () => {
     expect(wrapper.find('[data-testid="toolbar-image-input"]').exists()).toBe(true)
   })
 
+  it('renders the task list button by default and emits taskList when clicked', async () => {
+    const wrapper = mount(FormatToolbar)
+
+    expect(wrapper.find('[data-testid="toolbar-task-list"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="toolbar-task-list"]').trigger('click')
+
+    expect(wrapper.emitted('taskList')).toHaveLength(1)
+  })
+
+  it('hides the task list button when showTaskListButton is false', () => {
+    const wrapper = mount(FormatToolbar, {
+      props: {
+        showTaskListButton: false,
+      },
+    })
+
+    expect(wrapper.find('[data-testid="toolbar-task-list"]').exists()).toBe(false)
+  })
+
   it('opens file picker when image upload button is clicked', async () => {
     const wrapper = mount(FormatToolbar)
     const input = wrapper.get('[data-testid="toolbar-image-input"]')

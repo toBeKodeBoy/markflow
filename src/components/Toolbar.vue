@@ -46,9 +46,9 @@
 
           @click="emitSetViewMode('live')"
 
-          title="实时编辑（WYSIWYG）"
+          title="纯文档预览"
 
-        >编辑</button>
+        >预览</button>
 
         <button
 

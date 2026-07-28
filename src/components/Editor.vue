@@ -12,6 +12,7 @@
       @h3="insertLine('### ')"
       @bullet-list="insertLine('- ')"
       @ordered-list="insertLine('1. ')"
+      @task-list="insertTaskList()"
       @blockquote="insertLine('> ')"
       @inline-code="insertInlineCode()"
       @code-block="insertCodeBlock()"
@@ -295,6 +296,24 @@ function insertLine(prefix: string) {
   view.dispatch({
     changes: { from: line.from, to: line.from, insert: prefix },
     selection: { anchor: line.from + prefix.length + (sel.from - line.from) },
+  })
+  view.focus()
+}
+
+function insertTaskList() {
+  if (!view) return
+  const sel = view.state.selection.main
+  const needsLeadingNewline = sel.from > 0 && view.state.sliceDoc(sel.from - 1, sel.from) !== '\n'
+  const needsTrailingNewline = sel.to < view.state.doc.length && view.state.sliceDoc(sel.to, sel.to + 1) !== '\n'
+  const prefix = needsLeadingNewline ? '\n' : ''
+  const block = '- [ ] \n- [ ] \n- [ ] '
+  const suffix = needsTrailingNewline ? '\n' : ''
+  const insert = prefix + block + suffix
+  const cursor = sel.from + prefix.length + '- [ ] '.length
+
+  view.dispatch({
+    changes: { from: sel.from, to: sel.to, insert },
+    selection: EditorSelection.single(cursor),
   })
   view.focus()
 }
