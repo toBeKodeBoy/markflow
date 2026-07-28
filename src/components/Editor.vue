@@ -20,7 +20,6 @@
       @link="openLinkDialog()"
       @image-upload="onToolbarImageUpload"
     />
-    <NoteTagsBar v-if="isActive" />
     <div ref="editorEl" class="cm-host"></div>
     <LinkDialog
       :visible="linkDialogVisible"
@@ -62,7 +61,6 @@ import { showAppNotification } from '../utils/notify'
 import FormatToolbar from './FormatToolbar.vue'
 import HighlightTextModal from './HighlightTextModal.vue'
 import LinkDialog from './LinkDialog.vue'
-import NoteTagsBar from './NoteTagsBar.vue'
 
 const props = defineProps<{ noteId: string }>()
 

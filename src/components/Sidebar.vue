@@ -1,19 +1,5 @@
-﻿<template>
+<template>
   <aside class="sidebar" :style="{ width: sidebarWidth + 'px' }">
-    <div v-if="store.allTags.length" class="sidebar-tags">
-      <button
-        class="sidebar-tag"
-        :class="{ active: !store.activeTagFilter }"
-        @click="store.setActiveTagFilter(null)"
-      >全部</button>
-      <button
-        v-for="tag in store.allTags"
-        :key="tag"
-        class="sidebar-tag"
-        :class="{ active: isTagFilterActive(tag) }"
-        @click="onTagClick(tag)"
-      >{{ tag }}</button>
-    </div>
     <div v-if="store.activeFolderId" class="sidebar-scope-bar">
       <button
         type="button"
@@ -27,7 +13,6 @@
     </div>
 
     <div class="sidebar-section folders-section">
-
       <div
         ref="treeRef"
         class="sidebar-tree"
@@ -67,7 +52,6 @@
               @start-rename-note="startRenameNote"
               @commit-rename-note="commitRenameNote"
               @cancel-rename-note="cancelRenameNote"
-              @tag-click="onTagClick"
               @note-context="openNoteContextMenu"
               @drag-start="onDragStart"
               @drag-over-folder="onFolderDragOver"
@@ -105,7 +89,6 @@
             @start-rename-note="startRenameNote"
             @commit-rename-note="commitRenameNote"
             @cancel-rename-note="cancelRenameNote"
-            @tag-click="onTagClick"
             @note-context="openNoteContextMenu"
             @drag-start="onDragStart"
             @drag-over-folder="onFolderDragOver"
@@ -122,15 +105,6 @@
         </div>
       </div>
     </div>
-
-    <TagCloudPanel
-      v-if="store.tagStats.length"
-      :tags="store.tagStats"
-      :active-tag="store.activeTagFilter"
-      :collapsed="tagCloudCollapsed"
-      @select="onTagClick"
-      @toggle-collapse="toggleTagCloudCollapsed"
-    />
 
     <div class="sidebar-resizer" title="拖拽调整宽度" @mousedown="startResize" />
 
@@ -274,7 +248,6 @@ import {
 import { buildTreeIndex } from '../utils/treeIndex'
 import CreateEntryModal from './CreateEntryModal.vue'
 import SidebarTreeRowView from './SidebarTreeRow.vue'
-import TagCloudPanel from './TagCloudPanel.vue'
 import { useAppSettings, clampSidebarWidth } from '../composables/useAppSettings'
 import { useNoteSort } from '../composables/useNoteSort'
 import { sortNotes } from '../utils/noteSort'
@@ -312,16 +285,6 @@ const movingFolderParentId = ref<string | undefined>(undefined)
 const deleteFolderTarget = ref<{ id: string; impact: FolderDeleteImpact } | null>(null)
 const expandedFolderIds = ref(new Set<string>())
 
-const TAG_CLOUD_AUTO_COLLAPSE_THRESHOLD = 3
-
-function resolveTagCloudCollapsed(tagCount: number): boolean {
-  const saved = appSettings.get().sidebarTagCloudCollapsed
-  if (saved !== undefined) return saved
-  return tagCount <= TAG_CLOUD_AUTO_COLLAPSE_THRESHOLD
-}
-
-const tagCloudCollapsed = ref(resolveTagCloudCollapsed(store.tagStats.length))
-
 const dragPayload = ref<{ kind: 'note' | 'folder'; id: string } | null>(null)
 const dragOverFolderId = ref<string | null>(null)
 const dragOverNoteId = ref<string | null>(null)
@@ -338,7 +301,7 @@ const noteSort = useNoteSort({
 })
 
 const treeIndex = computed(() => buildTreeIndex(store.folderList, store.searchedNoteList))
-const isSearching = computed(() => !!store.activeTagFilter)
+const isSearching = computed(() => store.searchQuery.trim().length > 0)
 
 const sidebarRows = computed(() =>
   flattenSidebarTree(store.folderList, store.searchedNoteList, expandedFolderIds.value, {
@@ -369,7 +332,7 @@ const showTreeEmpty = computed(() => {
 })
 
 const emptyTip = computed(() => {
-  if (store.activeTagFilter) return '无匹配标签的笔记'
+  if (isSearching.value) return '无匹配笔记'
   return '暂无笔记，点击顶栏「新建」'
 })
 
@@ -403,23 +366,6 @@ function persistSidebarState() {
 function clearActiveFolder() {
   store.activeFolderId = null
   persistSidebarState()
-}
-
-function isTagFilterActive(tag: string): boolean {
-  return store.activeTagFilter?.toLowerCase() === tag.toLowerCase()
-}
-
-function onTagClick(tag: string) {
-  if (isTagFilterActive(tag)) {
-    store.setActiveTagFilter(null)
-  } else {
-    store.setActiveTagFilter(tag)
-  }
-}
-
-function toggleTagCloudCollapsed() {
-  tagCloudCollapsed.value = !tagCloudCollapsed.value
-  appSettings.save({ sidebarTagCloudCollapsed: tagCloudCollapsed.value })
 }
 
 function onTreeScroll(e: Event) {
@@ -742,12 +688,11 @@ watch(
 )
 
 watch(
-  () => store.activeTagFilter,
-  (tag) => {
-    if (!tag) return
+  () => store.searchQuery,
+  (query) => {
+    if (!query.trim()) return
     const ids = collectExpandIdsForSearch(store.folderList, store.searchedNoteList)
     expandedFolderIds.value = new Set([...expandedFolderIds.value, ...ids])
-    persistSidebarState()
   }
 )
 
@@ -775,4 +720,3 @@ onMounted(() => {
 
 onUnmounted(() => document.removeEventListener('click', onGlobalClick))
 </script>
-

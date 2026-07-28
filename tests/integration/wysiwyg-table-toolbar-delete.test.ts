@@ -17,11 +17,11 @@ describe('WysiwygEditor 表格工具栏占位渲染', () => {
     await flushPromises()
 
     const toolbar = wrapper.get('[data-testid="table-toolbar"]')
-    const toolbarWidget = toolbar.element.parentElement
+    const toolbarSlot = (toolbar.element as HTMLElement).closest('.markflow-table-toolbar-slot')
     const tableElement = wrapper.element.querySelector('.ProseMirror table')
-    expect(toolbarWidget?.classList.contains('table-toolbar-widget')).toBe(true)
+    expect(toolbarSlot).toBeTruthy()
     expect(tableElement).toBeTruthy()
-    expect(toolbarWidget?.compareDocumentPosition(tableElement as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(toolbarSlot?.compareDocumentPosition(tableElement as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 
     await wrapper.get('[data-testid="table-delete-table"]').trigger('click')
     await flushPromises()

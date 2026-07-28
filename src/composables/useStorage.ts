@@ -1,6 +1,9 @@
 import type { Note, NoteListItem, Folder, AppSettings } from '../types'
 import { showAppNotification } from '../utils/notify'
 
+type LegacyNote = Note & { tags?: unknown }
+type LegacyNoteListItem = NoteListItem & { tags?: unknown }
+
 /** 检测当前环境是否为 uTools 插件 */
 const isuTools = () => typeof window !== 'undefined' && typeof window.markflow !== 'undefined'
 
@@ -110,6 +113,16 @@ function wrapBridgeSave<T extends (...args: never[]) => void>(fn: T, label: stri
   }) as T
 }
 
+function sanitizeNote(note: LegacyNote): Note {
+  const { tags: _tags, ...rest } = note
+  return rest
+}
+
+function sanitizeNoteListItem(item: LegacyNoteListItem): NoteListItem {
+  const { tags: _tags, ...rest } = item
+  return rest
+}
+
 export function useStorage() {
   const raw = isuTools() ? window.markflow : localFallback
   const bridge = isuTools()
@@ -124,32 +137,33 @@ export function useStorage() {
 
   /** 获取全部笔记列表项 */
   function getNoteList(): NoteListItem[] {
-    return bridge.getNoteList()
+    return bridge.getNoteList().map((item) => sanitizeNoteListItem(item))
   }
 
-  /** 保存笔记列表项 */
+  /** 保存笔记列表项（写入前剥离 legacy tags） */
   function saveNoteList(list: NoteListItem[]) {
-    bridge.saveNoteList(list)
+    bridge.saveNoteList(list.map((item) => sanitizeNoteListItem(item as LegacyNoteListItem)))
   }
 
   /** 根据 ID 获取完整笔记 */
   function getNote(id: string): Note | null {
-    return bridge.getNote(id)
+    const note = bridge.getNote(id)
+    return note ? sanitizeNote(note) : null
   }
 
   /** 保存笔记及同步更新笔记列表 */
   function saveNote(note: Note) {
-    bridge.saveNote(note.id, note)
+    const sanitized = sanitizeNote(note)
+    bridge.saveNote(sanitized.id, sanitized)
     const list = getNoteList()
-    const idx = list.findIndex(n => n.id === note.id)
+    const idx = list.findIndex(n => n.id === sanitized.id)
     const item: NoteListItem = {
-      id: note.id,
-      title: note.title,
-      folderId: note.folderId,
-      updatedAt: note.updatedAt,
-      tags: note.tags?.length ? [...note.tags] : undefined,
-      pinned: note.pinned || undefined,
-      sortOrder: note.sortOrder,
+      id: sanitized.id,
+      title: sanitized.title,
+      folderId: sanitized.folderId,
+      updatedAt: sanitized.updatedAt,
+      pinned: sanitized.pinned || undefined,
+      sortOrder: sanitized.sortOrder,
     }
     if (idx >= 0) list[idx] = item
     else list.unshift(item)

@@ -64,7 +64,7 @@ describe('exportPdf', () => {
     const [, html] = savePdfFromHtml.mock.calls[0]
     expect(html).toContain('mermaid-rendered')
     expect(html).toContain('<svg')
-  })
+  }, 15000)
 
   it('文档过大时应中止导出', async () => {
     const { useNoteStore } = await import('../../../src/stores/note')

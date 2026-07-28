@@ -1,6 +1,8 @@
 import type { AppSettings, Folder, Note, NoteListItem } from '../types'
 import type { AssetIndexItem, AssetRecord } from '../types/asset'
 
+type LegacyNote = Note & { tags?: unknown }
+
 export const BACKUP_VERSION_LEGACY = 1 as const
 export const BACKUP_VERSION = 2 as const
 
@@ -49,6 +51,11 @@ export interface BackupAssetWriter {
 
 const EMPTY_ASSETS: MarkFlowBackupAssets = { index: [], records: {} }
 
+function sanitizeBackupNote(note: LegacyNote): Note {
+  const { tags: _tags, ...rest } = note
+  return rest
+}
+
 /** 收集可导出的全量备份数据 */
 export function buildBackup(
   storage: BackupStorageReader,
@@ -57,7 +64,7 @@ export function buildBackup(
   const notes: Note[] = []
   for (const item of storage.getNoteList()) {
     const note = storage.getNote(item.id)
-    if (note) notes.push(note)
+    if (note) notes.push(sanitizeBackupNote(note))
   }
 
   const assetBackup: MarkFlowBackupAssets = { index: [], records: {} }
@@ -87,7 +94,7 @@ export async function buildBackupAsync(
   const notes: Note[] = []
   for (const item of storage.getNoteList()) {
     const note = storage.getNote(item.id)
-    if (note) notes.push(note)
+    if (note) notes.push(sanitizeBackupNote(note))
   }
 
   const assetBackup: MarkFlowBackupAssets = { index: [], records: {} }
@@ -121,7 +128,7 @@ export function parseBackup(json: string): MarkFlowBackup {
   return {
     version: BACKUP_VERSION,
     exportedAt: data.exportedAt,
-    notes: data.notes,
+    notes: data.notes.map((note) => sanitizeBackupNote(note)),
     folders: data.folders,
     settings: data.settings,
     assets: data.assets ?? EMPTY_ASSETS,
@@ -137,7 +144,7 @@ export function applyBackup(
   storage.clearAllNotesAndFolders()
   storage.saveFolderList(backup.folders)
   for (const note of backup.notes) {
-    storage.saveNote(note)
+    storage.saveNote(sanitizeBackupNote(note))
   }
   if (assets && backup.assets.index.length > 0) {
     assets.saveAssetIndex(backup.assets.index)

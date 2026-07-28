@@ -230,7 +230,6 @@ export async function runFolderImport(
         content,
         folderId,
         sortOrder: nextImportedNoteSortOrder(nextNoteOrderByFolder, folderId),
-        tags: [],
         importSourcePath: file.relativePath.replace(/\\/g, '/'),
         titleLockedFromSource: true,
         createdAt: now,

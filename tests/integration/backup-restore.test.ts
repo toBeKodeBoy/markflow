@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useNoteStore } from '../../src/stores/note'
-import { buildBackup, parseBackup } from '../../src/utils/backup'
+import { parseBackup } from '../../src/utils/backup'
 
 describe('backup restore integration', () => {
   beforeEach(() => {
@@ -9,11 +9,10 @@ describe('backup restore integration', () => {
     localStorage.clear()
   })
 
-  it('export and restore preserves notes folders and tags', async () => {
+  it('export and restore preserves notes and folders', async () => {
     const store = useNoteStore()
     const folder = store.createFolder('docs')
-    const note = store.createNoteWithContent('# Hello\nworld', folder.id)
-    store.addTag(note.id, 'work')
+    store.createNoteWithContent('# Hello\nworld', folder.id)
 
     const backup = await store.exportLibraryBackup()
     const json = JSON.stringify(backup)
@@ -24,7 +23,6 @@ describe('backup restore integration', () => {
     const restored = await store.restoreLibraryBackup(json)
     expect(restored.notes).toHaveLength(1)
     expect(store.noteList).toHaveLength(1)
-    expect(store.noteList[0].tags).toEqual(['work'])
     expect(store.folderList).toHaveLength(1)
     expect(parseBackup(json).version).toBe(2)
   })

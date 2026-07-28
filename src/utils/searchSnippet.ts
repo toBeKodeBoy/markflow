@@ -42,7 +42,7 @@ export function fuzzyMatch(text: string, query: string): FuzzyMatchResult {
 }
 
 export type SnippetSegment = { text: string; highlight: boolean }
-export type SearchMatchKind = 'title' | 'body' | 'tag'
+export type SearchMatchKind = 'title' | 'body'
 
 export interface SearchMatchInfo {
   kind: SearchMatchKind
@@ -94,11 +94,6 @@ export function getSearchMatchInfo(
 
   if (note.title.toLowerCase().includes(lowerQ)) {
     return { kind: 'title', segments: splitHighlightSegments(note.title, q) }
-  }
-
-  const tagHit = note.tags?.find((t) => t.toLowerCase().includes(lowerQ))
-  if (tagHit) {
-    return { kind: 'tag', segments: splitHighlightSegments(tagHit, q) }
   }
 
   const bodySegments = buildSearchSnippet(content, q)

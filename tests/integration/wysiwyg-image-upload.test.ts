@@ -62,7 +62,6 @@ describe('WysiwygEditor 图片上传接线', () => {
         stubs: {
           FormatToolbar: FormatToolbarStub,
           FocusFormatToolbar: FocusFormatToolbarStub,
-          NoteTagsBar: true,
           TableToolbar: true,
         },
       },
@@ -97,7 +96,6 @@ describe('WysiwygEditor 图片上传接线', () => {
         stubs: {
           FormatToolbar: FormatToolbarStub,
           FocusFormatToolbar: FocusFormatToolbarStub,
-          NoteTagsBar: true,
           TableToolbar: true,
         },
       },
