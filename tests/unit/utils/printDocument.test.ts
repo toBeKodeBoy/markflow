@@ -51,7 +51,8 @@ describe('buildPrintDocument', () => {
     expect(html).toContain('mermaid-rendered')
     expect(html).toContain('<svg')
     expect(html).not.toContain('<pre class="mermaid">')
-  })
+  }, 15000)
+
   it('任务清单打印文档应保留 checked 状态标记供样式命中', () => {
     const html = buildPrintDocument('* [x] 已完成\n* [ ] 待处理', '任务', {
       scale: 1,

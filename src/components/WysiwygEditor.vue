@@ -22,7 +22,6 @@
       @link="onToolbarLink"
       @image-upload="onToolbarImageUpload"
     />
-    <NoteTagsBar v-if="!focusMode && isActive" />
     <div class="wysiwyg-body">
       <div ref="containerRef" :class="['milkdown-host', { 'milkdown-dark': isDark }]"></div>
       <Teleport v-if="!focusMode && isInTable && toolbarMountEl" :to="toolbarMountEl">
@@ -110,7 +109,6 @@ import FocusFormatToolbar from './FocusFormatToolbar.vue'
 import HighlightTextModal from './HighlightTextModal.vue'
 import LinkDialog from './LinkDialog.vue'
 import TableToolbar from './TableToolbar.vue'
-import NoteTagsBar from './NoteTagsBar.vue'
 import { useFocusToolbarVisibility } from '../composables/useFocusToolbarVisibility'
 import { getTableToolbarDecorations, useTableToolbar } from '../composables/useTableToolbar'
 import {

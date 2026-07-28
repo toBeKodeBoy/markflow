@@ -117,7 +117,6 @@ describe('runFolderImport — Phase 1', () => {
         title: 'old-a',
         content: '',
         folderId: 'target',
-        tags: [],
         sortOrder: 100,
         createdAt: 1,
         updatedAt: 1,
@@ -127,7 +126,6 @@ describe('runFolderImport — Phase 1', () => {
         title: 'old-b',
         content: '',
         folderId: 'target',
-        tags: [],
         sortOrder: 200,
         createdAt: 2,
         updatedAt: 2,
@@ -214,7 +212,6 @@ describe('runFolderImport — Phase 1', () => {
       id: '1',
       title: 'doc',
       content: '',
-      tags: [],
       createdAt: 1,
       updatedAt: 1,
     }]
@@ -230,7 +227,6 @@ describe('runFolderImport — Phase 1', () => {
       id: '1',
       title: 'doc',
       content: '',
-      tags: [],
       createdAt: 1,
       updatedAt: 1,
     }]

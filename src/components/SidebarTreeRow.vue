@@ -74,15 +74,6 @@
       @click.stop
     />
     <div v-else class="note-title">{{ row.note!.title }}</div>
-    <div v-if="row.note!.tags?.length" class="note-item-tags">
-      <button
-        v-for="tag in row.note!.tags"
-        :key="tag"
-        type="button"
-        class="note-item-tag"
-        @click.stop="$emit('tag-click', tag)"
-      >{{ tag }}</button>
-    </div>
     <div class="note-meta">{{ formatDate(row.note!.updatedAt) }}</div>
   </div>
 </template>
@@ -119,7 +110,6 @@ const emit = defineEmits<{
   'start-rename-note': [noteId: string]
   'commit-rename-note': []
   'cancel-rename-note': []
-  'tag-click': [tag: string]
   'note-context': [event: MouseEvent, noteId: string]
   'drag-start': [payload: { kind: 'note' | 'folder'; id: string }]
   'drag-over-folder': [folderId: string]

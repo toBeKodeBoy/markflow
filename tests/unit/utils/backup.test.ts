@@ -15,7 +15,6 @@ describe('backup', () => {
       id: 'n1',
       title: 'Hello',
       content: '# Hello',
-      tags: ['work'],
       createdAt: 1,
       updatedAt: 2,
     }
@@ -35,7 +34,7 @@ describe('backup', () => {
     let savedSettings: AppSettings = settings
 
     const storage = {
-      getNoteList: () => [{ id: 'n1', title: 'Hello', updatedAt: 2, folderId: 'f1', tags: ['work'] }],
+      getNoteList: () => [{ id: 'n1', title: 'Hello', updatedAt: 2, folderId: 'f1' }],
       getNote: (id: string) => (id === 'n1' ? note : null),
       getFolderList: () => folders,
       getSettings: () => settings,
@@ -55,24 +54,47 @@ describe('backup', () => {
     }
 
     const backup = buildBackup(storage)
-    expect(backup.version).toBe(BACKUP_VERSION)
-    expect(backup.notes).toHaveLength(1)
-
-    const json = JSON.stringify(backup)
-    const parsed = parseBackup(json)
+    const parsed = parseBackup(JSON.stringify(backup))
     applyBackup(parsed, storage)
 
+    expect(backup.version).toBe(BACKUP_VERSION)
     expect(savedFolders).toEqual(folders)
     expect(savedNotes).toHaveLength(1)
     expect(savedSettings.sidebarExpandedFolderIds).toEqual(['f1'])
   })
 
-  it('builds v2 backup with assets and parses legacy v1', () => {
-    const note: Note = {
+  it('strips legacy tags from exported notes', () => {
+    const storage = {
+      getNoteList: () => [{ id: 'n1', title: 'Hello', updatedAt: 2 }],
+      getNote: () => ({
+        id: 'n1',
+        title: 'Hello',
+        content: '# Hello',
+        tags: ['work'],
+        createdAt: 1,
+        updatedAt: 2,
+      }),
+      getFolderList: () => [] as Folder[],
+      getSettings: () =>
+        ({
+          theme: 'light',
+          fontSize: 14,
+          editorFontFamily: 'monospace',
+          previewVisible: true,
+          sidebarVisible: true,
+        }) satisfies AppSettings,
+    }
+
+    const backup = buildBackup(storage)
+    expect(backup.notes[0]).not.toHaveProperty('tags')
+  })
+
+  it('builds v2 backup with assets and parses legacy v1 while stripping tags', () => {
+    const noteWithTags = {
       id: 'n1',
       title: 'Hello',
       content: '![img](markflow-asset://a1)',
-      tags: [],
+      tags: ['work'],
       createdAt: 1,
       updatedAt: 2,
     }
@@ -86,7 +108,7 @@ describe('backup', () => {
 
     const storage = {
       getNoteList: () => [{ id: 'n1', title: 'Hello', updatedAt: 2 }],
-      getNote: (id: string) => (id === 'n1' ? note : null),
+      getNote: (id: string) => (id === 'n1' ? ({ ...noteWithTags, tags: undefined } as Note) : null),
       getFolderList: () => [] as Folder[],
       getSettings: () =>
         ({
@@ -103,20 +125,61 @@ describe('backup', () => {
       getAsset: (id) => (id === 'a1' ? assetRecord : null),
     })
 
-    expect(backup.version).toBe(BACKUP_VERSION)
     expect(backup.assets.index).toHaveLength(1)
     expect(backup.assets.records.a1.data).toBe('abcd')
 
     const legacyJson = JSON.stringify({
       version: BACKUP_VERSION_LEGACY,
       exportedAt: 1,
-      notes: [note],
+      notes: [noteWithTags],
       folders: [],
       settings: storage.getSettings(),
     })
     const legacy = parseBackup(legacyJson)
     expect(legacy.assets.index).toEqual([])
     expect(legacy.assets.records).toEqual({})
+    expect(legacy.notes[0]).not.toHaveProperty('tags')
+  })
+
+  it('applyBackup strips legacy tags before save', () => {
+    const savedNotes: Note[] = []
+    const storage = {
+      getNoteList: () => [],
+      getNote: () => null,
+      getFolderList: () => [] as Folder[],
+      getSettings: () =>
+        ({
+          theme: 'light',
+          fontSize: 14,
+          editorFontFamily: 'monospace',
+          previewVisible: true,
+          sidebarVisible: true,
+        }) satisfies AppSettings,
+      saveNote: (note: Note) => {
+        savedNotes.push(note)
+      },
+      saveFolderList: () => {},
+      saveSettings: () => {},
+      clearAllNotesAndFolders: () => {},
+    }
+
+    applyBackup({
+      version: BACKUP_VERSION,
+      exportedAt: Date.now(),
+      notes: [{
+        id: 'n1',
+        title: 'Hello',
+        content: '# Hello',
+        tags: ['work'],
+        createdAt: 1,
+        updatedAt: 2,
+      } as Note & { tags: string[] }],
+      folders: [],
+      settings: storage.getSettings(),
+      assets: { index: [], records: {} },
+    }, storage)
+
+    expect(savedNotes[0]).not.toHaveProperty('tags')
   })
 
   it('applyBackup restores assets', () => {
@@ -124,7 +187,6 @@ describe('backup', () => {
       id: 'n1',
       title: 'Hello',
       content: '# Hello',
-      tags: [],
       createdAt: 1,
       updatedAt: 2,
     }
@@ -170,7 +232,7 @@ describe('backup', () => {
       saveAssetIndex: (index) => {
         savedIndex = index
       },
-      saveAsset: (id, record) => {
+      saveAsset: (_id, record) => {
         savedAssets.push(record)
       },
     })

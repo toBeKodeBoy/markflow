@@ -7,8 +7,6 @@ import { LARGE_FILE_THRESHOLD } from '../constants'
 import { applyTocToContent } from '../utils/generateTocMarkdown'
 import { migrateLegacyPathFolders, collectDescendantFolderIds, nextSiblingOrder, wouldCreateFolderCycle, getFolderDeleteImpact } from '../utils/folderTree'
 import { buildBackupAsync, applyBackup, parseBackup, downloadBackupJson, type MarkFlowBackup } from '../utils/backup'
-import { normalizeTagInput, normalizeTags } from '../utils/tagNormalize'
-import { buildTagStats } from '../utils/tagStats'
 import { planSortOrderMigration } from '../utils/migrateNoteSortOrder'
 import { sortNotes } from '../utils/noteSort'
 import { runFolderImport, saveImportImageAsAsset } from '../utils/importFolderService'
@@ -110,7 +108,6 @@ export const useNoteStore = defineStore('note', () => {
   const liveContent = ref('')
   const folderList = ref<Folder[]>([])
   const searchQuery = ref('')
-  const activeTagFilter = ref<string | null>(null)
   const activeFolderId = ref<string | null>(null)
   /** 递增时 Sidebar 从 settings 重载展开/选中状态 */
   const sidebarStateRevision = ref(0)
@@ -123,38 +120,19 @@ export const useNoteStore = defineStore('note', () => {
   let tocJumpSeq = 0
   let editorContentPushSeq = 0
 
-  /** 根据 searchQuery / activeTagFilter 过滤（不含文件夹筛选） */
+  /** 根据 searchQuery 过滤（不含文件夹筛选） */
   const searchedNoteList = computed(() => {
     let list = noteList.value
-    if (activeTagFilter.value) {
-      const tag = activeTagFilter.value.toLowerCase()
-      list = list.filter((n) => n.tags?.some((t) => t.toLowerCase() === tag))
-    }
     if (searchQuery.value.trim()) {
       const q = searchQuery.value.toLowerCase()
       list = list.filter(
         (n) =>
           n.title.toLowerCase().includes(q) ||
-          (contentSearchIndex.value[n.id]?.includes(q) ?? false) ||
-          (n.tags?.some((t) => t.toLowerCase().includes(q)) ?? false)
+          (contentSearchIndex.value[n.id]?.includes(q) ?? false)
       )
     }
     return list
   })
-
-  /** 全部笔记中使用过的标签（去重、按字母序） */
-  const allTags = computed(() => {
-    const set = new Set<string>()
-    for (const note of noteList.value) {
-      for (const tag of note.tags ?? []) {
-        if (tag.trim()) set.add(tag.trim())
-      }
-    }
-    return [...set].sort((a, b) => a.localeCompare(b, 'zh'))
-  })
-
-  /** 标签云：按使用频率降序（全局统计） */
-  const tagStats = computed(() => buildTagStats(noteList.value))
 
   /** 根据 activeFolderId 和 searchQuery 过滤后的笔记列表 */
   const filteredNoteList = computed(() => {
@@ -275,7 +253,6 @@ export const useNoteStore = defineStore('note', () => {
       content: '# 无标题\n\n',
       folderId,
       assetPathMode: 'internal',
-      tags: [],
       createdAt: now,
       updatedAt: now
     }
@@ -308,7 +285,6 @@ export const useNoteStore = defineStore('note', () => {
       assetLinkStyle: options.assetLinkStyle,
       managedAssetIds: extractAssetIds(content),
       titleLockedFromSource: options.titleLockedFromSource,
-      tags: [],
       createdAt: now,
       updatedAt: now
     }
@@ -589,44 +565,6 @@ export const useNoteStore = defineStore('note', () => {
     return true
   }
 
-  /** 设置标签过滤 */
-  function setActiveTagFilter(tag: string | null) {
-    activeTagFilter.value = tag
-  }
-
-  /** 更新笔记标签；含无效标签时拒绝写入并返回 false */
-  function setNoteTags(id: string, tags: string[]): boolean {
-    const { tags: normalized, rejected } = normalizeTags(tags)
-    if (rejected) return false
-    const note = storage.getNote(id)
-    if (!note) return false
-    note.tags = normalized
-    note.updatedAt = Date.now()
-    storage.saveNote(note)
-    noteList.value = storage.getNoteList()
-    if (currentNote.value?.id === id) currentNote.value.tags = normalized
-    return true
-  }
-
-  function addTag(id: string, tag: string): boolean {
-    const normalized = normalizeTagInput(tag)
-    if (!normalized) return false
-    const note = storage.getNote(id)
-    if (!note) return false
-    const { tags, rejected } = normalizeTags([...(note.tags ?? []), normalized])
-    if (rejected) return false
-    if (tags.length === (note.tags ?? []).length) return false
-    setNoteTags(id, tags)
-    return true
-  }
-
-  function removeTag(id: string, tag: string): void {
-    const note = storage.getNote(id)
-    if (!note) return
-    const key = tag.toLowerCase()
-    setNoteTags(id, (note.tags ?? []).filter((t) => t.toLowerCase() !== key))
-  }
-
   function reorderNotes(folderId: string | undefined, orderedIds: string[]): void {
     const baseTime = Date.now()
     const pinnedIds = orderedIds.filter((id) => {
@@ -694,7 +632,6 @@ export const useNoteStore = defineStore('note', () => {
     }
     loadNoteList()
     activeFolderId.value = storage.getSettings().sidebarActiveFolderId ?? null
-    activeTagFilter.value = null
     searchQuery.value = ''
     sidebarStateRevision.value++
     notifyLibraryReset(noteList.value.length > 0 ? noteList.value[0].id : null)
@@ -726,7 +663,6 @@ export const useNoteStore = defineStore('note', () => {
     liveContent.value = ''
     activeFolderId.value = null
     searchQuery.value = ''
-    activeTagFilter.value = null
     notifyLibraryReset(null)
   }
 
@@ -785,8 +721,8 @@ export const useNoteStore = defineStore('note', () => {
   }
 
   return {
-    noteList, currentNote, liveContent, folderList, searchQuery, activeTagFilter, activeFolderId,
-    searchedNoteList, filteredNoteList, allTags, tagStats, sidebarStateRevision,
+    noteList, currentNote, liveContent, folderList, searchQuery, activeFolderId,
+    searchedNoteList, filteredNoteList, sidebarStateRevision,
     tocVisible, tocJumpTarget, editorContentPush, pendingLargeFileSwitch,
     contentSearchIndex,
     loadNoteList, openNote, createNote, createNoteWithContent, setLiveContent, setActiveNote, setTocVisible,
@@ -794,7 +730,7 @@ export const useNoteStore = defineStore('note', () => {
     applyExternalContentUpdate, updateCurrentContent, updateNoteContent, deleteNote, renameNote, moveNote, requestTocJump, insertAutoToc,
     clearPendingLargeFileSwitch, applyLargeFilePolicy,
     createFolder, deleteFolder, renameFolder, moveFolder, getDeleteFolderImpact,
-    setActiveTagFilter, setNoteTags, addTag, removeTag, toggleNotePinned, reorderNotes, getNoteContentById,
+    toggleNotePinned, reorderNotes, getNoteContentById,
     exportLibraryBackup, downloadLibraryBackup, restoreLibraryBackup, notifySidebarStateChanged,
     batchImportFromFolder, clearAllLibraryData
     , bindNoteToWorkingFile

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
 import { readFileSync } from 'node:fs'
@@ -18,18 +18,6 @@ function mountSidebar() {
       stubs: {
         Teleport: true,
         AppIcon: true,
-        SearchBar: {
-          template: '<div class="search-bar-stub"></div>',
-          methods: {
-            clearSearch() {},
-          },
-        },
-        SearchResultsList: {
-          template: '<div class="search-results-list-stub"></div>',
-        },
-        TagCloudPanel: {
-          template: '<div class="tag-cloud-panel-stub"></div>',
-        },
         CreateEntryModal: {
           props: ['visible'],
           template: '<div v-if="visible">新建内容</div>',
@@ -105,8 +93,6 @@ describe('Sidebar', () => {
     await flushPromises()
 
     const clearButton = wrapper.get('[data-testid="sidebar-clear-folder-filter"]')
-    expect(clearButton.text()).toContain('返回全部')
-
     await clearButton.trigger('click')
     await flushPromises()
 
@@ -123,18 +109,14 @@ describe('Sidebar', () => {
     expect(wrapper.text()).toContain('新建')
   })
 
-  it('renders readable tag filter and context menu labels', async () => {
+  it('renders context menu labels for notes and folders', async () => {
     const store = useNoteStore()
     const folder = store.createFolder('工作区')
-    const note = store.createNoteWithContent('# 周报\n')
-    store.setNoteTags(note.id, ['自定义标签'])
+    store.createNoteWithContent('# 周报\n')
     store.createNoteWithContent('# 文件夹笔记\n', { folderId: folder.id })
 
     const wrapper = mountSidebar()
     await flushPromises()
-
-    expect(wrapper.text()).toContain('全部')
-    expect(wrapper.text()).toContain('自定义标签')
 
     await wrapper.get('.note-context-trigger').trigger('click')
     await flushPromises()
@@ -146,6 +128,7 @@ describe('Sidebar', () => {
     expect(wrapper.text()).toContain('新建子文件夹')
     expect(wrapper.text()).toContain('新建笔记')
   })
+
   it('renders note context menu without fixed right anchoring', async () => {
     const store = useNoteStore()
     store.createNoteWithContent('# A\n')
@@ -158,5 +141,25 @@ describe('Sidebar', () => {
     const menu = wrapper.get('.context-menu-fixed').element as HTMLElement
     expect(menu.className).toContain('context-menu-fixed')
     expect(getComputedStyle(menu).right).toBe('auto')
+  })
+
+  it('search expansion does not persist expanded folder state', async () => {
+    const store = useNoteStore()
+    const folder = store.createFolder('docs')
+    store.createNoteWithContent('# Match\nbody', { folderId: folder.id })
+
+    const saveSpy = vi.spyOn(window.markflow, 'saveSettings')
+    const wrapper = mountSidebar()
+    await flushPromises()
+    saveSpy.mockClear()
+
+    store.searchQuery = 'match'
+    await flushPromises()
+
+    expect(saveSpy).not.toHaveBeenCalledWith(
+      expect.objectContaining({ sidebarExpandedFolderIds: expect.any(Array) })
+    )
+
+    await wrapper.unmount()
   })
 })

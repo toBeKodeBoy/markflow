@@ -45,7 +45,6 @@ describe('Editor 图片上传接线', () => {
         plugins: [pinia],
         stubs: {
           FormatToolbar: FormatToolbarStub,
-          NoteTagsBar: true,
         },
       },
     })

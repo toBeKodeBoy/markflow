@@ -25,7 +25,6 @@ export interface Note {
   title: string
   content: string
   folderId?: string
-  tags: string[]
   pinned?: boolean
   sortOrder?: number
   /** 文件夹导入时的源相对路径；存在时不从正文自动改标题 */
@@ -63,17 +62,8 @@ export interface NoteListItem {
   title: string
   folderId?: string
   updatedAt: number
-  tags?: string[]
   pinned?: boolean
   sortOrder?: number
-}
-
-/** 标签云统计项（全局频率，非搜索结果内） */
-export interface TagStat {
-  tag: string
-  count: number
-  /** 0–1，相对最大 count */
-  weight: number
 }
 
 export interface TocJumpTarget {
@@ -122,7 +112,7 @@ export interface AutoBackupSettings {
   intervalHours: AutoBackupInterval
   /** uTools 本地目录绝对路径 */
   directoryPath?: string
-  /** 保留份数，0 表示不限制 */
+  /** 保留份数；0 表示不限制 */
   maxCopies: number
   lastBackupAt?: number
   lastBackupStatus?: 'success' | 'error' | 'running'
@@ -165,8 +155,6 @@ export interface AppSettings {
   sidebarActiveFolderId?: string | null
   /** PDF 导出选项（可选，缺省用默认值） */
   pdfExport?: PdfExportOptions
-  /** 侧栏标签云折叠（未设置时：标签 ≤3 默认折叠） */
-  sidebarTagCloudCollapsed?: boolean
   /** 自动备份配置 */
   autoBackup?: AutoBackupSettings
   /** 上次打开的编辑器 Tab（启动时恢复） */
@@ -194,7 +182,7 @@ export interface MarkFlowBridge {
     filePath: string,
     content: string
   ) => { ok: true } | { ok: false; reason: 'error' }
-  /** Typora 路线：完整 HTML → Chromium printToPDF */
+  /** Typora 路线：完整 HTML -> Chromium printToPDF */
   savePdfFromHtml: (
     filename: string,
     html: string,
@@ -220,7 +208,7 @@ export interface MarkFlowBridge {
     dirPath: string,
     maxCopies: number
   ) => { ok: true; deleted: number } | { ok: false; reason: 'error' }
-  /** uTools 默认自动备份目录（appData/markflow-backups） */
+  /** uTools 默认自动备份目录（AppData/markflow-backups） */
   getDefaultBackupDirectory?: () => string | null
   /** 自动备份桥接能力探测 */
   getAutoBackupCapabilities?: () => {
