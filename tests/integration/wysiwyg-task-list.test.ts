@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { mountWysiwygEditor } from '../helpers/mountWysiwygEditor'
+import { wysiwygInsertTaskList } from '@/utils/wysiwygFormat'
 
 const LOOSE_TASK_LIST = `# 任务清单
 
@@ -35,7 +36,7 @@ describe('WysiwygEditor 任务清单', () => {
     await wrapper.unmount()
   }, 15000)
 
-  it('不应把 [x] 语法泄漏为可见文本', async () => {
+  it('不应把 [x] / [ ] 语法泄漏为可见文本', async () => {
     const { wrapper, prose } = await mountWysiwygEditor(LOOSE_TASK_LIST)
     expect(prose.textContent).not.toMatch(/\[x\]/i)
     expect(prose.textContent).not.toMatch(/\[ \]/)
@@ -65,7 +66,22 @@ describe('WysiwygEditor 任务清单', () => {
 
     const items = [...prose.querySelectorAll('li[data-item-type="task"]')]
     expect(items[0].getAttribute('data-checked')).toBe('false')
-    expect(store.liveContent).toContain('* [ ] 任务1')
+    expect(store.liveContent).toContain('- [ ] 任务1')
+    await wrapper.unmount()
+  }, 15000)
+
+  it('通过任务列表插入能力应生成 3 条未勾选任务并回写 Markdown', async () => {
+    const { wrapper, prose, store } = await mountWysiwygEditor('')
+    const editor = (wrapper.vm as { editor: unknown }).editor
+
+    wysiwygInsertTaskList(editor as Parameters<typeof wysiwygInsertTaskList>[0])
+
+    await new Promise((resolve) => setTimeout(resolve, 400))
+
+    const items = [...prose.querySelectorAll('li[data-item-type="task"]')]
+    expect(items).toHaveLength(3)
+    expect(items.every((item) => item.getAttribute('data-checked') === 'false')).toBe(true)
+    expect(store.liveContent).toContain('- [ ] ')
     await wrapper.unmount()
   }, 15000)
 })

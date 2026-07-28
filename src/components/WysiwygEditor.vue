@@ -3,6 +3,7 @@
     <FormatToolbar
       v-if="!focusMode"
       :char-count="charCount"
+      :show-task-list-button="!focusMode"
       @bold="onToolbarBold"
       @italic="onToolbarItalic"
       @strike="onToolbarStrike"
@@ -13,6 +14,7 @@
       @h3="onToolbarH3"
       @bullet-list="onToolbarBulletList"
       @ordered-list="onToolbarOrderedList"
+      @task-list="onToolbarTaskList"
       @blockquote="onToolbarBlockquote"
       @inline-code="onToolbarInlineCode"
       @code-block="onToolbarCodeBlock"
@@ -125,6 +127,7 @@ import {
   wysiwygWrapBlockquote,
   wysiwygWrapBulletList,
   wysiwygWrapOrderedList,
+  wysiwygInsertTaskList,
   wysiwygToggleTaskItem,
   wysiwygInsertCodeBlock,
   wysiwygInsertTable,
@@ -220,6 +223,7 @@ function onToolbarH2() { wysiwygSetHeading(editor, 2) }
 function onToolbarH3() { wysiwygSetHeading(editor, 3) }
 function onToolbarBulletList() { wysiwygWrapBulletList(editor) }
 function onToolbarOrderedList() { wysiwygWrapOrderedList(editor) }
+function onToolbarTaskList() { wysiwygInsertTaskList(editor) }
 function onToolbarBlockquote() { wysiwygWrapBlockquote(editor) }
 function onToolbarInlineCode() { wysiwygToggleInlineCode(editor) }
 function onToolbarCodeBlock() { wysiwygInsertCodeBlock(editor) }

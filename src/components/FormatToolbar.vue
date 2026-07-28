@@ -32,6 +32,16 @@
       <span class="toolbar-group-label" data-testid="toolbar-group-list">列表</span>
       <button type="button" title="无序列表" aria-label="无序列表" @click="$emit('bulletList')">≡</button>
       <button type="button" title="有序列表" aria-label="有序列表" @click="$emit('orderedList')">1.</button>
+      <button
+        v-if="showTaskListButton"
+        type="button"
+        data-testid="toolbar-task-list"
+        title="任务列表"
+        aria-label="任务列表"
+        @click="$emit('taskList')"
+      >
+        [x]
+      </button>
       <button type="button" title="引用块" aria-label="引用块" @click="$emit('blockquote')">❝</button>
     </div>
 
@@ -78,7 +88,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-defineProps<{ charCount?: number }>()
+withDefaults(defineProps<{ charCount?: number; showTaskListButton?: boolean }>(), {
+  showTaskListButton: true,
+})
 
 const emit = defineEmits<{
   bold: []
@@ -91,6 +103,7 @@ const emit = defineEmits<{
   h3: []
   bulletList: []
   orderedList: []
+  taskList: []
   blockquote: []
   inlineCode: []
   codeBlock: []

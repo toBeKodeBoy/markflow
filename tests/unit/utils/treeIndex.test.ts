@@ -17,4 +17,18 @@ describe('treeIndex', () => {
     expect(index.notesByFolder.get('a')).toHaveLength(1)
     expect(countNotesInSubtree(index, 'a')).toBe(2)
   })
+
+  it('notesByFolder 应按置顶优先排序（写入 Map 后生效）', () => {
+    const mixed: NoteListItem[] = [
+      { id: 'normal', title: 'README', updatedAt: 100 },
+      { id: 'pin', title: '00-学习地图', updatedAt: 50, pinned: true },
+      { id: 'older', title: '旧笔记', updatedAt: 10 },
+    ]
+    const index = buildTreeIndex([], mixed)
+    expect(index.notesByFolder.get(undefined)?.map((n) => n.id)).toEqual([
+      'pin',
+      'normal',
+      'older',
+    ])
+  })
 })

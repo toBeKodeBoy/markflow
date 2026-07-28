@@ -31,6 +31,7 @@ import {
   wysiwygDeleteCol,
   wysiwygDeleteTable,
   wysiwygToggleTaskItem,
+  wysiwygInsertTaskList,
 } from '../../../src/utils/wysiwygFormat'
 
 const schema = new Schema({
@@ -156,6 +157,15 @@ function createTaskListView(): EditorView {
   const doc = taskSchema.node('doc', null, [
     taskSchema.node('bullet_list', null, [item(false, 'first'), item(true, 'second')]),
   ])
+  return new EditorView(parent, {
+    state: EditorState.create({ doc }),
+  })
+}
+
+function createEmptyTaskEditorView(s: Schema): EditorView {
+  const parent = document.createElement('div')
+  document.body.appendChild(parent)
+  const doc = s.node('doc', null, [s.node('paragraph')])
   return new EditorView(parent, {
     state: EditorState.create({ doc }),
   })
@@ -528,5 +538,30 @@ describe('wysiwygToggleTaskItem', () => {
 
     expect(wysiwygToggleTaskItem(editor, paragraph)).toBe(false)
     view.destroy()
+  })
+})
+
+describe('wysiwygInsertTaskList', () => {
+  it('inserts 3 unchecked task items and moves the cursor to the first item content', () => {
+    const view = createEmptyTaskEditorView(taskSchema)
+    const focusSpy = vi.spyOn(view, 'focus')
+    const editor = createEditorWithCommands(view, vi.fn(), taskSchema)
+
+    wysiwygInsertTaskList(editor)
+
+    const list = view.state.doc.child(0)
+    expect(list.type.name).toBe('bullet_list')
+    expect(list.childCount).toBe(3)
+    expect(list.child(0).attrs.checked).toBe(false)
+    expect(list.child(1).attrs.checked).toBe(false)
+    expect(list.child(2).attrs.checked).toBe(false)
+    expect(view.state.selection.from).toBe(4)
+    expect(view.state.selection.to).toBe(4)
+    expect(focusSpy).toHaveBeenCalledOnce()
+    view.destroy()
+  })
+
+  it('does nothing when editor is null', () => {
+    wysiwygInsertTaskList(null)
   })
 })

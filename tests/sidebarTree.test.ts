@@ -61,6 +61,16 @@ describe('sidebarTree', () => {
     expect(rows[rows.length - 1].note?.title).toBe('Root')
   })
 
+  it('根级置顶笔记应排在非置顶根笔记之前', () => {
+    const mixedNotes: NoteListItem[] = [
+      { id: 'n-readme', title: 'README', updatedAt: 100 },
+      { id: 'n-pin', title: '00-学习地图', updatedAt: 50, pinned: true },
+    ]
+    const rows = flattenSidebarTree(folders, mixedNotes, new Set())
+    const rootNotes = rows.filter((r) => r.kind === 'note').map((r) => r.note!.id)
+    expect(rootNotes).toEqual(['n-pin', 'n-readme'])
+  })
+
   it('collects ancestor folder ids for a note', () => {
     const note = notes[1]
     expect(collectAncestorIdsForNote(note, folders)).toEqual(['f2', 'f1'])
