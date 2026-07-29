@@ -27,6 +27,7 @@ describe('backup', () => {
       sidebarVisible: true,
       sidebarExpandedFolderIds: ['f1'],
       sidebarActiveFolderId: 'f1',
+      recentNoteAccess: [{ noteId: 'n1', openedAt: 99 }],
     }
 
     const savedNotes: Note[] = []
@@ -61,6 +62,7 @@ describe('backup', () => {
     expect(savedFolders).toEqual(folders)
     expect(savedNotes).toHaveLength(1)
     expect(savedSettings.sidebarExpandedFolderIds).toEqual(['f1'])
+    expect(savedSettings.recentNoteAccess).toEqual([{ noteId: 'n1', openedAt: 99 }])
   })
 
   it('strips legacy tags from exported notes', () => {

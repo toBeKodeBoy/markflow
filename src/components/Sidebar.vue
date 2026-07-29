@@ -251,6 +251,8 @@ import SidebarTreeRowView from './SidebarTreeRow.vue'
 import { useAppSettings, clampSidebarWidth } from '../composables/useAppSettings'
 import { useNoteSort } from '../composables/useNoteSort'
 import { sortNotes } from '../utils/noteSort'
+import { buildRecentNoteList } from '../utils/recentNotes'
+import { RECENT_FOLDER_ID, RECENT_FOLDER_NAME } from '../constants/recentFolder'
 
 const SIDEBAR_ROW_HEIGHT = 42
 const VIRTUAL_THRESHOLD = 150
@@ -303,12 +305,47 @@ const noteSort = useNoteSort({
 const treeIndex = computed(() => buildTreeIndex(store.folderList, store.searchedNoteList))
 const isSearching = computed(() => store.searchQuery.trim().length > 0)
 
-const sidebarRows = computed(() =>
+const recentNotes = computed(() =>
+  buildRecentNoteList(appSettings.settings.value?.recentNoteAccess ?? [], store.searchedNoteList)
+)
+
+const baseSidebarRows = computed(() =>
   flattenSidebarTree(store.folderList, store.searchedNoteList, expandedFolderIds.value, {
     hideEmptyFolders: isSearching.value,
     index: treeIndex.value,
   })
 )
+
+const sidebarRows = computed(() => {
+  const base = baseSidebarRows.value
+  const recent = recentNotes.value
+
+  if (isSearching.value && recent.length === 0) {
+    return base
+  }
+
+  const recentExpanded = expandedFolderIds.value.has(RECENT_FOLDER_ID)
+  const recentFolderRow: SidebarTreeRow = {
+    kind: 'folder',
+    depth: 0,
+    folder: { id: RECENT_FOLDER_ID, name: RECENT_FOLDER_NAME, order: -1 },
+    hasChildren: recent.length > 0,
+    noteCount: recent.length,
+    isSystemFolder: true,
+  }
+
+  const recentNoteRows: SidebarTreeRow[] = recentExpanded
+    ? recent.map((note) => ({
+        kind: 'note' as const,
+        depth: 1,
+        note,
+        hasChildren: false,
+        isRecentView: true,
+      }))
+    : []
+
+  return [recentFolderRow, ...recentNoteRows, ...base]
+})
 
 const useVirtualTree = computed(() => sidebarRows.value.length > VIRTUAL_THRESHOLD)
 const virtualListHeight = computed(() => sidebarRows.value.length * SIDEBAR_ROW_HEIGHT)
@@ -327,7 +364,9 @@ const visibleSidebarRows = computed(() =>
 )
 
 const showTreeEmpty = computed(() => {
-  if (isSearching.value) return store.searchedNoteList.length === 0
+  if (isSearching.value) {
+    return store.searchedNoteList.length === 0 && recentNotes.value.length === 0
+  }
   return store.noteList.length === 0 && store.folderList.length === 0
 })
 
@@ -352,7 +391,12 @@ const moveFolderRows = computed(() =>
 )
 
 function rowKey(row: SidebarTreeRow, suffix = '') {
-  const base = row.kind === 'folder' ? `f-${row.folder!.id}` : `n-${row.note!.id}`
+  const base =
+    row.kind === 'folder'
+      ? `f-${row.folder!.id}`
+      : row.isRecentView
+        ? `n-recent-${row.note!.id}`
+        : `n-${row.note!.id}`
   return suffix ? `${base}-${suffix}` : base
 }
 
@@ -404,6 +448,10 @@ function handleCreateEntry(payload: { kind: 'note' | 'folder'; id: string; paren
 }
 
 function onFolderClick(folderId: string, hasChildren: boolean) {
+  if (folderId === RECENT_FOLDER_ID) {
+    toggleExpand(folderId)
+    return
+  }
   if (hasChildren) toggleExpand(folderId)
   store.activeFolderId = folderId
   persistSidebarState()
@@ -436,6 +484,7 @@ function commitRenameFolder() {
 }
 
 function openFolderContextMenu(e: MouseEvent, folderId: string) {
+  if (folderId === RECENT_FOLDER_ID) return
   noteContextMenu.value = null
   folderContextMenu.value = { folderId, x: e.clientX, y: e.clientY }
 }
@@ -588,6 +637,7 @@ function onDropOnNote(targetId: string, position: 'before' | 'after') {
 }
 
 function onFolderDragOver(folderId: string) {
+  if (folderId === RECENT_FOLDER_ID) return
   if (!dragPayload.value) return
   if (dragPayload.value.kind === 'folder' && dragPayload.value.id === folderId) return
   if (
@@ -600,6 +650,7 @@ function onFolderDragOver(folderId: string) {
 }
 
 function onDropOnFolder(folderId: string) {
+  if (folderId === RECENT_FOLDER_ID) return
   dragOverFolderId.value = null
   const payload = dragPayload.value
   dragPayload.value = null
@@ -668,7 +719,7 @@ function onGlobalClick() {
 watch(
   () => store.activeFolderId,
   (folderId) => {
-    if (!folderId) return
+    if (!folderId || folderId === RECENT_FOLDER_ID) return
     const next = new Set(expandedFolderIds.value)
     for (const id of collectAncestorFolderIds(folderId, store.folderList)) next.add(id)
     expandedFolderIds.value = next
@@ -710,8 +761,13 @@ watch(
 onMounted(() => {
   document.addEventListener('click', onGlobalClick)
   const settings = appSettings.get()
-  if (settings.sidebarExpandedFolderIds?.length) {
-    expandedFolderIds.value = new Set(settings.sidebarExpandedFolderIds)
+  // 只有在配置字段缺失（undefined）时才默认展开「最新」；
+  // 若用户显式折叠导致配置为空数组（[]），应保持折叠状态。
+  const expandedFromSettings = settings.sidebarExpandedFolderIds
+  if (expandedFromSettings !== undefined) {
+    expandedFolderIds.value = new Set(expandedFromSettings)
+  } else {
+    expandedFolderIds.value = new Set([RECENT_FOLDER_ID])
   }
   if (settings.sidebarActiveFolderId) {
     store.activeFolderId = settings.sidebarActiveFolderId

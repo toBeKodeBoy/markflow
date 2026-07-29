@@ -14,6 +14,7 @@ import {
   clearTabContentCache,
 } from './tabContentCache'
 import { registerEditorTabsBridge } from './editorTabsBridge'
+import { touchRecentNote } from '../utils/recentNotes'
 import type { EditorTab } from '../types'
 
 type SaveBehavior = { save: boolean }
@@ -81,6 +82,7 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
       noteStore.setActiveNote(note, tab.liveContent)
       noteStore.applyLargeFilePolicy(tab.liveContent)
     }
+    touchRecentNote(noteId)
     persistTabs()
   }
 

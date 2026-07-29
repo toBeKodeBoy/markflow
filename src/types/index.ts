@@ -126,6 +126,13 @@ export interface EditorTabsSettings {
   activeNoteId: string | null
 }
 
+/** 最近访问的笔记记录 */
+export interface RecentNoteAccess {
+  noteId: string
+  /** 最后一次打开时间 */
+  openedAt: number
+}
+
 export interface EditorTab {
   noteId: string
   liveContent: string
@@ -159,6 +166,8 @@ export interface AppSettings {
   autoBackup?: AutoBackupSettings
   /** 上次打开的编辑器 Tab（启动时恢复） */
   editorTabs?: EditorTabsSettings
+  /** 最近访问的笔记（LRU，最多 30 条） */
+  recentNoteAccess?: RecentNoteAccess[]
   imageExport?: ImageExportSettings
 }
 

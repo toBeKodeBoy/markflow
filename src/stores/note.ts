@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useStorage } from '../composables/useStorage'
+import { useAppSettings } from '../composables/useAppSettings'
 import { getAssetStorage } from '../composables/useAssetStorage'
 import { collectAllNoteContents } from '../utils/resolveMarkdownAssets'
 import { LARGE_FILE_THRESHOLD } from '../constants'
@@ -20,6 +21,7 @@ import type { Note, NoteListItem, Folder, TocJumpTarget, EditorContentPush, Impo
 import { extractNoteTitle } from '../utils/noteTitle'
 import { getTabContentCache, setTabContentCache } from './tabContentCache'
 import { notifyNoteDeleted, notifyLibraryReset } from './editorTabsBridge'
+import { touchRecentNote, clearRecentNote } from '../utils/recentNotes'
 
 /** 将笔记正文规范化为可搜索文本（小写），截断到 2000 字节省内存 */
 function normalizeForSearch(text: string): string {
@@ -243,6 +245,7 @@ export const useNoteStore = defineStore('note', () => {
       currentNote.value.updatedAt = note.updatedAt
       liveContent.value = content
     }
+    touchRecentNote(noteId, note.updatedAt)
   }
 
   /** 创建空白笔记，保存到存储，设为当前 */
@@ -351,6 +354,7 @@ export const useNoteStore = defineStore('note', () => {
       (noteId) => storage.getNote(noteId)
     )
     void getAssetStorage().gcOrphans(contents)
+    clearRecentNote(id)
     notifyNoteDeleted(id)
   }
 
@@ -627,6 +631,7 @@ export const useNoteStore = defineStore('note', () => {
     const assetStorage = getAssetStorage()
     await assetStorage.clearAllAssets()
     applyBackup(backup, storage)
+    useAppSettings().load()
     for (const item of backup.assets.index) {
       const record = backup.assets.records[item.id]
       if (record) await assetStorage.saveAssetAsync(item.id, record)
@@ -656,6 +661,7 @@ export const useNoteStore = defineStore('note', () => {
   async function clearAllLibraryData() {
     const assetStorage = getAssetStorage()
     storage.clearAllNotesAndFolders()
+    useAppSettings().save({ recentNoteAccess: [] })
     await assetStorage.clearAllAssets()
     noteList.value = []
     folderList.value = []
