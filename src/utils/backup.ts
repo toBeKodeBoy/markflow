@@ -157,6 +157,7 @@ export function applyBackup(
     ...current,
     sidebarExpandedFolderIds: backup.settings.sidebarExpandedFolderIds,
     sidebarActiveFolderId: backup.settings.sidebarActiveFolderId,
+    recentNoteAccess: backup.settings.recentNoteAccess,
   }
   storage.saveSettings(next)
   return next

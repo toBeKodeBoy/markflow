@@ -9,6 +9,10 @@ export interface SidebarTreeRow {
   hasChildren: boolean
   /** 子树笔记数（仅 folder 行） */
   noteCount?: number
+  /** 「最新」虚拟系统文件夹 */
+  isSystemFolder?: boolean
+  /** 「最新」下的笔记行 */
+  isRecentView?: boolean
 }
 
 /** Folder has child folders or notes */

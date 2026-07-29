@@ -3,19 +3,20 @@
     v-if="row.kind === 'folder'"
     class="folder-item"
     :class="{
-      active: activeFolderId === row.folder!.id,
-      'drag-over': dragOverFolderId === row.folder!.id,
+      active: !row.isSystemFolder && activeFolderId === row.folder!.id,
+      'drag-over': !row.isSystemFolder && dragOverFolderId === row.folder!.id,
       'is-empty': (row.noteCount ?? 0) === 0,
+      'system-folder': row.isSystemFolder,
     }"
     :style="rowStyle"
-    draggable="true"
+    :draggable="!row.isSystemFolder"
     @click="$emit('folder-click', row.folder!.id, row.hasChildren)"
-    @dblclick.stop="$emit('start-rename-folder', row.folder!)"
-    @contextmenu.prevent="$emit('folder-context', $event, row.folder!.id)"
-    @dragstart.stop="onDragStart('folder', row.folder!.id, $event)"
-    @dragover.prevent.stop="$emit('drag-over-folder', row.folder!.id)"
-    @dragleave.stop="$emit('drag-leave-folder')"
-    @drop.prevent.stop="$emit('drop-on-folder', row.folder!.id)"
+    @dblclick.stop="!row.isSystemFolder && $emit('start-rename-folder', row.folder!)"
+    @contextmenu.prevent="!row.isSystemFolder && $emit('folder-context', $event, row.folder!.id)"
+    @dragstart.stop="!row.isSystemFolder && onDragStart('folder', row.folder!.id, $event)"
+    @dragover.prevent.stop="!row.isSystemFolder && $emit('drag-over-folder', row.folder!.id)"
+    @dragleave.stop="!row.isSystemFolder && $emit('drag-leave-folder')"
+    @drop.prevent.stop="!row.isSystemFolder && $emit('drop-on-folder', row.folder!.id)"
   >
     <button
       v-if="row.hasChildren"
@@ -27,8 +28,14 @@
       <AppIcon :name="expanded ? 'chevron-down' : 'chevron-right'" :size="12" />
     </button>
     <span v-else class="folder-toggle-spacer" aria-hidden="true" />
+    <AppIcon
+      v-if="row.isSystemFolder"
+      name="clock"
+      :size="14"
+      class="system-folder-icon"
+    />
     <input
-      v-if="renamingFolderId === row.folder!.id"
+      v-if="!row.isSystemFolder && renamingFolderId === row.folder!.id"
       :value="renamingFolderName"
       class="rename-input"
       autofocus
@@ -48,18 +55,19 @@
     :class="{
       active: currentNoteId === row.note!.id,
       pinned: row.note!.pinned,
-      'drag-over-top': dragOverNoteId === row.note!.id && dragOverNotePosition === 'before',
-      'drag-over-bottom': dragOverNoteId === row.note!.id && dragOverNotePosition === 'after',
+      'recent-view': row.isRecentView,
+      'drag-over-top': !row.isRecentView && dragOverNoteId === row.note!.id && dragOverNotePosition === 'before',
+      'drag-over-bottom': !row.isRecentView && dragOverNoteId === row.note!.id && dragOverNotePosition === 'after',
     }"
     :style="rowStyle"
-    draggable="true"
+    :draggable="!row.isRecentView"
     @click="$emit('note-click', row.note!.id)"
     @dblclick.stop="$emit('start-rename-note', row.note!.id)"
     @contextmenu.prevent="$emit('note-context', $event, row.note!.id)"
-    @dragstart.stop="onDragStart('note', row.note!.id, $event)"
-    @dragover.prevent.stop="onNoteDragOver($event, row.note!.id)"
-    @dragleave.stop="$emit('drag-leave-note')"
-    @drop.prevent.stop="onNoteDrop($event, row.note!.id)"
+    @dragstart.stop="!row.isRecentView && onDragStart('note', row.note!.id, $event)"
+    @dragover.prevent.stop="!row.isRecentView && onNoteDragOver($event, row.note!.id)"
+    @dragleave.stop="!row.isRecentView && $emit('drag-leave-note')"
+    @drop.prevent.stop="!row.isRecentView && onNoteDrop($event, row.note!.id)"
   >
     <span v-if="row.note!.pinned" class="note-pin-icon" title="已置顶">📌</span>
     <input

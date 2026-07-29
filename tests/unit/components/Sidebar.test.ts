@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import Sidebar from '../../../src/components/Sidebar.vue'
 import { useNoteStore } from '../../../src/stores/note'
+import { useEditorTabsStore } from '../../../src/stores/editorTabs'
 
 let pinia: Pinia
 let styleEl: HTMLStyleElement | null = null
@@ -25,8 +26,15 @@ function mountSidebar() {
         SidebarTreeRowView: {
           props: ['row'],
           template: `
-            <div class="sidebar-row-stub">
+            <div class="sidebar-row-stub" :data-kind="row.kind" :data-recent="row.isRecentView ? '1' : '0'">
               {{ row.kind === 'folder' ? row.folder.name : row.note.title }}
+              <button
+                v-if="row.kind === 'folder'"
+                class="folder-click-trigger"
+                @click="$emit('folder-click', row.folder.id, row.hasChildren)"
+              >
+                folder-click
+              </button>
               <button
                 v-if="row.kind === 'folder'"
                 class="folder-context-trigger"
@@ -123,7 +131,8 @@ describe('Sidebar', () => {
     expect(wrapper.text()).toContain('置顶')
     expect(wrapper.text()).toContain('删除')
 
-    await wrapper.get('.folder-context-trigger').trigger('click')
+    const folderTriggers = wrapper.findAll('.folder-context-trigger')
+    await folderTriggers[1].trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('新建子文件夹')
     expect(wrapper.text()).toContain('新建笔记')
@@ -161,5 +170,93 @@ describe('Sidebar', () => {
     )
 
     await wrapper.unmount()
+  })
+
+  it('renders the recent virtual folder at the top of the sidebar tree', async () => {
+    const store = useNoteStore()
+    const tabsStore = useEditorTabsStore()
+    const note = store.createNoteWithContent('# Recent note\n')
+    tabsStore.openTab(note.id)
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    const rows = wrapper.findAll('.sidebar-row-stub')
+    expect(rows[0].text()).toContain('最新')
+    expect(rows.some((row) => row.text().includes('Recent note'))).toBe(true)
+  })
+
+  it('clicking the recent folder does not change activeFolderId', async () => {
+    const store = useNoteStore()
+    const folder = store.createFolder('工作区')
+    store.activeFolderId = folder.id
+    store.createNoteWithContent('# Recent\n')
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    const recentTrigger = wrapper.find('.folder-click-trigger')
+    await recentTrigger.trigger('click')
+    await flushPromises()
+
+    expect(store.activeFolderId).toBe(folder.id)
+  })
+
+  it('filters recent notes when searching', async () => {
+    const store = useNoteStore()
+    const tabsStore = useEditorTabsStore()
+    const alpha = store.createNoteWithContent('# Alpha\n')
+    const beta = store.createNoteWithContent('# Beta\n')
+    tabsStore.openTab(alpha.id)
+    tabsStore.openTab(beta.id)
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    store.searchQuery = 'beta'
+    await flushPromises()
+
+    const recentRows = wrapper
+      .findAll('.sidebar-row-stub')
+      .filter((row) => row.attributes('data-recent') === '1')
+    expect(recentRows).toHaveLength(1)
+    expect(recentRows[0].text()).toContain('Beta')
+  })
+
+  it('collapsing the recent folder should persist after remount', async () => {
+    const store = useNoteStore()
+    const tabsStore = useEditorTabsStore()
+
+    const note = store.createNoteWithContent('# Recent note\n')
+    tabsStore.openTab(note.id)
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    // Collapse the only folder row ("最新")
+    const recentFolderRow = wrapper
+      .findAll('.sidebar-row-stub')
+      .find((row) => row.attributes('data-kind') === 'folder' && row.text().includes('最新'))
+    expect(recentFolderRow).toBeTruthy()
+
+    const toggleBtn = recentFolderRow!.find('.folder-click-trigger')
+    await toggleBtn.trigger('click')
+    await flushPromises()
+
+    const recentNoteRowsAfterCollapse = wrapper
+      .findAll('.sidebar-row-stub')
+      .filter((row) => row.attributes('data-recent') === '1')
+    expect(recentNoteRowsAfterCollapse).toHaveLength(0)
+
+    await wrapper.unmount()
+
+    const wrapper2 = mountSidebar()
+    await flushPromises()
+
+    const recentNoteRowsAfterRemount = wrapper2
+      .findAll('.sidebar-row-stub')
+      .filter((row) => row.attributes('data-recent') === '1')
+    // If collapse persisted, recent notes should not render.
+    expect(recentNoteRowsAfterRemount).toHaveLength(0)
   })
 })

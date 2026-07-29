@@ -29,6 +29,18 @@ describe('useEditorTabsStore', () => {
     expect(noteStore.liveContent).toBe('# Tab A\n')
   })
 
+  it('openTab 会记录最近访问', () => {
+    const noteStore = useNoteStore()
+    const tabsStore = useEditorTabsStore()
+    const note = noteStore.createNoteWithContent('# Tab A\n')
+    noteStore.setActiveNote(null, '')
+
+    tabsStore.openTab(note.id)
+
+    const settings = JSON.parse(localStorage.getItem('markflow_settings') ?? '{}')
+    expect(settings.recentNoteAccess?.[0]?.noteId).toBe(note.id)
+  })
+
   it('re-opening an existing tab only activates it', () => {
     const noteStore = useNoteStore()
     const tabsStore = useEditorTabsStore()

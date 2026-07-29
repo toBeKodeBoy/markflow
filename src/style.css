@@ -649,6 +649,20 @@ input:focus { border-color: var(--primary); }
 .folder-item:hover { background: var(--bg-hover); }
 .folder-item.active { background: var(--bg-active); color: var(--primary); }
 
+.folder-item.system-folder {
+  color: var(--text-muted);
+}
+
+.folder-item.system-folder .folder-name {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.system-folder-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
 .folder-icon { font-size: 11px; color: var(--text-muted); }
 
 .folder-toggle {

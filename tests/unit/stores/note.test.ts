@@ -60,6 +60,24 @@ describe('useNoteStore', () => {
     expect(store.noteList.find((n) => n.id === note.id)?.pinned).toBe(true)
   })
 
+  it('updateNoteContent 会记录最近访问', () => {
+    const store = useNoteStore()
+    const note = store.createNoteWithContent('# A\nbody')
+    store.updateNoteContent(note.id, '# A\nupdated body')
+    const settings = JSON.parse(localStorage.getItem('markflow_settings') ?? '{}')
+    expect(settings.recentNoteAccess?.[0]?.noteId).toBe(note.id)
+  })
+
+  it('deleteNote 会清除最近访问记录', () => {
+    const store = useNoteStore()
+    const note = store.createNoteWithContent('# A\nbody')
+    store.updateNoteContent(note.id, '# A\nupdated')
+    store.deleteNote(note.id)
+    const settings = JSON.parse(localStorage.getItem('markflow_settings') ?? '{}')
+    const access = settings.recentNoteAccess ?? []
+    expect(access.some((entry: { noteId: string }) => entry.noteId === note.id)).toBe(false)
+  })
+
   it('reorderNotes 会更新同级 sortOrder', () => {
     const store = useNoteStore()
     const folder = store.createFolder('工作')
@@ -113,11 +131,14 @@ describe('useNoteStore', () => {
   it('clearAllLibraryData 会清空笔记和文件夹', async () => {
     const store = useNoteStore()
     store.createFolder('docs')
-    store.createNoteWithContent('# A')
+    const note = store.createNoteWithContent('# A')
+    store.updateNoteContent(note.id, '# A\nupdated')
     await store.clearAllLibraryData()
     expect(store.noteList).toEqual([])
     expect(store.folderList).toEqual([])
     expect(store.currentNote).toBeNull()
+    const settings = JSON.parse(localStorage.getItem('markflow_settings') ?? '{}')
+    expect(settings.recentNoteAccess ?? []).toEqual([])
   })
 
   it('batchImportFromFolder 会增量更新 noteList 并写入搜索索引', async () => {

@@ -45,13 +45,17 @@
     <template v-else-if="name === 'close'">
       <path d="M6 6l12 12M18 6L6 18" />
     </template>
+    <template v-else-if="name === 'clock'">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </template>
   </svg>
 </template>
 
 <script setup lang="ts">
 withDefaults(
   defineProps<{
-    name: 'menu' | 'folder' | 'file' | 'settings' | 'toc' | 'plus' | 'file-menu' | 'chevron-down' | 'chevron-right' | 'trash' | 'close'
+    name: 'menu' | 'folder' | 'file' | 'settings' | 'toc' | 'plus' | 'file-menu' | 'chevron-down' | 'chevron-right' | 'trash' | 'close' | 'clock'
     size?: number
   }>(),
   { size: 16 }
