@@ -241,6 +241,25 @@ export function findRootFolderByName(folders: Folder[], name: string): Folder | 
   return folders.find((f) => f.name === name && f.parentId === undefined)
 }
 
+/** Folder-scoped title map key; root notes share `__root__` */
+export function folderTitleKey(folderId?: string): string {
+  return folderId ?? '__root__'
+}
+
+/** Get or create the title set for a folder within a titles-by-folder map */
+export function getOrCreateTitleSet(
+  titlesByFolder: Map<string, Set<string>>,
+  folderId?: string
+): Set<string> {
+  const key = folderTitleKey(folderId)
+  let set = titlesByFolder.get(key)
+  if (!set) {
+    set = new Set()
+    titlesByFolder.set(key, set)
+  }
+  return set
+}
+
 /** Resolve unique note title given existing titles */
 export function resolveUniqueTitle(
   title: string,
@@ -259,14 +278,15 @@ export function resolveUniqueTitle(
 export function ensureFolderForPath(
   dirPath: string,
   folders: Folder[],
-  createFolder: (name: string, parentId?: string) => Folder
+  createFolder: (name: string, parentId?: string) => Folder,
+  initialParentId?: string
 ): string {
   const segments = normalizeRelativePath(dirPath).split('/').filter(Boolean)
   if (segments.length === 0) {
     throw new Error('ensureFolderForPath: empty dirPath')
   }
 
-  let parentId: string | undefined
+  let parentId = initialParentId
   for (const segment of segments) {
     const existing = folders.find((f) => f.name === segment && f.parentId === parentId)
     if (existing) {

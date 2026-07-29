@@ -7,6 +7,8 @@ import {
   parseFolderSequence,
   compareImportFolderNames,
   resolveUniqueTitle,
+  folderTitleKey,
+  getOrCreateTitleSet,
   isBlankContent,
   shouldSkipDirName,
   isImportableTextFilename,
@@ -102,6 +104,28 @@ describe('importFolderHelpers', () => {
     it('returns null when skip and conflict', () => {
       const existing = new Set(['Doc'])
       expect(resolveUniqueTitle('Doc', existing, 'skip')).toBeNull()
+    })
+  })
+
+  describe('folderTitleKey / getOrCreateTitleSet', () => {
+    it('maps undefined folderId to __root__', () => {
+      expect(folderTitleKey(undefined)).toBe('__root__')
+      expect(folderTitleKey('f1')).toBe('f1')
+    })
+
+    it('reuses the same Set for a folder and creates missing ones', () => {
+      const map = new Map<string, Set<string>>()
+      const rootSet = getOrCreateTitleSet(map, undefined)
+      rootSet.add('A')
+      expect(getOrCreateTitleSet(map, undefined)).toBe(rootSet)
+      expect(getOrCreateTitleSet(map, undefined).has('A')).toBe(true)
+
+      const folderSet = getOrCreateTitleSet(map, 'f1')
+      expect(folderSet).not.toBe(rootSet)
+      folderSet.add('A')
+      expect(rootSet.has('A')).toBe(true)
+      expect(folderSet.has('A')).toBe(true)
+      expect(map.size).toBe(2)
     })
   })
 
@@ -207,5 +231,22 @@ describe('ensureFolderForPath', () => {
     expect(folders).toHaveLength(2)
     expect(folders[0]).toMatchObject({ name: 'docs', parentId: undefined })
     expect(folders[1]).toMatchObject({ name: 'guide', parentId: 'f-1' })
+  })
+
+  it('creates nested folders under provided parentId', async () => {
+    const { ensureFolderForPath } = await import('../src/utils/importFolderHelpers')
+    const folders: Folder[] = [{ id: 'root', name: 'project', order: 0 }]
+    let n = 0
+
+    const id = ensureFolderForPath('docs/guide', folders, (name, parentId) => ({
+      id: `f-${++n}`,
+      name,
+      order: folders.length,
+      parentId,
+    }), 'root')
+
+    expect(id).toBe('f-2')
+    expect(folders[1]).toMatchObject({ name: 'docs', parentId: 'root' })
+    expect(folders[2]).toMatchObject({ name: 'guide', parentId: 'f-1' })
   })
 })
