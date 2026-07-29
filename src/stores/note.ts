@@ -734,11 +734,14 @@ export const useNoteStore = defineStore('note', () => {
       }
 
       return result
-    } finally {
-      // 无论成功或失败，都从 storage 重载确保响应式状态与持久化一致
+    } catch (err) {
+      // 失败路径：onNotesCommitted 已写入的条目需从 storage 重载清除
       noteList.value = storage.getNoteList()
       folderList.value = storage.getFolderList()
+      throw err
     }
+    // 成功路径：onNotesCommitted 已增量维护 noteList，无需全量重载（避免千份文件 UI 冻结）
+    folderList.value = storage.getFolderList()
   }
 
   function getNoteContentById(id: string): string {

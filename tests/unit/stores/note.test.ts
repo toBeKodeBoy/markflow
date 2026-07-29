@@ -153,4 +153,87 @@ describe('useNoteStore', () => {
       Object.values(store.contentSearchIndex).some((t) => t.includes('search-token-a'))
     ).toBe(true)
   })
+
+  it('成功导入后 noteList 不应从 storage 全量重载（避免千份文件 UI 冻结）', async () => {
+    const store = useNoteStore()
+    const getItemSpy = vi.spyOn(localStorage, 'getItem')
+
+    // 记录导入前的调用次数作为基线
+    const callsBefore = getItemSpy.mock.calls.filter((c) => c[0] === 'markflow_note_list').length
+
+    await store.batchImportFromFolder(
+      {
+        rootPath: '/tmp/demo',
+        files: [
+          { relativePath: 'x.md', content: '# X', images: [] },
+          { relativePath: 'y.md', content: '# Y', images: [] },
+        ],
+      },
+      {
+        preserveStructure: false,
+        onConflict: 'rename',
+        importImages: false,
+        replaceExisting: false,
+        selectedPaths: null,
+      }
+    )
+
+    const callsAfter = getItemSpy.mock.calls.filter((c) => c[0] === 'markflow_note_list').length
+    // 成功路径：finally 块不应再调用 getNoteList 全量重载
+    // saveNoteBatch 内部需要 1 次 getNoteList 做 upsert，这是必要的
+    expect(callsAfter - callsBefore).toBe(1)
+    // 数据仍然正确
+    expect(store.noteList).toHaveLength(2)
+    expect(store.noteList.map((n) => n.title).sort()).toEqual(['x', 'y'])
+
+    getItemSpy.mockRestore()
+  })
+
+  it('导入失败时 noteList 应从 storage 重载以清除已回滚的幽灵条目', async () => {
+    const store = useNoteStore()
+    const getItemSpy = vi.spyOn(localStorage, 'getItem')
+    const callsBefore = getItemSpy.mock.calls.filter((c) => c[0] === 'markflow_note_list').length
+
+    // 让 bridge.saveNote 在第二次调用时失败，模拟部分写入后回滚
+    const storage = (store as any)._storage || null
+    // useStorage 内部持有 bridge 引用，通过 mock localStorage.setItem 间接触发失败不可靠，
+    // 改为直接 mock storage 层的 saveNote：让它在处理第二个 note 时抛错
+    const origSaveNote = localStorage.setItem.bind(localStorage)
+    let saveCount = 0
+    vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, value: string) => {
+      if (key.startsWith('markflow_note_')) {
+        saveCount++
+        if (saveCount === 2) throw new Error('quota exceeded')
+      }
+      return origSaveNote(key, value)
+    })
+
+    await expect(
+      store.batchImportFromFolder(
+        {
+          rootPath: '/tmp/demo',
+          files: [
+            { relativePath: 'a.md', content: '# A', images: [] },
+            { relativePath: 'b.md', content: '# B', images: [] },
+          ],
+        },
+        {
+          preserveStructure: false,
+          onConflict: 'rename',
+          importImages: false,
+          replaceExisting: false,
+          selectedPaths: null,
+        }
+      )
+    ).rejects.toThrow()
+
+    const callsAfter = getItemSpy.mock.calls.filter((c) => c[0] === 'markflow_note_list').length
+    // 失败路径：finally 块必须调用 getNoteList 重载以清除 onNotesCommitted 写入的幽灵条目
+    expect(callsAfter - callsBefore).toBeGreaterThanOrEqual(1)
+    // noteList 应与 storage 一致（回滚后为空）
+    expect(store.noteList).toEqual([])
+
+    vi.mocked(localStorage.setItem).mockRestore()
+    getItemSpy.mockRestore()
+  })
 })
