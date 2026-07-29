@@ -20,16 +20,29 @@ import {
 } from './importFolderHelpers'
 import { importMarkdownImages } from './importMarkdownImages'
 
+/** 每批写入 storage 的笔记数 */
+export const IMPORT_COMMIT_BATCH_SIZE = 50
+/** 每隔多少个文件 yield 一次，让出主线程 */
+export const IMPORT_YIELD_INTERVAL = 10
+
 export interface FolderImportDeps {
   getFolderList: () => Folder[]
   getExistingNotes?: () => Array<Pick<Note, 'folderId' | 'sortOrder'>>
   saveFolderList: (folders: Folder[]) => void
   saveNote: (note: Note) => void
+  /** 批量写笔记（可选）；缺省时 fallback 为逐条 saveNote */
+  saveNoteBatch?: (notes: Note[]) => void
+  /** 一批笔记成功提交后回调（用于增量更新 UI） */
+  onNotesCommitted?: (notes: Note[]) => void
   getExistingTitlesByFolder: () => Map<string, Set<string>>
   saveImageFromBase64: (base64: string, mime: string, filename?: string) => Promise<string>
   removeNote?: (id: string) => void
   removeAsset?: (id: string) => void | Promise<void>
   onProgress?: (progress: ImportFolderProgress) => void
+  /** 测试可覆盖默认批次大小 */
+  commitBatchSize?: number
+  /** 测试可覆盖默认 yield 间隔 */
+  yieldInterval?: number
 }
 
 function generateId(): string {
@@ -132,32 +145,113 @@ async function importStandaloneImageNote(
   }
 }
 
-async function rollbackImport(
+async function rollbackBatch(
   deps: FolderImportDeps,
-  folderSnapshot: Folder[],
-  pendingNotes: Note[],
-  createdAssetIds: string[]
+  batchNotes: Note[],
+  batchAssetIds: string[],
+  folders: Folder[],
+  foldersAtLastCommit: Folder[],
+  lastSavedFolderCount: { value: number },
+  titlesByFolder: Map<string, Set<string>>
 ): Promise<void> {
   if (deps.removeNote) {
-    for (const note of pendingNotes) {
+    for (const note of batchNotes) {
       deps.removeNote(note.id)
     }
   }
-  deps.saveFolderList(folderSnapshot)
+  for (const note of batchNotes) {
+    getOrCreateTitleSet(titlesByFolder, note.folderId).delete(note.title)
+  }
+  // 恢复到上一成功提交时的文件夹快照，避免失败批次留下空文件夹
+  const restored = foldersAtLastCommit.map((f) => ({ ...f }))
+  folders.splice(0, folders.length, ...restored)
+  lastSavedFolderCount.value = folders.length
+  deps.saveFolderList(restored)
   if (deps.removeAsset) {
-    for (const id of createdAssetIds) {
+    for (const id of batchAssetIds) {
       await deps.removeAsset(id)
     }
   }
 }
 
-/** Batch import markdown files from a folder scan result (atomic commit) */
+async function flushPending(params: {
+  deps: FolderImportDeps
+  pendingNotes: Note[]
+  uncommittedAssetIds: string[]
+  folders: Folder[]
+  foldersAtLastCommit: { value: Folder[] }
+  initialFolderCount: number
+  lastSavedFolderCount: { value: number }
+  titlesByFolder: Map<string, Set<string>>
+  result: ImportFolderResult
+}): Promise<void> {
+  const {
+    deps,
+    pendingNotes,
+    uncommittedAssetIds,
+    folders,
+    foldersAtLastCommit,
+    initialFolderCount,
+    lastSavedFolderCount,
+    titlesByFolder,
+    result,
+  } = params
+
+  if (pendingNotes.length === 0) return
+
+  const batch = pendingNotes.splice(0, pendingNotes.length)
+  const batchAssets = uncommittedAssetIds.splice(0, uncommittedAssetIds.length)
+
+  try {
+    if (folders.length !== lastSavedFolderCount.value) {
+      deps.saveFolderList(folders)
+      lastSavedFolderCount.value = folders.length
+      result.foldersCreated = Math.max(0, folders.length - initialFolderCount)
+    }
+
+    if (deps.saveNoteBatch) {
+      deps.saveNoteBatch(batch)
+    } else {
+      for (const note of batch) {
+        deps.saveNote(note)
+      }
+    }
+
+    deps.onNotesCommitted?.(batch)
+    result.imported += batch.length
+    if (!result.firstImportedNoteId && batch[0]) {
+      result.firstImportedNoteId = batch[0].id
+    }
+    foldersAtLastCommit.value = folders.map((f) => ({ ...f }))
+  } catch (err) {
+    await rollbackBatch(
+      deps,
+      batch,
+      batchAssets,
+      folders,
+      foldersAtLastCommit.value,
+      lastSavedFolderCount,
+      titlesByFolder
+    )
+    const reason = err instanceof Error ? err.message : String(err)
+    throw new Error(`导入提交失败，已回滚当前批次：${reason}`)
+  }
+}
+
+function yieldToUi(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
+/** Batch import markdown files from a folder scan result（边处理边提交） */
 export async function runFolderImport(
   scan: ImportFolderScanResult,
   options: ImportFolderOptions,
   deps: FolderImportDeps
 ): Promise<ImportFolderResult> {
   const files = filterSelectedFiles(scan, options.selectedPaths)
+  const commitBatchSize = deps.commitBatchSize ?? IMPORT_COMMIT_BATCH_SIZE
+  const yieldInterval = deps.yieldInterval ?? IMPORT_YIELD_INTERVAL
+
   const result: ImportFolderResult = {
     imported: 0,
     skipped: 0,
@@ -168,13 +262,14 @@ export async function runFolderImport(
   }
 
   const folders = [...deps.getFolderList()]
-  const folderSnapshot = folders.map((f) => ({ ...f }))
+  const foldersAtLastCommit = { value: folders.map((f) => ({ ...f })) }
   const initialFolderCount = folders.length
+  const lastSavedFolderCount = { value: initialFolderCount }
   const titlesByFolder = deps.getExistingTitlesByFolder()
   const existingNotes = deps.getExistingNotes?.() ?? []
   const total = files.length
   const pendingNotes: Note[] = []
-  const createdAssetIds: string[] = []
+  const uncommittedAssetIds: string[] = []
   const nextFolderOrderByParent = new Map<string, number>()
   const nextNoteOrderByFolder = new Map<string, number>()
 
@@ -245,14 +340,14 @@ export async function runFolderImport(
         ;({ content, imported, warnings } = await importStandaloneImageNote(
           file,
           deps.saveImageFromBase64,
-          createdAssetIds
+          uncommittedAssetIds
         ))
       } else {
         ;({ content, imported, warnings } = await importImagesForFile(
           file,
           options.importImages,
           deps.saveImageFromBase64,
-          createdAssetIds
+          uncommittedAssetIds
         ))
         content = formatImportTextContent(content, file.relativePath)
       }
@@ -273,30 +368,43 @@ export async function runFolderImport(
         updatedAt: now,
       }
       pendingNotes.push(note)
-      result.imported++
-      if (!result.firstImportedNoteId) result.firstImportedNoteId = note.id
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err)
       result.failed.push({ path: file.relativePath, reason })
     }
+
+    if ((i + 1) % yieldInterval === 0) {
+      await yieldToUi()
+    }
+
+    if (pendingNotes.length >= commitBatchSize) {
+      await flushPending({
+        deps,
+        pendingNotes,
+        uncommittedAssetIds,
+        folders,
+        foldersAtLastCommit,
+        initialFolderCount,
+        lastSavedFolderCount,
+        titlesByFolder,
+        result,
+      })
+      deps.onProgress?.({ current: i + 1, total, path: file.relativePath })
+    }
   }
 
-  if (pendingNotes.length === 0) {
-    return result
-  }
-
-  try {
-    if (folders.length > initialFolderCount) {
-      deps.saveFolderList(folders)
-      result.foldersCreated = folders.length - initialFolderCount
-    }
-    for (const note of pendingNotes) {
-      deps.saveNote(note)
-    }
-  } catch (err) {
-    await rollbackImport(deps, folderSnapshot, pendingNotes, createdAssetIds)
-    const reason = err instanceof Error ? err.message : String(err)
-    throw new Error(`导入提交失败，已回滚：${reason}`)
+  if (pendingNotes.length > 0) {
+    await flushPending({
+      deps,
+      pendingNotes,
+      uncommittedAssetIds,
+      folders,
+      foldersAtLastCommit,
+      initialFolderCount,
+      lastSavedFolderCount,
+      titlesByFolder,
+      result,
+    })
   }
 
   return result

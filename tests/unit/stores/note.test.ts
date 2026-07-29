@@ -119,4 +119,38 @@ describe('useNoteStore', () => {
     expect(store.folderList).toEqual([])
     expect(store.currentNote).toBeNull()
   })
+
+  it('batchImportFromFolder 会增量更新 noteList 并写入搜索索引', async () => {
+    const store = useNoteStore()
+    const lengths: number[] = []
+
+    const result = await store.batchImportFromFolder(
+      {
+        rootPath: '/tmp/demo',
+        files: [
+          { relativePath: 'a.md', content: '# Alpha\nsearch-token-a', images: [] },
+          { relativePath: 'b.md', content: '# Beta\nsearch-token-b', images: [] },
+        ],
+      },
+      {
+        preserveStructure: false,
+        onConflict: 'rename',
+        importImages: false,
+        replaceExisting: false,
+        selectedPaths: null,
+      },
+      () => {
+        lengths.push(store.noteList.length)
+      }
+    )
+
+    expect(result.imported).toBe(2)
+    expect(store.noteList.length).toBe(2)
+    expect(store.noteList.map((n) => n.title).sort()).toEqual(['a', 'b'])
+    const ids = store.noteList.map((n) => n.id)
+    expect(store.contentSearchIndex[ids[0]] || store.contentSearchIndex[ids[1]]).toBeTruthy()
+    expect(
+      Object.values(store.contentSearchIndex).some((t) => t.includes('search-token-a'))
+    ).toBe(true)
+  })
 })

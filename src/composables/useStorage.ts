@@ -170,6 +170,28 @@ export function useStorage() {
     saveNoteList(list)
   }
 
+  /** 批量保存笔记：逐条写本体，noteList 只读写一次 */
+  function saveNoteBatch(notes: Note[]) {
+    if (notes.length === 0) return
+    const list = getNoteList()
+    for (const note of notes) {
+      const sanitized = sanitizeNote(note)
+      bridge.saveNote(sanitized.id, sanitized)
+      const item: NoteListItem = {
+        id: sanitized.id,
+        title: sanitized.title,
+        folderId: sanitized.folderId,
+        updatedAt: sanitized.updatedAt,
+        pinned: sanitized.pinned || undefined,
+        sortOrder: sanitized.sortOrder,
+      }
+      const idx = list.findIndex((n) => n.id === sanitized.id)
+      if (idx >= 0) list[idx] = item
+      else list.unshift(item)
+    }
+    saveNoteList(list)
+  }
+
   /** 删除笔记并从列表移除 */
   function removeNote(id: string) {
     const list = getNoteList().filter(n => n.id !== id)
@@ -206,5 +228,17 @@ export function useStorage() {
     bridge.saveSettings(settings)
   }
 
-  return { getNoteList, saveNoteList, getNote, saveNote, removeNote, clearAllNotesAndFolders, getFolderList, saveFolderList, getSettings, saveSettings }
+  return {
+    getNoteList,
+    saveNoteList,
+    getNote,
+    saveNote,
+    saveNoteBatch,
+    removeNote,
+    clearAllNotesAndFolders,
+    getFolderList,
+    saveFolderList,
+    getSettings,
+    saveSettings,
+  }
 }

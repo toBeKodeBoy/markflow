@@ -678,46 +678,67 @@ export const useNoteStore = defineStore('note', () => {
     }
 
     const assetStorage = getAssetStorage()
-    const result = await runFolderImport(scan, options, {
-      getFolderList: () => folderList.value,
-      saveFolderList: (list) => {
-        folderList.value = list
-        storage.saveFolderList(list)
-      },
-      saveNote: (note) => {
-        storage.saveNote(note)
-        updateSearchIndex(note.id, note.content)
-      },
-      removeNote: (id) => {
-        storage.removeNote(id)
-      },
-      removeAsset: (id) => assetStorage.removeAssetAsync(id),
-      getExistingTitlesByFolder: () => {
-        if (options.replaceExisting) return new Map<string, Set<string>>()
-        const map = new Map<string, Set<string>>()
-        for (const note of noteList.value) {
-          getOrCreateTitleSet(map, note.folderId).add(note.title)
+    try {
+      const result = await runFolderImport(scan, options, {
+        getFolderList: () => folderList.value,
+        saveFolderList: (list) => {
+          folderList.value = list
+          storage.saveFolderList(list)
+        },
+        saveNote: (note) => {
+          storage.saveNote(note)
+          updateSearchIndex(note.id, note.content)
+        },
+        saveNoteBatch: (notes) => {
+          storage.saveNoteBatch(notes)
+          for (const note of notes) {
+            updateSearchIndex(note.id, note.content)
+          }
+        },
+        onNotesCommitted: (notes) => {
+          for (const note of notes) {
+            noteList.value.push({
+              id: note.id,
+              title: note.title,
+              folderId: note.folderId,
+              updatedAt: note.updatedAt,
+              pinned: note.pinned,
+              sortOrder: note.sortOrder,
+            })
+          }
+        },
+        removeNote: (id) => {
+          storage.removeNote(id)
+        },
+        removeAsset: (id) => assetStorage.removeAssetAsync(id),
+        getExistingTitlesByFolder: () => {
+          if (options.replaceExisting) return new Map<string, Set<string>>()
+          const map = new Map<string, Set<string>>()
+          for (const note of noteList.value) {
+            getOrCreateTitleSet(map, note.folderId).add(note.title)
+          }
+          return map
+        },
+        saveImageFromBase64: (base64, mime, filename) =>
+          saveImportImageAsAsset(base64, mime, filename, assetStorage.saveFromBlob),
+        onProgress,
+        getExistingNotes: () => noteList.value,
+      })
+
+      if (result.firstImportedNoteId) {
+        notifyLibraryReset(result.firstImportedNoteId)
+        const imported = storage.getNote(result.firstImportedNoteId)
+        if (imported?.folderId) {
+          activeFolderId.value = imported.folderId
         }
-        return map
-      },
-      saveImageFromBase64: (base64, mime, filename) =>
-        saveImportImageAsAsset(base64, mime, filename, assetStorage.saveFromBlob),
-      onProgress,
-      getExistingNotes: () => noteList.value,
-    })
-
-    noteList.value = storage.getNoteList()
-    folderList.value = storage.getFolderList()
-
-    if (result.firstImportedNoteId) {
-      notifyLibraryReset(result.firstImportedNoteId)
-      const imported = storage.getNote(result.firstImportedNoteId)
-      if (imported?.folderId) {
-        activeFolderId.value = imported.folderId
       }
-    }
 
-    return result
+      return result
+    } finally {
+      // 无论成功或失败，都从 storage 重载确保响应式状态与持久化一致
+      noteList.value = storage.getNoteList()
+      folderList.value = storage.getFolderList()
+    }
   }
 
   function getNoteContentById(id: string): string {

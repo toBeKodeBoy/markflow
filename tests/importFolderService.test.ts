@@ -490,11 +490,245 @@ describe('runFolderImport — Phase 3 selection', () => {
   })
 })
 
-describe('runFolderImport — atomic commit', () => {
-  it('rolls back notes, folders and assets when commit fails', async () => {
+describe('runFolderImport — incremental commit', () => {
+  it('flushes with saveNoteBatch and notifies onNotesCommitted', async () => {
+    const folders: Folder[] = []
+    const notes: Note[] = []
+    const committedBatches: Note[][] = []
+    const saveNoteBatch = vi.fn((batch: Note[]) => {
+      notes.push(...batch)
+    })
+    const saveNote = vi.fn()
+
+    const files = Array.from({ length: 5 }, (_, i) => ({
+      path: `n${i}.md`,
+      content: `# N${i}`,
+    }))
+
+    const result = await runFolderImport(
+      makeScan(files),
+      {
+        preserveStructure: true,
+        onConflict: 'rename',
+        importImages: false,
+        selectedPaths: null,
+      },
+      {
+        getFolderList: () => folders,
+        saveFolderList: (list) => {
+          folders.splice(0, folders.length, ...list)
+        },
+        saveNote,
+        saveNoteBatch,
+        onNotesCommitted: (batch) => {
+          committedBatches.push([...batch])
+        },
+        getExistingTitlesByFolder: () => new Map(),
+        saveImageFromBase64: vi.fn(async () => 'asset-id'),
+        commitBatchSize: 2,
+        yieldInterval: 100,
+      }
+    )
+
+    expect(result.imported).toBe(5)
+    expect(saveNoteBatch).toHaveBeenCalledTimes(3) // 2+2+1
+    expect(saveNote).not.toHaveBeenCalled()
+    expect(committedBatches.map((b) => b.length)).toEqual([2, 2, 1])
+    expect(notes).toHaveLength(5)
+  })
+
+  it('yields periodically during import', async () => {
+    vi.useFakeTimers()
+    const folders: Folder[] = []
+    const notes: Note[] = []
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout')
+
+    const files = Array.from({ length: 5 }, (_, i) => ({
+      path: `y${i}.md`,
+      content: `# Y${i}`,
+    }))
+
+    const importPromise = runFolderImport(
+      makeScan(files),
+      {
+        preserveStructure: false,
+        onConflict: 'rename',
+        importImages: false,
+        selectedPaths: null,
+      },
+      {
+        getFolderList: () => folders,
+        saveFolderList: () => {},
+        saveNote: (note) => notes.push(note),
+        getExistingTitlesByFolder: () => new Map(),
+        saveImageFromBase64: vi.fn(async () => 'asset-id'),
+        commitBatchSize: 50,
+        yieldInterval: 2,
+      }
+    )
+
+    await vi.runAllTimersAsync()
+    const result = await importPromise
+    expect(result.imported).toBe(5)
+    // i+1 为 2、4 时各 yield 一次
+    expect(setTimeoutSpy.mock.calls.some((c) => c[1] === 0)).toBe(true)
+    vi.useRealTimers()
+  })
+
+  it('keeps committed batches when a later flush fails', async () => {
+    const folders: Folder[] = [{ id: 'f0', name: 'existing', order: 0 }]
+    const savedNotes: Note[] = []
+    const removedNoteIds: string[] = []
+    let flushCount = 0
+
+    await expect(
+      runFolderImport(
+        makeScan([
+          { path: 'a.md', content: '# A' },
+          { path: 'b.md', content: '# B' },
+          { path: 'c.md', content: '# C' },
+        ]),
+        {
+          preserveStructure: false,
+          onConflict: 'rename',
+          importImages: false,
+          selectedPaths: null,
+        },
+        {
+          getFolderList: () => folders,
+          saveFolderList: (list) => {
+            folders.splice(0, folders.length, ...list)
+          },
+          saveNote: () => {
+            throw new Error('should use batch')
+          },
+          saveNoteBatch: (batch) => {
+            flushCount++
+            if (flushCount === 2) throw new Error('disk full')
+            savedNotes.push(...batch)
+          },
+          removeNote: (id) => {
+            removedNoteIds.push(id)
+          },
+          getExistingTitlesByFolder: () => new Map(),
+          saveImageFromBase64: vi.fn(async () => 'asset-id'),
+          commitBatchSize: 2,
+          yieldInterval: 100,
+        }
+      )
+    ).rejects.toThrow('已回滚当前批次')
+
+    expect(savedNotes).toHaveLength(2)
+    expect(removedNoteIds).toHaveLength(1) // 仅第三批失败回滚
+    expect(folders.find((f) => f.id === 'f0')).toBeTruthy()
+  })
+
+  it('prunes folders created only for the failing batch', async () => {
+    const folders: Folder[] = []
+    let flushCount = 0
+
+    await expect(
+      runFolderImport(
+        makeScan([
+          { path: 'docs/a.md', content: '# A' },
+          { path: 'other/b.md', content: '# B' },
+        ]),
+        {
+          preserveStructure: true,
+          onConflict: 'rename',
+          importImages: false,
+          selectedPaths: null,
+        },
+        {
+          getFolderList: () => folders,
+          saveFolderList: (list) => {
+            folders.splice(0, folders.length, ...list)
+          },
+          saveNote: () => {
+            throw new Error('should use batch')
+          },
+          saveNoteBatch: () => {
+            flushCount++
+            if (flushCount === 2) throw new Error('disk full')
+          },
+          removeNote: () => {},
+          getExistingTitlesByFolder: () => new Map(),
+          saveImageFromBase64: vi.fn(async () => 'asset-id'),
+          commitBatchSize: 1,
+          yieldInterval: 100,
+        }
+      )
+    ).rejects.toThrow('已回滚当前批次')
+
+    expect(folders.some((f) => f.name === 'docs')).toBe(true)
+    expect(folders.some((f) => f.name === 'other')).toBe(false)
+    expect(folders.some((f) => f.name === 'project')).toBe(true)
+  })
+
+  it('falls back to saveNote when saveNoteBatch is absent', async () => {
+    const notes: Note[] = []
+    const saveNote = vi.fn((note: Note) => notes.push(note))
+
+    const result = await runFolderImport(
+      makeScan([{ path: 'solo.md', content: '# Solo' }]),
+      {
+        preserveStructure: false,
+        onConflict: 'rename',
+        importImages: false,
+        selectedPaths: null,
+      },
+      {
+        getFolderList: () => [],
+        saveFolderList: () => {},
+        saveNote,
+        getExistingTitlesByFolder: () => new Map(),
+        saveImageFromBase64: vi.fn(async () => 'asset-id'),
+      }
+    )
+
+    expect(result.imported).toBe(1)
+    expect(saveNote).toHaveBeenCalledTimes(1)
+  })
+
+  it('imports 200 files with O(batches) saveNoteBatch calls', async () => {
+    const notes: Note[] = []
+    const saveNoteBatch = vi.fn((batch: Note[]) => {
+      notes.push(...batch)
+    })
+    const files = Array.from({ length: 200 }, (_, i) => ({
+      path: `f${String(i).padStart(3, '0')}.md`,
+      content: `# File ${i}`,
+    }))
+
+    const result = await runFolderImport(
+      makeScan(files),
+      {
+        preserveStructure: false,
+        onConflict: 'rename',
+        importImages: false,
+        selectedPaths: null,
+      },
+      {
+        getFolderList: () => [],
+        saveFolderList: () => {},
+        saveNote: vi.fn(),
+        saveNoteBatch,
+        getExistingTitlesByFolder: () => new Map(),
+        saveImageFromBase64: vi.fn(async () => 'asset-id'),
+        yieldInterval: 1000,
+      }
+    )
+
+    expect(result.imported).toBe(200)
+    expect(notes).toHaveLength(200)
+    expect(saveNoteBatch).toHaveBeenCalledTimes(4) // 50*4
+  })
+})
+
+describe('runFolderImport — batch rollback', () => {
+  it('rolls back only the failing batch notes and assets', async () => {
     const folders: Folder[] = [{ id: 'f0', name: 'existing', order: 0 }]
     const folderSnapshot = [...folders]
-    const savedNotes: Note[] = []
     const removedNoteIds: string[] = []
     const removedAssetIds: string[] = []
     let saveNoteCalls = 0
@@ -539,13 +773,14 @@ describe('runFolderImport — atomic commit', () => {
           },
           getExistingTitlesByFolder: () => new Map(),
           saveImageFromBase64: vi.fn(async () => 'asset-1'),
+          commitBatchSize: 50,
         }
       )
-    ).rejects.toThrow('已回滚')
+    ).rejects.toThrow('已回滚当前批次')
 
+    // 单批失败：回滚该批笔记与未提交资源；无已提交批次时可恢复文件夹快照
     expect(folders).toEqual(folderSnapshot)
     expect(removedNoteIds).toHaveLength(2)
     expect(removedAssetIds.length).toBeGreaterThan(0)
-    expect(savedNotes).toHaveLength(0)
   })
 })
