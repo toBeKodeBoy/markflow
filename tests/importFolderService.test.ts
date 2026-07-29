@@ -1,7 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { runFolderImport } from '../src/utils/importFolderService'
+import { folderTitleKey, getOrCreateTitleSet } from '../src/utils/importFolderHelpers'
 import type { ImportFolderScanResult, ImportFolderOptions } from '../src/types/import'
 import type { Folder, Note } from '../src/types'
+
+function titlesByFolder(notes: Note[]): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>()
+  for (const note of notes) {
+    getOrCreateTitleSet(map, note.folderId).add(note.title)
+  }
+  return map
+}
 
 function makeScan(files: Array<{ path: string; content: string }>): ImportFolderScanResult {
   return {
@@ -49,7 +58,7 @@ describe('runFolderImport — Phase 1', () => {
       saveFolderList,
       saveNote,
       getExistingNotes: () => notes,
-      getExistingTitles: () => new Set(notes.map((n) => n.title)),
+      getExistingTitlesByFolder: () => titlesByFolder(notes),
       saveImageFromBase64: vi.fn(async () => 'asset-id'),
       onProgress,
     })
@@ -65,11 +74,35 @@ describe('runFolderImport — Phase 1', () => {
 
     expect(result.imported).toBe(2)
     expect(result.skipped).toBe(0)
-    expect(result.foldersCreated).toBe(1)
+    expect(result.foldersCreated).toBe(2)
+    const rootFolder = folders.find((f) => f.name === 'project')
+    expect(rootFolder).toBeTruthy()
     expect(folders.some((f) => f.name === 'docs')).toBe(true)
-    expect(notes.find((n) => n.title === 'readme')?.folderId).toBeUndefined()
+    expect(notes.find((n) => n.title === 'readme')?.folderId).toBe(rootFolder?.id)
     expect(notes.find((n) => n.title === 'api')?.folderId).toBeTruthy()
     expect(notes.every((n) => n.importSourcePath)).toBe(true)
+  })
+
+  it('preserves selected root folder as top-level node when keeping structure', async () => {
+    const result = await run(
+      makeScan([
+        { path: 'README.md', content: '# README' },
+        { path: 'docs/guide/setup.md', content: '# Setup' },
+      ])
+    )
+
+    expect(result.imported).toBe(2)
+    expect(result.foldersCreated).toBe(3)
+
+    const rootFolder = folders.find((f) => f.name === 'project')
+    const docsFolder = folders.find((f) => f.name === 'docs')
+    const guideFolder = folders.find((f) => f.name === 'guide')
+
+    expect(rootFolder).toBeTruthy()
+    expect(docsFolder?.parentId).toBe(rootFolder?.id)
+    expect(guideFolder?.parentId).toBe(docsFolder?.id)
+    expect(notes.find((n) => n.title === 'README')?.folderId).toBe(rootFolder?.id)
+    expect(notes.find((n) => n.title === 'setup')?.folderId).toBe(guideFolder?.id)
   })
 
   it('sorts folders by leading integer prefix and assigns note sortOrder in that order', async () => {
@@ -83,7 +116,14 @@ describe('runFolderImport — Phase 1', () => {
     )
 
     expect(result.imported).toBe(4)
-    expect(folders.map((f) => `${f.order}:${f.name}`)).toEqual(['0:01-基础', '1:02-进阶', '2:10-附录'])
+    const rootFolder = folders.find((f) => f.name === 'project')
+    expect(rootFolder?.order).toBe(0)
+    expect(rootFolder?.parentId).toBeUndefined()
+    expect(
+      folders
+        .filter((f) => f.parentId === rootFolder?.id)
+        .map((f) => `${f.order}:${f.name}`)
+    ).toEqual(['0:01-基础', '1:02-进阶', '2:10-附录'])
 
     const baseFolderId = folders.find((f) => f.name === '01-基础')?.id
     expect(
@@ -207,7 +247,41 @@ describe('runFolderImport — Phase 1', () => {
     expect(result.skipped).toBe(1)
   })
 
-  it('renames conflicting titles', async () => {
+  it('keeps same title across different folders', async () => {
+    const result = await run(
+      makeScan([
+        { path: 'docs/README.md', content: '# Docs README' },
+        { path: 'api/README.md', content: '# API README' },
+      ])
+    )
+
+    expect(result.imported).toBe(2)
+    const readmes = notes.filter((n) => n.title === 'README')
+    expect(readmes).toHaveLength(2)
+    expect(readmes[0].folderId).not.toBe(readmes[1].folderId)
+  })
+
+  it('renames conflicting titles within the same folder', async () => {
+    folders = [{ id: 'f1', name: 'target', order: 0 }]
+    notes = [{
+      id: '1',
+      title: 'doc',
+      content: '',
+      folderId: 'f1',
+      createdAt: 1,
+      updatedAt: 1,
+    }]
+
+    const result = await run(
+      makeScan([{ path: 'doc.md', content: '# Doc Title\n\nnew' }]),
+      { preserveStructure: false, targetFolderId: 'f1' }
+    )
+
+    expect(result.imported).toBe(1)
+    expect(notes.some((n) => n.title === 'doc (2)' && n.folderId === 'f1')).toBe(true)
+  })
+
+  it('does not rename when existing same title is in another folder', async () => {
     notes = [{
       id: '1',
       title: 'doc',
@@ -219,25 +293,46 @@ describe('runFolderImport — Phase 1', () => {
     const result = await run(makeScan([{ path: 'doc.md', content: '# Doc Title\n\nnew' }]))
 
     expect(result.imported).toBe(1)
-    expect(notes.some((n) => n.title === 'doc (2)')).toBe(true)
+    expect(notes.filter((n) => n.title === 'doc')).toHaveLength(2)
+    expect(notes.some((n) => n.title === 'doc (2)')).toBe(false)
+    expect(folderTitleKey(notes.find((n) => n.id !== '1')?.folderId)).not.toBe('__root__')
   })
 
   it('skips conflicting titles when onConflict is skip', async () => {
+    folders = [{ id: 'f1', name: 'target', order: 0 }]
     notes = [{
       id: '1',
       title: 'doc',
       content: '',
+      folderId: 'f1',
       createdAt: 1,
       updatedAt: 1,
     }]
 
     const result = await run(
       makeScan([{ path: 'doc.md', content: '# Doc\n\nnew' }]),
-      { onConflict: 'skip' }
+      { preserveStructure: false, targetFolderId: 'f1', onConflict: 'skip' }
     )
 
     expect(result.imported).toBe(0)
     expect(result.skipped).toBe(1)
+  })
+
+  it('renames batch duplicates in the same directory', async () => {
+    const result = await run(
+      makeScan([
+        { path: 'docs/README.md', content: '# One' },
+        { path: 'docs/README.md', content: '# Two' },
+      ])
+    )
+
+    expect(result.imported).toBe(2)
+    const docsFolder = folders.find((f) => f.name === 'docs')
+    const titles = notes
+      .filter((n) => n.folderId === docsFolder?.id)
+      .map((n) => n.title)
+      .sort()
+    expect(titles).toEqual(['README', 'README (2)'])
   })
 
   it('reports progress per file', async () => {
@@ -276,7 +371,7 @@ describe('runFolderImport — Phase 2 images', () => {
         getFolderList: () => folders,
         saveFolderList: (list) => { folders.splice(0, folders.length, ...list) },
         saveNote: (note) => notes.push(note),
-        getExistingTitles: () => new Set<string>(),
+        getExistingTitlesByFolder: () => new Map(),
         saveImageFromBase64: saveImage,
       }
     )
@@ -307,7 +402,7 @@ describe('runFolderImport — Phase 2 images', () => {
         getFolderList: () => [],
         saveFolderList: () => {},
         saveNote: () => {},
-        getExistingTitles: () => new Set<string>(),
+        getExistingTitlesByFolder: () => new Map(),
         saveImageFromBase64: vi.fn(async () => {
           throw new Error('quota')
         }),
@@ -323,6 +418,7 @@ describe('runFolderImport — Phase 2 images', () => {
 describe('runFolderImport — Phase 3 selection', () => {
   it('imports only selected paths when provided', async () => {
     const notes: Note[] = []
+    const folders: Folder[] = []
 
     const result = await runFolderImport(
       makeScan([
@@ -337,16 +433,60 @@ describe('runFolderImport — Phase 3 selection', () => {
         selectedPaths: new Set(['a.md', 'c.md']),
       },
       {
-        getFolderList: () => [],
-        saveFolderList: () => {},
+        getFolderList: () => folders,
+        saveFolderList: (list) => {
+          folders.splice(0, folders.length, ...list)
+        },
         saveNote: (n) => notes.push(n),
-        getExistingTitles: () => new Set<string>(),
+        getExistingTitlesByFolder: () => new Map(),
         saveImageFromBase64: vi.fn(),
       }
     )
 
     expect(result.imported).toBe(2)
     expect(notes.map((n) => n.title).sort()).toEqual(['a', 'c'])
+  })
+
+  it('keeps root folder and required ancestors for partial selection', async () => {
+    const notes: Note[] = []
+    const folders: Folder[] = []
+
+    const result = await runFolderImport(
+      makeScan([
+        { path: 'a.md', content: '# A' },
+        { path: 'docs/b.md', content: '# B' },
+        { path: 'docs/deep/c.md', content: '# C' },
+      ]),
+      {
+        preserveStructure: true,
+        onConflict: 'rename',
+        importImages: false,
+        replaceExisting: false,
+        selectedPaths: new Set(['docs/deep/c.md']),
+      },
+      {
+        getFolderList: () => folders,
+        saveFolderList: (list) => {
+          folders.splice(0, folders.length, ...list)
+        },
+        saveNote: (n) => notes.push(n),
+        getExistingTitlesByFolder: () => new Map(),
+        saveImageFromBase64: vi.fn(),
+      }
+    )
+
+    expect(result.imported).toBe(1)
+    expect(result.foldersCreated).toBe(3)
+
+    const rootFolder = folders.find((f) => f.name === 'project')
+    const docsFolder = folders.find((f) => f.name === 'docs')
+    const deepFolder = folders.find((f) => f.name === 'deep')
+
+    expect(rootFolder).toBeTruthy()
+    expect(docsFolder?.parentId).toBe(rootFolder?.id)
+    expect(deepFolder?.parentId).toBe(docsFolder?.id)
+    expect(notes[0]?.title).toBe('c')
+    expect(notes[0]?.folderId).toBe(deepFolder?.id)
   })
 })
 
@@ -397,7 +537,7 @@ describe('runFolderImport — atomic commit', () => {
           removeAsset: (id) => {
             removedAssetIds.push(id)
           },
-          getExistingTitles: () => new Set<string>(),
+          getExistingTitlesByFolder: () => new Map(),
           saveImageFromBase64: vi.fn(async () => 'asset-1'),
         }
       )

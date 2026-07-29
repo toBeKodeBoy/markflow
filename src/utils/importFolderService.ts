@@ -12,6 +12,7 @@ import {
   getFilenameStem,
   getBasename,
   getRelativeDir,
+  getOrCreateTitleSet,
   isBlankContent,
   normalizeRelativePath,
   resolveUniqueTitle,
@@ -24,7 +25,7 @@ export interface FolderImportDeps {
   getExistingNotes?: () => Array<Pick<Note, 'folderId' | 'sortOrder'>>
   saveFolderList: (folders: Folder[]) => void
   saveNote: (note: Note) => void
-  getExistingTitles: () => Set<string>
+  getExistingTitlesByFolder: () => Map<string, Set<string>>
   saveImageFromBase64: (base64: string, mime: string, filename?: string) => Promise<string>
   removeNote?: (id: string) => void
   removeAsset?: (id: string) => void | Promise<void>
@@ -50,6 +51,30 @@ function filterSelectedFiles(
   return files
     .filter((f) => normalizedSelected.has(f.relativePath))
     .sort((a, b) => compareImportRelativePaths(a.relativePath, b.relativePath))
+}
+
+function getImportRootFolderName(rootPath: string): string {
+  const normalized = normalizeRelativePath(rootPath).replace(/\/+$/, '')
+  if (!normalized) return 'import'
+  return getBasename(normalized) || normalized
+}
+
+function ensureImportRootFolder(
+  scan: ImportFolderScanResult,
+  folders: Folder[],
+  nextFolderOrderByParent: Map<string, number>
+): string {
+  const rootName = getImportRootFolderName(scan.rootPath)
+  const existing = folders.find((f) => f.name === rootName && f.parentId === undefined)
+  if (existing) return existing.id
+
+  const folder: Folder = {
+    id: generateId(),
+    name: rootName,
+    order: nextSiblingImportOrder(nextFolderOrderByParent, undefined),
+  }
+  folders.push(folder)
+  return folder.id
 }
 
 async function importImagesForFile(
@@ -145,7 +170,7 @@ export async function runFolderImport(
   const folders = [...deps.getFolderList()]
   const folderSnapshot = folders.map((f) => ({ ...f }))
   const initialFolderCount = folders.length
-  const existingTitles = deps.getExistingTitles()
+  const titlesByFolder = deps.getExistingTitlesByFolder()
   const existingNotes = deps.getExistingNotes?.() ?? []
   const total = files.length
   const pendingNotes: Note[] = []
@@ -158,6 +183,8 @@ export async function runFolderImport(
     nextFolderOrderByParent.set(key, Math.max(nextFolderOrderByParent.get(key) ?? 0, folder.order + 1))
   }
   seedNextNoteOrderByFolder(nextNoteOrderByFolder, existingNotes)
+  // 延迟创建根文件夹，避免无笔记导入时产生孤立文件夹
+  let importRootFolderId: string | undefined
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i]
@@ -177,28 +204,38 @@ export async function runFolderImport(
       let title = isStandaloneImage
         ? getFilenameStem(file.relativePath)
         : extractImportTitle(file.content, file.relativePath)
-      const uniqueTitle = resolveUniqueTitle(title, existingTitles, options.onConflict)
+
+      let folderId: string | undefined
+      if (options.preserveStructure) {
+        if (importRootFolderId === undefined) {
+          importRootFolderId = ensureImportRootFolder(scan, folders, nextFolderOrderByParent)
+        }
+        const dir = getRelativeDir(file.relativePath)
+        folderId = dir
+          ? ensureFolderForPath(
+              dir,
+              folders,
+              (name, parentId) => ({
+                id: generateId(),
+                name,
+                order: nextSiblingImportOrder(nextFolderOrderByParent, parentId),
+                parentId,
+              }),
+              importRootFolderId
+            )
+          : importRootFolderId
+      } else {
+        folderId = options.targetFolderId
+      }
+
+      const folderTitles = getOrCreateTitleSet(titlesByFolder, folderId)
+      const uniqueTitle = resolveUniqueTitle(title, folderTitles, options.onConflict)
       if (uniqueTitle === null) {
         result.skipped++
         continue
       }
       title = uniqueTitle
-      existingTitles.add(title)
-
-      let folderId: string | undefined
-      if (options.preserveStructure) {
-        const dir = getRelativeDir(file.relativePath)
-        if (dir) {
-          folderId = ensureFolderForPath(dir, folders, (name, parentId) => ({
-            id: generateId(),
-            name,
-            order: nextSiblingImportOrder(nextFolderOrderByParent, parentId),
-            parentId,
-          }))
-        }
-      } else {
-        folderId = options.targetFolderId
-      }
+      folderTitles.add(title)
 
       let content: string
       let imported: number

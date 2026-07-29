@@ -32,7 +32,7 @@
         </label>
 
         <label v-if="!draft.replaceExisting" class="import-option-row">
-          <span class="import-option-label">重名笔记</span>
+          <span class="import-option-label">同文件夹内重名</span>
           <select v-model="draft.onConflict" class="import-option-select">
             <option value="rename">自动重命名</option>
             <option value="skip">跳过</option>

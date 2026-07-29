@@ -10,6 +10,7 @@ import { buildBackupAsync, applyBackup, parseBackup, downloadBackupJson, type Ma
 import { planSortOrderMigration } from '../utils/migrateNoteSortOrder'
 import { sortNotes } from '../utils/noteSort'
 import { runFolderImport, saveImportImageAsAsset } from '../utils/importFolderService'
+import { getOrCreateTitleSet } from '../utils/importFolderHelpers'
 import { importMarkdownImages } from '../utils/importMarkdownImages'
 import { extractAssetIds } from '../utils/assetUri'
 import { sanitizeFilename } from '../utils/exportPdf'
@@ -691,8 +692,14 @@ export const useNoteStore = defineStore('note', () => {
         storage.removeNote(id)
       },
       removeAsset: (id) => assetStorage.removeAssetAsync(id),
-      getExistingTitles: () =>
-        options.replaceExisting ? new Set<string>() : new Set(noteList.value.map((n) => n.title)),
+      getExistingTitlesByFolder: () => {
+        if (options.replaceExisting) return new Map<string, Set<string>>()
+        const map = new Map<string, Set<string>>()
+        for (const note of noteList.value) {
+          getOrCreateTitleSet(map, note.folderId).add(note.title)
+        }
+        return map
+      },
       saveImageFromBase64: (base64, mime, filename) =>
         saveImportImageAsAsset(base64, mime, filename, assetStorage.saveFromBlob),
       onProgress,
