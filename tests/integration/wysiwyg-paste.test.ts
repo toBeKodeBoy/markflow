@@ -4,10 +4,14 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { editorViewCtx } from '@milkdown/core'
+import { TextSelection } from '@milkdown/prose/state'
+import type { EditorView } from '@milkdown/prose/view'
 import { useNoteStore } from '@/stores/note'
 import { mountWysiwygEditor } from '../helpers/mountWysiwygEditor'
 
 const PASTE_MD = '# Test\n\n**bold**'
+const LIST_MD = '- 列表1\n- 列表2\n- 列表3'
 
 function mockClipboard(payload: {
   plain: string
@@ -87,6 +91,92 @@ describe('WysiwygEditor 粘贴 Markdown', () => {
 
     expect(prose.querySelector('h1')?.textContent).toContain('Test')
     expect(prose.querySelector('pre')).toBeNull()
+
+    await wrapper.unmount()
+  }, 15000)
+
+  it('代码块内粘贴列表源码时应作为纯文本写入代码块', async () => {
+    const { wrapper, prose, store } = await mountWysiwygEditor('```text\nplaceholder\n```')
+    const editor = (wrapper.vm as { editor?: { action: (runner: (ctx: unknown) => void) => void } }).editor
+
+    let view: EditorView | undefined
+    editor?.action((ctx) => {
+      view = (ctx as { get: (value: typeof editorViewCtx) => EditorView }).get(editorViewCtx)
+    })
+
+    expect(view).toBeTruthy()
+
+    let codeBlockPos = -1
+    view!.state.doc.descendants((node, pos) => {
+      if (node.type.name !== 'code_block') return true
+      codeBlockPos = pos
+      return false
+    })
+
+    expect(codeBlockPos).toBeGreaterThanOrEqual(0)
+
+    const start = codeBlockPos + 1
+    const end = start + 'placeholder'.length
+    view!.dispatch(view!.state.tr.setSelection(TextSelection.create(view!.state.doc, start, end)))
+    view!.focus()
+
+    dispatchPaste(prose, mockClipboard({
+      plain: LIST_MD,
+      html: '<ul><li>列表1</li><li>列表2</li><li>列表3</li></ul>',
+    }))
+
+    await flushPromises()
+    await new Promise((r) => setTimeout(r, 200))
+
+    expect(store.liveContent).toContain('```text\n- 列表1\n- 列表2\n- 列表3\n```')
+    expect(store.liveContent).not.toContain('\n```\n\n- 列表1')
+
+    await wrapper.unmount()
+  }, 15000)
+
+  it('跨出代码块的选区粘贴时不应误走代码块纯文本分支', async () => {
+    const { wrapper, prose, store } = await mountWysiwygEditor('```text\nplaceholder\n```\n\nafter')
+    const editor = (wrapper.vm as { editor?: { action: (runner: (ctx: unknown) => void) => void } }).editor
+
+    let view: EditorView | undefined
+    editor?.action((ctx) => {
+      view = (ctx as { get: (value: typeof editorViewCtx) => EditorView }).get(editorViewCtx)
+    })
+
+    expect(view).toBeTruthy()
+
+    let codeBlockPos = -1
+    let paragraphPos = -1
+    view!.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'code_block' && codeBlockPos < 0) {
+        codeBlockPos = pos
+      }
+      if (node.type.name === 'paragraph' && node.textContent === 'after' && paragraphPos < 0) {
+        paragraphPos = pos
+      }
+      return true
+    })
+
+    expect(codeBlockPos).toBeGreaterThanOrEqual(0)
+    expect(paragraphPos).toBeGreaterThanOrEqual(0)
+
+    const from = codeBlockPos + 1
+    const to = paragraphPos + 1 + 'after'.length
+    view!.dispatch(view!.state.tr.setSelection(TextSelection.create(view!.state.doc, from, to)))
+    view!.focus()
+
+    dispatchPaste(prose, mockClipboard({
+      plain: LIST_MD,
+      html: '<ul><li>列表1</li><li>列表2</li><li>列表3</li></ul>',
+    }))
+
+    await flushPromises()
+    await new Promise((r) => setTimeout(r, 200))
+
+    expect(store.liveContent).not.toContain('```text\n- 列表1\n- 列表2\n- 列表3\n```')
+    expect(store.liveContent).not.toContain('```text\n* 列表1\n* 列表2\n* 列表3\n```')
+    expect(store.liveContent).toContain('列表1')
+    expect(store.liveContent).not.toContain('after')
 
     await wrapper.unmount()
   }, 15000)
