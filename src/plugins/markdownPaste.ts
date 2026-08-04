@@ -54,6 +54,36 @@ function isEditable(view: EditorView): boolean {
   return editable ? editable(view.state as EditorState) : true
 }
 
+function getCodeBlockPos($pos: EditorState['selection']['$from']): number | null {
+  for (let depth = $pos.depth; depth >= 0; depth--) {
+    const node = $pos.node(depth)
+    if (node.type.spec.code) return depth > 0 ? $pos.before(depth) : 0
+  }
+  return null
+}
+
+function isSelectionFullyInsideCodeBlock(view: EditorView): boolean {
+  const { $from, $to } = view.state.selection
+  const fromCodeBlockPos = getCodeBlockPos($from)
+  if (fromCodeBlockPos == null) return false
+  const toCodeBlockPos = getCodeBlockPos($to)
+  if (toCodeBlockPos == null) return false
+  return fromCodeBlockPos === toCodeBlockPos
+}
+
+function normalizeClipboardText(text: string): string {
+  return text.replace(/\r\n?/g, '\n')
+}
+
+function replaceSelectionWithPlainText(view: EditorView, text: string): boolean {
+  try {
+    view.dispatch(view.state.tr.insertText(normalizeClipboardText(text)))
+    return true
+  } catch {
+    return false
+  }
+}
+
 /// 在 clipboard 插件之后注册，优先于默认 HTML/VS Code 代码块粘贴路径解析 Markdown
 export const markdownPaste = $prose((ctx) => {
   return new Plugin({
@@ -62,10 +92,11 @@ export const markdownPaste = $prose((ctx) => {
       handlePaste(view, event) {
         const { clipboardData } = event
         if (!clipboardData || !isEditable(view)) return false
-        if (view.state.selection.$from.node().type.spec.code) return false
 
         const text = clipboardData.getData('text/plain')
         if (!text) return false
+
+        if (isSelectionFullyInsideCodeBlock(view)) return replaceSelectionWithPlainText(view, text)
 
         const html = clipboardData.getData('text/html')
         const vscodeData = clipboardData.getData('vscode-editor-data')

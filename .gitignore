@@ -30,4 +30,9 @@ coverage
 .cursor
 .codegraph/
 docs
+!docs/
+docs/*
+!docs/plans/
+docs/plans/*
+!docs/plans/unordered-list-paste-into-code-block-plan.md
 AGENTS.md
