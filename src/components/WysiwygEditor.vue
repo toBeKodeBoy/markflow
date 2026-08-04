@@ -103,6 +103,11 @@ import {
 } from '../utils/codeCopy'
 import { handleImageLightboxDblClick } from '../utils/imageLightbox'
 import { handlePreviewFragmentClick } from '../utils/previewFragmentNav'
+import {
+  handlePreviewLinkClick,
+  openPreviewExternalHref,
+  openPreviewLocalHref,
+} from '../utils/previewLinkNav'
 import { resolveMarkdownForDisplay, persistMarkdownAssets } from '../utils/resolveMarkdownAssets'
 import FormatToolbar from './FormatToolbar.vue'
 import FocusFormatToolbar from './FocusFormatToolbar.vue'
@@ -413,6 +418,14 @@ useTocJumpHandler(containerRef, store, () => isActive.value)
 function onWysiwygClick(e: MouseEvent) {
   if (handlePreviewFragmentClick(e, containerRef.value)) return
   if (handleTaskItemToggle(e)) return
+  if (handlePreviewLinkClick(e, {
+    root: containerRef.value,
+    notify: showAppNotification,
+    openExternalUrl: openPreviewExternalHref,
+    openLocalPath: openPreviewLocalHref,
+  }, {
+    requireModifierKey: true,
+  }).handled) return
   handleCodeCopyCaptureClick(e)
 }
 

@@ -375,6 +375,45 @@ window.markflow = {
     }
   },
 
+  openExternalUrl: function (url) {
+    try {
+      if (utools.shellOpenExternal) {
+        utools.shellOpenExternal(url);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('[MarkFlow] 打开外部链接失败:', err);
+      return false;
+    }
+  },
+
+  openLocalPath: function (pathOrFileUrl) {
+    try {
+      var path = pathOrFileUrl;
+      if (/^file:/i.test(pathOrFileUrl)) {
+        var fileURLToPath = require('url').fileURLToPath;
+        path = fileURLToPath(pathOrFileUrl);
+      }
+      if (utools.shellOpenPath) {
+        utools.shellOpenPath(path);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('[MarkFlow] 打开本地路径失败:', err);
+      return false;
+    }
+  },
+
+  getLinkOpenCapabilities: function () {
+    return {
+      version: 1,
+      external: typeof utools.shellOpenExternal === 'function',
+      localFile: typeof utools.shellOpenPath === 'function'
+    };
+  },
+
 
 
   // 获取 uTools 主题（dark/light）
