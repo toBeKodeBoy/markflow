@@ -16,9 +16,15 @@ import { resolveMarkdownForDisplay } from '../utils/resolveMarkdownAssets'
 import { handleCodeCopyCaptureClick } from '../utils/codeCopy'
 import { handleImageLightboxDblClick } from '../utils/imageLightbox'
 import { handlePreviewFragmentClick } from '../utils/previewFragmentNav'
+import {
+  handlePreviewLinkClick,
+  openPreviewExternalHref,
+  openPreviewLocalHref,
+} from '../utils/previewLinkNav'
 import { annotateTaskListHtml } from '../utils/taskListHtml'
 import { toggleTaskCheckedByLine } from '../utils/taskListMutations'
 import { writeClipboard } from '../utils/clipboard'
+import { showAppNotification } from '../utils/notify'
 import { hydrateMermaidBlocks, refreshMermaidBlocks } from '../utils/mermaidRender'
 import { useNoteStore } from '../stores/note'
 import { useScrollSync } from '../composables/useScrollSync'
@@ -121,6 +127,12 @@ onBeforeUnmount(() => {
 function onPreviewClick(e: MouseEvent) {
   if (handlePreviewFragmentClick(e, previewContentEl.value)) return
   if (handleTaskListToggle(e)) return
+  if (handlePreviewLinkClick(e, {
+    root: previewContentEl.value,
+    notify: showAppNotification,
+    openExternalUrl: openPreviewExternalHref,
+    openLocalPath: openPreviewLocalHref,
+  }).handled) return
   handleCodeCopyCaptureClick(e)
 }
 

@@ -1958,7 +1958,7 @@ input:focus { border-color: var(--primary); }
 
 .markdown-body p { margin: 0.8em 0; }
 
-.markdown-body a { color: var(--primary); text-decoration: underline; }
+.markdown-body a { color: var(--primary); text-decoration: underline; cursor: pointer; }
 
 .markdown-body a.md-fragment-link {
   text-decoration: none;
@@ -2795,7 +2795,7 @@ img.ProseMirror-separator {
 .ProseMirror em { font-style: italic; }
 .ProseMirror del { text-decoration: line-through; color: var(--text-muted); }
 
-.ProseMirror a { color: var(--primary); text-decoration: underline; }
+.ProseMirror a { color: var(--primary); text-decoration: underline; cursor: pointer; }
 .ProseMirror a[href^="#"],
 .ProseMirror a.md-fragment-link {
   text-decoration: none;

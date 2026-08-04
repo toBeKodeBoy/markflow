@@ -55,6 +55,13 @@ if (typeof window !== 'undefined') {
       mockStorage.setItem('markflow_settings', JSON.stringify(settings))
     }),
     showNotification: vi.fn(),
+    openExternalUrl: vi.fn(() => true),
+    openLocalPath: vi.fn(() => true),
+    getLinkOpenCapabilities: vi.fn(() => ({
+      version: 1,
+      external: true,
+      localFile: true,
+    })),
     saveMarkdownFile: vi.fn(() => true),
     selectMarkdownSavePath: vi.fn(() => ({ ok: true as const, path: 'D:\\mock\\export.md' })),
     writeTextFile: vi.fn(() => ({ ok: true as const })),

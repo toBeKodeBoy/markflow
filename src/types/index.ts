@@ -197,6 +197,19 @@ export interface MarkFlowBridge {
     html: string,
     options?: PdfExportOptions
   ) => Promise<{ ok: true } | { ok: false; reason: 'cancel' | 'error' }>
+  appendAppLog?: (
+    level: 'debug' | 'info' | 'warn' | 'error',
+    scope: string,
+    message: string,
+    data?: Record<string, unknown>,
+  ) => void | string
+  openExternalUrl?: (url: string) => boolean
+  openLocalPath?: (pathOrFileUrl: string) => boolean
+  getLinkOpenCapabilities?: () => {
+    version: number
+    external: boolean
+    localFile: boolean
+  }
   openMarkdownFile: () => ImportedMarkdownFile | null
   openMarkdownFolder: () => Promise<ImportFolderScanResult | null>
   isDarkTheme: () => boolean
