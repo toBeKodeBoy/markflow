@@ -11,89 +11,91 @@ const mockStorage = {
   deleteItem(key: string) { localStorage.removeItem(key) },
 }
 
-;(globalThis as any).__clearMockStorage = () => {
-  Object.keys(localStorage).forEach(k => localStorage.removeItem(k))
-}
+if (typeof window !== 'undefined') {
+  ;(globalThis as any).__clearMockStorage = () => {
+    Object.keys(localStorage).forEach(k => localStorage.removeItem(k))
+  }
 
-window.markflow = {
-  getNoteList: vi.fn(() => {
-    const raw = mockStorage.getItem('markflow_note_list')
-    return raw ? JSON.parse(raw) : []
-  }),
-  saveNoteList: vi.fn((list) => {
-    mockStorage.setItem('markflow_note_list', JSON.stringify(list))
-  }),
-  getNote: vi.fn((id: string) => {
-    const raw = mockStorage.getItem(`markflow_note_${id}`)
-    return raw ? JSON.parse(raw) : null
-  }),
-  saveNote: vi.fn((id: string, data) => {
-    mockStorage.setItem(`markflow_note_${id}`, JSON.stringify(data))
-  }),
-  removeNote: vi.fn((id: string) => {
-    mockStorage.deleteItem(`markflow_note_${id}`)
-  }),
-  getFolderList: vi.fn(() => {
-    const raw = mockStorage.getItem('markflow_folder_list')
-    return raw ? JSON.parse(raw) : []
-  }),
-  saveFolderList: vi.fn((list) => {
-    mockStorage.setItem('markflow_folder_list', JSON.stringify(list))
-  }),
-  getSettings: vi.fn(() => {
-    const raw = mockStorage.getItem('markflow_settings')
-    return raw ? JSON.parse(raw) : {
-      theme: 'light',
-      fontSize: 14,
-      editorFontFamily: 'monospace',
-      previewVisible: true,
-      sidebarVisible: true,
-    }
-  }),
-  saveSettings: vi.fn((settings) => {
-    mockStorage.setItem('markflow_settings', JSON.stringify(settings))
-  }),
-  showNotification: vi.fn(),
-  saveMarkdownFile: vi.fn(() => true),
-  selectMarkdownSavePath: vi.fn(() => ({ ok: true as const, path: 'D:\\mock\\export.md' })),
-  writeTextFile: vi.fn(() => ({ ok: true as const })),
-  savePdfFromHtml: vi.fn(() => Promise.resolve({ ok: true })),
-  openMarkdownFile: vi.fn(() => ({
-    content: '# Test content\n',
-    path: 'D:\\mock\\test.md',
-    name: 'test.md',
-    images: [],
-  })),
-  openMarkdownFolder: vi.fn(() =>
-    Promise.resolve({
-      rootPath: '/mock/import',
-      files: [{ relativePath: 'readme.md', content: '# Test', images: [] }],
-    })
-  ),
-  isDarkTheme: vi.fn(() => false),
-  hideMainWindow: vi.fn(),
-  copyText: vi.fn(() => true),
-  getAssetIndex: vi.fn(() => {
-    const raw = mockStorage.getItem('markflow_asset_index')
-    return raw ? JSON.parse(raw) : []
-  }),
-  saveAssetIndex: vi.fn((index) => {
-    mockStorage.setItem('markflow_asset_index', JSON.stringify(index))
-  }),
-  getAsset: vi.fn((id: string) => {
-    const raw = mockStorage.getItem(`markflow_asset_${id}`)
-    return raw ? JSON.parse(raw) : null
-  }),
-  saveAsset: vi.fn((id: string, record) => {
-    mockStorage.setItem(`markflow_asset_${id}`, JSON.stringify(record))
-  }),
-  removeAsset: vi.fn((id: string) => {
-    mockStorage.deleteItem(`markflow_asset_${id}`)
-  }),
-  ensureDirectory: vi.fn(() => ({ ok: true as const })),
-  writeAssetFile: vi.fn((filePath: string) => ({ ok: true as const, path: filePath })),
-  movePath: vi.fn(() => ({ ok: true as const })),
-  pathExists: vi.fn(() => false),
+  window.markflow = {
+    getNoteList: vi.fn(() => {
+      const raw = mockStorage.getItem('markflow_note_list')
+      return raw ? JSON.parse(raw) : []
+    }),
+    saveNoteList: vi.fn((list) => {
+      mockStorage.setItem('markflow_note_list', JSON.stringify(list))
+    }),
+    getNote: vi.fn((id: string) => {
+      const raw = mockStorage.getItem(`markflow_note_${id}`)
+      return raw ? JSON.parse(raw) : null
+    }),
+    saveNote: vi.fn((id: string, data) => {
+      mockStorage.setItem(`markflow_note_${id}`, JSON.stringify(data))
+    }),
+    removeNote: vi.fn((id: string) => {
+      mockStorage.deleteItem(`markflow_note_${id}`)
+    }),
+    getFolderList: vi.fn(() => {
+      const raw = mockStorage.getItem('markflow_folder_list')
+      return raw ? JSON.parse(raw) : []
+    }),
+    saveFolderList: vi.fn((list) => {
+      mockStorage.setItem('markflow_folder_list', JSON.stringify(list))
+    }),
+    getSettings: vi.fn(() => {
+      const raw = mockStorage.getItem('markflow_settings')
+      return raw ? JSON.parse(raw) : {
+        theme: 'light',
+        fontSize: 14,
+        editorFontFamily: 'monospace',
+        previewVisible: true,
+        sidebarVisible: true,
+      }
+    }),
+    saveSettings: vi.fn((settings) => {
+      mockStorage.setItem('markflow_settings', JSON.stringify(settings))
+    }),
+    showNotification: vi.fn(),
+    saveMarkdownFile: vi.fn(() => true),
+    selectMarkdownSavePath: vi.fn(() => ({ ok: true as const, path: 'D:\\mock\\export.md' })),
+    writeTextFile: vi.fn(() => ({ ok: true as const })),
+    savePdfFromHtml: vi.fn(() => Promise.resolve({ ok: true })),
+    openMarkdownFile: vi.fn(() => ({
+      content: '# Test content\n',
+      path: 'D:\\mock\\test.md',
+      name: 'test.md',
+      images: [],
+    })),
+    openMarkdownFolder: vi.fn(() =>
+      Promise.resolve({
+        rootPath: '/mock/import',
+        files: [{ relativePath: 'readme.md', content: '# Test', images: [] }],
+      })
+    ),
+    isDarkTheme: vi.fn(() => false),
+    hideMainWindow: vi.fn(),
+    copyText: vi.fn(() => true),
+    getAssetIndex: vi.fn(() => {
+      const raw = mockStorage.getItem('markflow_asset_index')
+      return raw ? JSON.parse(raw) : []
+    }),
+    saveAssetIndex: vi.fn((index) => {
+      mockStorage.setItem('markflow_asset_index', JSON.stringify(index))
+    }),
+    getAsset: vi.fn((id: string) => {
+      const raw = mockStorage.getItem(`markflow_asset_${id}`)
+      return raw ? JSON.parse(raw) : null
+    }),
+    saveAsset: vi.fn((id: string, record) => {
+      mockStorage.setItem(`markflow_asset_${id}`, JSON.stringify(record))
+    }),
+    removeAsset: vi.fn((id: string) => {
+      mockStorage.deleteItem(`markflow_asset_${id}`)
+    }),
+    ensureDirectory: vi.fn(() => ({ ok: true as const })),
+    writeAssetFile: vi.fn((filePath: string) => ({ ok: true as const, path: filePath })),
+    movePath: vi.fn(() => ({ ok: true as const })),
+    pathExists: vi.fn(() => false),
+  }
 }
 
 class LocalStorageMock {
@@ -105,75 +107,77 @@ class LocalStorageMock {
   get length() { return Object.keys(this.store).length }
   key(index: number) { return Object.keys(this.store)[index] ?? null }
 }
-Object.defineProperty(window, 'localStorage', { value: new LocalStorageMock() })
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'localStorage', { value: new LocalStorageMock() })
 
-vi.spyOn(console, 'warn').mockImplementation(() => {})
+  vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-/** jsdom 下 mermaid 依赖 SVG getBBox */
-if (typeof SVGElement !== 'undefined') {
-  Object.defineProperty(SVGElement.prototype, 'getBBox', {
-    configurable: true,
-    value() {
-      return { x: 0, y: 0, width: 100, height: 20 }
-    },
-  })
-}
-if (typeof Element !== 'undefined' && !Element.prototype.getBoundingClientRect) {
-  Element.prototype.getBoundingClientRect = () => ({
-    x: 0, y: 0, width: 100, height: 20,
-    top: 0, left: 0, bottom: 20, right: 100,
-    width: 100, height: 20, toJSON: () => ({}),
-  })
-}
-if (typeof Range !== 'undefined' && !Range.prototype.getClientRects) {
-  Object.defineProperty(Range.prototype, 'getClientRects', {
-    configurable: true,
-    value() {
-      const rect = {
-        x: 0, y: 0, width: 100, height: 20,
-        top: 0, left: 0, bottom: 20, right: 100,
-        toJSON: () => ({}),
-      }
-      return {
-        0: rect,
-        length: 1,
-        item: () => rect,
-        [Symbol.iterator]: function* iterator() {
-          yield rect
-        },
-      }
-    },
-  })
-}
-/** jsdom 下 mermaid htmlLabels:false 依赖 SVG 文本度量 */
-const svgTextProto =
-  typeof SVGTextElement !== 'undefined'
-    ? SVGTextElement.prototype
-    : typeof SVGElement !== 'undefined'
-      ? SVGElement.prototype
-      : null
-if (svgTextProto && !('getComputedTextLength' in svgTextProto)) {
-  Object.defineProperty(svgTextProto, 'getComputedTextLength', {
-    configurable: true,
-    value(this: { textContent: string | null }) {
-      return (this.textContent?.length ?? 1) * 8
-    },
-  })
-}
+  /** jsdom 下 mermaid 依赖 SVG getBBox */
+  if (typeof SVGElement !== 'undefined') {
+    Object.defineProperty(SVGElement.prototype, 'getBBox', {
+      configurable: true,
+      value() {
+        return { x: 0, y: 0, width: 100, height: 20 }
+      },
+    })
+  }
+  if (typeof Element !== 'undefined' && !Element.prototype.getBoundingClientRect) {
+    Element.prototype.getBoundingClientRect = () => ({
+      x: 0, y: 0, width: 100, height: 20,
+      top: 0, left: 0, bottom: 20, right: 100,
+      width: 100, height: 20, toJSON: () => ({}),
+    })
+  }
+  if (typeof Range !== 'undefined' && !Range.prototype.getClientRects) {
+    Object.defineProperty(Range.prototype, 'getClientRects', {
+      configurable: true,
+      value() {
+        const rect = {
+          x: 0, y: 0, width: 100, height: 20,
+          top: 0, left: 0, bottom: 20, right: 100,
+          toJSON: () => ({}),
+        }
+        return {
+          0: rect,
+          length: 1,
+          item: () => rect,
+          [Symbol.iterator]: function* iterator() {
+            yield rect
+          },
+        }
+      },
+    })
+  }
+  /** jsdom 下 mermaid htmlLabels:false 依赖 SVG 文本度量 */
+  const svgTextProto =
+    typeof SVGTextElement !== 'undefined'
+      ? SVGTextElement.prototype
+      : typeof SVGElement !== 'undefined'
+        ? SVGElement.prototype
+        : null
+  if (svgTextProto && !('getComputedTextLength' in svgTextProto)) {
+    Object.defineProperty(svgTextProto, 'getComputedTextLength', {
+      configurable: true,
+      value(this: { textContent: string | null }) {
+        return (this.textContent?.length ?? 1) * 8
+      },
+    })
+  }
 
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: vi.fn().mockImplementation((query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })),
-})
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  })
+}
 
 class IDBRequestMock<T = unknown> {
   result: T | undefined
@@ -255,10 +259,12 @@ const idbOpen = vi.fn(() => {
   return req
 })
 
-Object.defineProperty(window, 'indexedDB', {
-  writable: true,
-  value: { open: idbOpen },
-})
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'indexedDB', {
+    writable: true,
+    value: { open: idbOpen },
+  })
+}
 
 beforeEach(() => {
   idbStore.clear()

@@ -102,7 +102,7 @@ npm install
 npm run dev
 ```
 
-开发服务器运行在 `http://localhost:5173`。在 uTools 开发者模式中将插件目录指向本项目根目录，`plugin.json` 已配置 `development.main` 指向 localhost。
+开发服务器运行在 `http://localhost:5174`。在 uTools 开发者模式中将插件目录指向本项目根目录，`plugin.json` 已配置 `development.main` 指向 localhost。
 
 ### 生产构建
 
@@ -328,7 +328,7 @@ markflow/
   "main": "index.html",
   "preload": "preload.js",
   "development": {
-    "main": "http://localhost:5173",
+    "main": "http://localhost:5174",
     "preload": "preload.js"
   },
   "features": [{
