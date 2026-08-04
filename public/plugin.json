@@ -6,7 +6,7 @@
   "main": "index.html",
   "preload": "preload.js",
   "development": {
-    "main": "http://localhost:5173",
+    "main": "http://localhost:5174",
     "preload": "preload.js"
   },
   "features": [
