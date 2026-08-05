@@ -80,7 +80,7 @@ describe('shouldStopCodeBlockEvent', () => {
     expect(shouldStopCodeBlockEvent(createMouseEvent(pre), content, wrapper)).toBe(false)
   })
 
-  it('真实命中的 editable 层点击应允许触发退出', () => {
+  it('真实命中的 editable 层点击不触发退出：点击代码块内容应走默认光标定位', () => {
     const doc = schema.node('doc', null, [
       schema.node('paragraph', null, [schema.text('before')]),
       schema.node('code_block', { language: 'js' }, [schema.text('const x = 1;')]),
@@ -96,8 +96,7 @@ describe('shouldStopCodeBlockEvent', () => {
 
     const handled = plugin.props.handleClickOn?.(view, nodePos, codeBlock, nodePos, clickEvent, true) ?? false
 
-    expect(handled).toBe(true)
-    expect(view.state.selection.from).toBe(nodePos + codeBlock.nodeSize + 1)
+    expect(handled).toBe(false)
     view.destroy()
   })
 })
