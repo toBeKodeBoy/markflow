@@ -41,50 +41,67 @@ function createView(doc: ReturnType<typeof schema.node>) {
   return { view: new EditorView(parent, { state }), plugin }
 }
 
-function createCodeBlockBodyMouseDown(): MouseEvent {
-  const target = document.createElement('code')
-  target.className = 'code-block-editable language-js'
-  const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true })
-  Object.defineProperty(event, 'target', { configurable: true, value: target })
-  return event
+function createArrowDownEvent(): KeyboardEvent {
+  return new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
 }
 
-describe('codeBlockExitPlugin click exit', () => {
-  it('点击中间代码块时，应把光标移到代码块后已有段落', () => {
+describe('codeBlockExitPlugin 交互边界', () => {
+  it('不再注册 handleClickOn：点击代码块不得强制把光标移出到下一行（回归守护）', () => {
     const doc = schema.node('doc', null, [
       schema.node('paragraph', null, [schema.text('before')]),
       schema.node('code_block', { language: 'js' }, [schema.text('const x = 1;')]),
       schema.node('paragraph', null, [schema.text('after')]),
     ])
     const { view, plugin } = createView(doc)
-    const codeBlock = doc.child(1)
-    const nodePos = doc.child(0).nodeSize
-    const clickEvent = createCodeBlockBodyMouseDown()
 
-    const handled = plugin.props.handleClickOn?.(view, nodePos, codeBlock, nodePos, clickEvent, true) ?? false
+    expect(plugin.props.handleClickOn).toBeUndefined()
 
-    expect(handled).toBe(true)
-    expect(view.state.selection.from).toBe(nodePos + codeBlock.nodeSize + 1)
-    expect(view.state.doc.childCount).toBe(3)
     view.destroy()
   })
 
-  it('点击文末代码块时，应补段落并把光标移出代码块', () => {
+  it('保留键盘退出：代码块末行按 ArrowDown，光标移到代码块后已有段落', () => {
+    const doc = schema.node('doc', null, [
+      schema.node('paragraph', null, [schema.text('before')]),
+      schema.node('code_block', { language: 'js' }, [schema.text('const x = 1;')]),
+      schema.node('paragraph', null, [schema.text('after')]),
+    ])
+    const { view, plugin } = createView(doc)
+    const nodePos = doc.child(0).nodeSize
+    const codeBlockEnd = nodePos + doc.child(1).nodeSize - 1
+
+    const selection = TextSelection.create(doc, codeBlockEnd)
+    const tr = view.state.tr.setSelection(selection)
+    view.dispatch(tr)
+
+    const handled = plugin.props.handleKeyDown?.(view, createArrowDownEvent()) ?? false
+
+    expect(handled).toBe(true)
+    expect(view.state.doc.childCount).toBe(3)
+    // TextSelection.near 在 block 边界会推进到段落首字符（afterPos + 1）
+    const afterPos = nodePos + doc.child(1).nodeSize
+    expect(view.state.selection.from).toBe(afterPos + 1)
+    expect(view.state.selection.$from.parent.type.name).toBe('paragraph')
+    view.destroy()
+  })
+
+  it('保留键盘退出：文末代码块按 ArrowDown，补段落并把光标移出', () => {
     const doc = schema.node('doc', null, [
       schema.node('paragraph', null, [schema.text('before')]),
       schema.node('code_block', { language: 'js' }, [schema.text('const x = 1;')]),
     ])
     const { view, plugin } = createView(doc)
-    const codeBlock = doc.child(1)
     const nodePos = doc.child(0).nodeSize
-    const clickEvent = createCodeBlockBodyMouseDown()
+    const codeBlockEnd = nodePos + doc.child(1).nodeSize - 1
 
-    const handled = plugin.props.handleClickOn?.(view, nodePos, codeBlock, nodePos, clickEvent, true) ?? false
+    const selection = TextSelection.create(doc, codeBlockEnd)
+    const tr = view.state.tr.setSelection(selection)
+    view.dispatch(tr)
+
+    const handled = plugin.props.handleKeyDown?.(view, createArrowDownEvent()) ?? false
 
     expect(handled).toBe(true)
     expect(view.state.doc.childCount).toBe(3)
     expect(view.state.doc.lastChild?.type.name).toBe('paragraph')
-    expect(view.state.selection.from).toBe(view.state.doc.content.size - 1)
     view.destroy()
   })
 })
