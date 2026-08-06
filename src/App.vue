@@ -20,12 +20,13 @@
       <Sidebar v-if="showSidebar" />
 
       <main class="workspace-main">
-        <ViewModeSwitcher
-          v-if="viewMode !== 'focus'"
-          :view-mode="viewMode"
-          @set-view-mode="setViewMode"
-        />
-        <EditorTabBar v-if="viewMode !== 'focus'" />
+        <div
+          v-if="hasOpenTabs && viewMode !== 'focus'"
+          class="workspace-chrome-bar"
+          data-testid="workspace-chrome-bar"
+        >
+          <EditorTabBar />
+        </div>
 
         <div class="workspace-editor-row">
           <div class="editor-stage">
@@ -44,8 +45,10 @@
                 :key="'wysiwyg-' + tab.noteId"
                 v-show="tab.noteId === tabsStore.activeTabId"
                 :note-id="tab.noteId"
+                :view-mode="viewMode"
                 :focusMode="viewMode === 'focus'"
                 class="editor-tab-pane"
+                @set-view-mode="setViewMode"
               />
             </template>
 
@@ -55,7 +58,9 @@
                 :key="'editor-' + tab.noteId"
                 v-show="tab.noteId === tabsStore.activeTabId"
                 :note-id="tab.noteId"
+                :view-mode="viewMode"
                 class="editor-tab-pane"
+                @set-view-mode="setViewMode"
               />
 
               <Preview v-if="viewMode === 'split'" key="preview" />
@@ -105,7 +110,6 @@ import CreateEntryModal from './components/CreateEntryModal.vue'
 import SearchModal from './components/SearchModal.vue'
 import AppIcon from './components/AppIcon.vue'
 import EditorTabBar from './components/EditorTabBar.vue'
-import ViewModeSwitcher from './components/ViewModeSwitcher.vue'
 import { useNoteStore } from './stores/note'
 import { useEditorTabsStore } from './stores/editorTabs'
 import { useTheme } from './composables/useTheme'
@@ -115,10 +119,23 @@ import { showAppNotification } from './utils/notify'
 import { collectAncestorFolderIds } from './utils/folderTree'
 import { useAutoBackup } from './composables/useAutoBackup'
 import { useFullscreen } from './composables/useFullscreen'
+import {
+  createViewModeFlashRegistry,
+  provideViewModeFlash,
+} from './composables/useViewModeFlash'
 import type { ViewMode } from './types'
+
+const VIEW_MODE_SHORTCUTS: Record<string, ViewMode> = {
+  j: 'live',
+  k: 'split',
+  l: 'source',
+  m: 'focus',
+}
 
 const store = useNoteStore()
 const tabsStore = useEditorTabsStore()
+const viewModeFlash = createViewModeFlashRegistry()
+provideViewModeFlash(viewModeFlash)
 
 useTheme()
 useAppSettings().load()
@@ -149,15 +166,27 @@ store.loadNoteList()
 tabsStore.restoreFromSettings()
 tabsStore.bootstrapAfterLoad()
 
-function setViewMode(mode: ViewMode) {
-  tabsStore.flushActiveTab()
-  if (mode === 'focus') prevMode.value = viewMode.value
+function syncChromeToMode(mode: ViewMode) {
   if (mode === 'focus') {
+    if (viewMode.value !== 'focus') prevMode.value = viewMode.value
     enterFullscreen()
   } else if (viewMode.value === 'focus' && isFullscreen.value) {
     exitFullscreen()
   }
   viewMode.value = mode
+}
+
+function setViewMode(mode: ViewMode) {
+  tabsStore.flushActiveTab()
+  // 进入专注时持久化进入前的模式，而非 focus 本身
+  const durableMode: ViewMode =
+    mode === 'focus'
+      ? (viewMode.value === 'focus' ? prevMode.value : viewMode.value)
+      : mode
+  syncChromeToMode(mode)
+  if (tabsStore.activeTabId) {
+    tabsStore.setTabViewMode(tabsStore.activeTabId, durableMode === 'focus' ? 'live' : durableMode)
+  }
 }
 
 function toggleToc() {
@@ -197,6 +226,19 @@ watch(sidebarVisible, (visible) => {
 })
 
 watch(
+  () => tabsStore.activeTabId,
+  (id) => {
+    if (!id) return
+    const tab = tabsStore.findTab(id)
+    if (!tab) return
+    if (tab.viewMode === viewMode.value) return
+    tabsStore.flushActiveTab()
+    syncChromeToMode(tab.viewMode)
+  },
+  { immediate: true },
+)
+
+watch(
   () => store.pendingLargeFileSwitch,
   (pending) => {
     if (!pending) return
@@ -211,12 +253,18 @@ watch(
 watch(isFullscreen, (fs) => {
   if (!fs && viewMode.value === 'focus') {
     viewMode.value = prevMode.value
+    if (tabsStore.activeTabId) {
+      tabsStore.setTabViewMode(tabsStore.activeTabId, prevMode.value)
+    }
   }
 })
 
 function exitFocus() {
   if (isFullscreen.value) exitFullscreen()
   viewMode.value = prevMode.value
+  if (tabsStore.activeTabId) {
+    tabsStore.setTabViewMode(tabsStore.activeTabId, prevMode.value)
+  }
 }
 
 function onSearchSelect(noteId: string) {
@@ -232,6 +280,15 @@ function onKeydown(e: KeyboardEvent) {
       setViewMode('focus')
     }
     return
+  }
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && hasOpenTabs.value) {
+    const mode = VIEW_MODE_SHORTCUTS[e.key.toLowerCase()]
+    if (mode) {
+      e.preventDefault()
+      setViewMode(mode)
+      viewModeFlash.flash()
+      return
+    }
   }
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
     e.preventDefault()

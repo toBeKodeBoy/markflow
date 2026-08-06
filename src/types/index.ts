@@ -124,6 +124,8 @@ export interface AutoBackupSettings {
 export interface EditorTabsSettings {
   openNoteIds: string[]
   activeNoteId: string | null
+  /** 各笔记上次使用的视图模式（预览=live） */
+  viewModesByNoteId?: Record<string, ViewMode>
 }
 
 /** 最近访问的笔记记录 */
@@ -137,6 +139,8 @@ export interface EditorTab {
   noteId: string
   liveContent: string
   savedContent: string
+  /** 该文档绑定的视图模式；新建默认为 live（预览） */
+  viewMode: ViewMode
 }
 
 export interface TableToolbarContext {

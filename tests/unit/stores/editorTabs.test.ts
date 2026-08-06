@@ -7,6 +7,7 @@ import { useNoteStore } from '../../../src/stores/note'
 import { useEditorTabsStore } from '../../../src/stores/editorTabs'
 import { MAX_EDITOR_TABS } from '../../../src/constants'
 import { useStorage } from '../../../src/composables/useStorage'
+import { useAppSettings } from '../../../src/composables/useAppSettings'
 
 describe('useEditorTabsStore', () => {
   beforeEach(() => {
@@ -201,5 +202,28 @@ describe('useEditorTabsStore', () => {
     noteStore.renameNote(note.id, '入门练习001')
 
     expect(tabsStore.getTabDisplayTitle(tabsStore.tabs[0])).toBe('入门练习001')
+  })
+
+  it('setTabViewMode 不持久化 focus；恢复时 focus 归一为 live', () => {
+    const noteStore = useNoteStore()
+    const tabsStore = useEditorTabsStore()
+    const note = noteStore.createNoteWithContent('# A\n')
+    tabsStore.openTab(note.id)
+
+    tabsStore.setTabViewMode(note.id, 'focus')
+    expect(tabsStore.findTab(note.id)?.viewMode).toBe('live')
+
+    tabsStore.setTabViewMode(note.id, 'source')
+    expect(tabsStore.findTab(note.id)?.viewMode).toBe('source')
+
+    useAppSettings().save({
+      editorTabs: {
+        openNoteIds: [note.id],
+        activeNoteId: note.id,
+        viewModesByNoteId: { [note.id]: 'focus' },
+      },
+    })
+    tabsStore.restoreFromSettings()
+    expect(tabsStore.findTab(note.id)?.viewMode).toBe('live')
   })
 })

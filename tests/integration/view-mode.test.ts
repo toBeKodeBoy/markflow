@@ -48,9 +48,17 @@ function mountApp() {
 }
 
 async function clickMode(wrapper: ReturnType<typeof mountApp>, label: string) {
-  const btn = wrapper.findAll('.view-mode-switcher button').find((b) => b.text() === label)
-  expect(btn).toBeDefined()
-  await btn!.trigger('click')
+  const map: Record<string, string> = {
+    预览: 'j',
+    分屏: 'k',
+    源码: 'l',
+    专注: 'm',
+  }
+  const key = map[label]
+  expect(key).toBeDefined()
+  window.dispatchEvent(
+    new KeyboardEvent('keydown', { key, ctrlKey: true, shiftKey: true, bubbles: true }),
+  )
   await flushPromises()
 }
 
@@ -70,7 +78,7 @@ describe('四视图模式切换', () => {
     expect(wrapper.find('.stub-preview').exists()).toBe(false)
   })
 
-  it('非专注模式下页签栏位于右侧主内容列，侧栏上移为 workspace 首列；模式切换在 Tab 上方', () => {
+  it('非专注模式下页签在 chrome 行；侧栏为 workspace 首列', () => {
     const wrapper = mountApp()
     const workspace = wrapper.get('.workspace')
     const children = workspace.element.children
@@ -78,13 +86,8 @@ describe('四视图模式切换', () => {
     expect(children[0]).toBe(wrapper.get('.stub-sidebar').element)
     expect(children[1]).toBe(wrapper.get('.workspace-main').element)
     const main = wrapper.get('.workspace-main')
-    expect(main.find('.view-mode-switcher').exists()).toBe(true)
+    expect(main.find('[data-testid="workspace-chrome-bar"]').exists()).toBe(true)
     expect(main.find('.editor-tab-bar-stub').exists()).toBe(true)
-    const mainChildren = [...main.element.children]
-    const modeIdx = mainChildren.findIndex((el) => el.classList.contains('workspace-mode-bar') || el.querySelector?.('.view-mode-switcher'))
-    const tabIdx = mainChildren.findIndex((el) => el.classList.contains('editor-tab-bar-stub'))
-    expect(modeIdx).toBeGreaterThanOrEqual(0)
-    expect(tabIdx).toBeGreaterThan(modeIdx)
     expect(Array.from(children).some((child) => child.classList.contains('editor-tab-bar-stub'))).toBe(false)
   })
 

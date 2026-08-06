@@ -3,9 +3,10 @@ import { mount } from '@vue/test-utils'
 import FocusFormatToolbar from '../../../src/components/FocusFormatToolbar.vue'
 
 describe('FocusFormatToolbar', () => {
-  it('renders mini formatting actions', () => {
+  it('renders mini formatting actions with icons', () => {
     const wrapper = mount(FocusFormatToolbar, {
       props: { visible: true },
+      global: { stubs: { AppIcon: true } },
     })
     expect(wrapper.find('[data-testid="focus-toolbar-bold"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="focus-toolbar-italic"]').exists()).toBe(true)
@@ -13,6 +14,7 @@ describe('FocusFormatToolbar', () => {
     expect(wrapper.find('[data-testid="focus-toolbar-h2"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="focus-toolbar-bullet-list"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="focus-toolbar-ordered-list"]').exists()).toBe(true)
+    expect(wrapper.findAllComponents({ name: 'AppIcon' }).length).toBeGreaterThan(0)
   })
 
   it('applies hidden class when not visible', () => {

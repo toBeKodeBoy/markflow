@@ -35,6 +35,21 @@ describe('editor tab empty state', () => {
     expect(wrapper.find('.stub-preview').exists()).toBe(false)
   })
 
+  it('hides workspace chrome and view mode dropdown when no tabs are open', async () => {
+    const wrapper = mount(App, { global: { stubs } })
+    const tabsStore = useEditorTabsStore()
+
+    expect(wrapper.find('[data-testid="workspace-chrome-bar"]').exists()).toBe(true)
+
+    tabsStore.closeAllTabs({ save: false })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="empty-tabs-state"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="workspace-chrome-bar"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="view-mode-dropdown"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="view-mode-hotzone"]').exists()).toBe(false)
+  })
+
   it('opens the unified create modal from empty state instead of creating immediately', async () => {
     const wrapper = mount(App, { global: { stubs } })
     const tabsStore = useEditorTabsStore()

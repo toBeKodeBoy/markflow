@@ -15,10 +15,18 @@ import {
 } from './tabContentCache'
 import { registerEditorTabsBridge } from './editorTabsBridge'
 import { touchRecentNote } from '../utils/recentNotes'
-import type { EditorTab } from '../types'
+import type { EditorTab, ViewMode } from '../types'
 
 type SaveBehavior = { save: boolean }
 type TabCloseScope = 'current' | 'others' | 'all'
+
+const DEFAULT_VIEW_MODE: ViewMode = 'live'
+const VIEW_MODES: ViewMode[] = ['live', 'split', 'source', 'focus']
+
+function normalizeViewMode(mode: unknown): ViewMode {
+  if (mode === 'focus') return DEFAULT_VIEW_MODE
+  return VIEW_MODES.includes(mode as ViewMode) ? (mode as ViewMode) : DEFAULT_VIEW_MODE
+}
 
 export function isTabDirty(tab: EditorTab, liveContent?: string): boolean {
   const live = liveContent ?? tab.liveContent
@@ -48,10 +56,15 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
 
   function persistTabs(): void {
     const { save } = useAppSettings()
+    const viewModesByNoteId: Record<string, ViewMode> = {}
+    for (const tab of tabs.value) {
+      viewModesByNoteId[tab.noteId] = tab.viewMode
+    }
     save({
       editorTabs: {
         openNoteIds: tabs.value.map((t) => t.noteId),
         activeNoteId: activeTabId.value,
+        viewModesByNoteId,
       },
     })
   }
@@ -60,11 +73,28 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     setTabContentCache(tab.noteId, tab.liveContent)
   }
 
-  function addTabFromNote(noteId: string, content: string): EditorTab {
-    const tab: EditorTab = { noteId, liveContent: content, savedContent: content }
+  function addTabFromNote(
+    noteId: string,
+    content: string,
+    viewMode: ViewMode = DEFAULT_VIEW_MODE,
+  ): EditorTab {
+    const tab: EditorTab = {
+      noteId,
+      liveContent: content,
+      savedContent: content,
+      viewMode: normalizeViewMode(viewMode),
+    }
     tabs.value.push(tab)
     syncTabCache(tab)
     return tab
+  }
+
+  function setTabViewMode(noteId: string, mode: ViewMode): void {
+    const tab = findTab(noteId)
+    if (!tab) return
+    // focus 为瞬时 UI 态，禁止写入文档级持久化（避免重启无手势全屏/切回误进专注）
+    tab.viewMode = normalizeViewMode(mode === 'focus' ? DEFAULT_VIEW_MODE : mode)
+    persistTabs()
   }
 
   function activateTab(noteId: string): void {
@@ -102,7 +132,9 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     const note = storage.getNote(noteId)
     if (!note) return
 
-    addTabFromNote(noteId, note.content)
+    const settings = useAppSettings().get()
+    const savedMode = settings.editorTabs?.viewModesByNoteId?.[noteId]
+    addTabFromNote(noteId, note.content, normalizeViewMode(savedMode))
     if (activate) activateTab(noteId)
     else persistTabs()
   }
@@ -269,6 +301,7 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     const note = storage.getNote(noteId)
     if (!note) return
     if (findTab(noteId)) {
+      setTabViewMode(noteId, 'live')
       activateTab(noteId)
       return
     }
@@ -277,7 +310,7 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
       activateTab(noteId)
       return
     }
-    addTabFromNote(noteId, note.content)
+    addTabFromNote(noteId, note.content, 'live')
     activateTab(noteId)
   }
 
@@ -326,9 +359,10 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     const ids = (saved?.openNoteIds ?? []).filter((id) => storage.getNote(id))
     if (ids.length === 0) return
 
+    const savedModes = saved?.viewModesByNoteId ?? {}
     for (const id of ids.slice(0, MAX_EDITOR_TABS)) {
       const note = storage.getNote(id)!
-      addTabFromNote(id, note.content)
+      addTabFromNote(id, note.content, normalizeViewMode(savedModes[id]))
     }
 
     const activeId = saved?.activeNoteId
@@ -393,6 +427,8 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     getLiveContent,
     resetAndOpenTab,
     clearAllTabs,
+    setTabViewMode,
+    findTab,
   }
 })
 

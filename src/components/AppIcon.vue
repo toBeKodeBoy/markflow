@@ -105,6 +105,26 @@
       <circle cx="9" cy="10" r="1.5" />
       <path d="M4 16l5-4 3 3 3-2 5 3" />
     </template>
+    <template v-else-if="name === 'view-live'">
+      <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" />
+      <circle cx="12" cy="12" r="2.5" />
+    </template>
+    <template v-else-if="name === 'view-split'">
+      <path d="M4 5h16v14H4z" />
+      <path d="M12 5v14" />
+    </template>
+    <template v-else-if="name === 'view-source'">
+      <path d="M8 7l-4 5 4 5" />
+      <path d="M16 7l4 5-4 5" />
+      <path d="M13 5l-2 14" />
+    </template>
+    <template v-else-if="name === 'view-focus'">
+      <path d="M4 9V5h4" />
+      <path d="M20 9V5h-4" />
+      <path d="M4 15v4h4" />
+      <path d="M20 15v4h-4" />
+      <path d="M9 12h6" />
+    </template>
   </svg>
 </template>
 
@@ -139,6 +159,10 @@ export type AppIconName =
   | 'table'
   | 'link'
   | 'image'
+  | 'view-live'
+  | 'view-split'
+  | 'view-source'
+  | 'view-focus'
 
 withDefaults(
   defineProps<{

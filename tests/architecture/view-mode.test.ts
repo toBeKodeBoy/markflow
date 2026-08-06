@@ -20,7 +20,7 @@ describe('ViewMode 类型', () => {
 
   it('App.vue 应引用共享 ViewMode；Toolbar 不再承载模式切换', () => {
     expect(readSrc('src/App.vue')).toMatch(/import type \{ ViewMode \} from '\.\/types'/)
-    expect(readSrc('src/components/ViewModeSwitcher.vue')).toMatch(/import type \{ ViewMode \} from '\.\.\/types'/)
+    expect(readSrc('src/components/ViewModeDropdown.vue')).toMatch(/import type \{ ViewMode \} from '\.\.\/types'/)
     expect(readSrc('src/components/Toolbar.vue')).not.toMatch(/ViewMode/)
   })
 })
@@ -51,7 +51,7 @@ describe('App.vue 视图调度', () => {
   })
 
   it('进入 focus 时记录 prevMode', () => {
-    expect(appSrc).toMatch(/if \(mode === 'focus'\) prevMode\.value = viewMode\.value/)
+    expect(appSrc).toMatch(/prevMode\.value = viewMode\.value/)
     expect(appSrc).toMatch(/viewMode\.value = prevMode\.value/)
   })
 
@@ -80,9 +80,10 @@ describe('编辑器卸载 flush', () => {
 describe('视图模式样式', () => {
   const css = readSrc('src/style.css')
 
-  it('workspace-main 内模式切换居中（segmented）', () => {
-    expect(css).toMatch(/\.workspace-mode-bar[\s\S]*?justify-content:\s*center/)
-    expect(css).toMatch(/\.view-mode-switcher button\.active[\s\S]*?background:\s*var\(--primary\)/)
+  it('右侧悬浮热区样式已移除；工具栏下拉样式存在', () => {
+    expect(css).not.toMatch(/\.view-mode-hotzone/)
+    expect(css).toMatch(/\.view-mode-dropdown/)
+    expect(css).toMatch(/\.view-mode-dropdown-menu/)
   })
 
   it('不应使用无效的 sidebar-pane 选择器', () => {

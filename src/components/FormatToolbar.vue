@@ -109,18 +109,30 @@
       >
     </div>
 
-    <span class="sep" aria-hidden="true" />
-    <span v-if="charCount !== undefined" class="char-count">{{ charCount }} 字</span>
+    <ViewModeDropdown
+      v-if="viewMode"
+      ref="viewModeDropdownRef"
+      :view-mode="viewMode"
+      @set-view-mode="(mode) => $emit('setViewMode', mode)"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import AppIcon from './AppIcon.vue'
+import ViewModeDropdown from './ViewModeDropdown.vue'
+import type { ViewMode } from '../types'
 
-withDefaults(defineProps<{ charCount?: number; showTaskListButton?: boolean }>(), {
-  showTaskListButton: true,
-})
+withDefaults(
+  defineProps<{
+    showTaskListButton?: boolean
+    viewMode?: ViewMode
+  }>(),
+  {
+    showTaskListButton: true,
+  },
+)
 
 const emit = defineEmits<{
   bold: []
@@ -140,9 +152,11 @@ const emit = defineEmits<{
   table: []
   link: []
   imageUpload: [file: File]
+  setViewMode: [mode: ViewMode]
 }>()
 
 const imageInputRef = ref<HTMLInputElement>()
+const viewModeDropdownRef = ref<{ flashFeedback: () => void } | null>(null)
 
 function triggerImageUpload() {
   imageInputRef.value?.click()
@@ -154,4 +168,8 @@ function onImageFileChange(event: Event) {
   if (file) emit('imageUpload', file)
   if (input) input.value = ''
 }
+
+defineExpose({
+  flashViewModeFeedback: () => viewModeDropdownRef.value?.flashFeedback(),
+})
 </script>
