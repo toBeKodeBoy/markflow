@@ -5,7 +5,6 @@ import FormatToolbar from '../../../src/components/FormatToolbar.vue'
 describe('FormatToolbar', () => {
   it('renders grouped toolbar sections with icon buttons', () => {
     const wrapper = mount(FormatToolbar, {
-      props: { charCount: 42 },
       global: { stubs: { AppIcon: true } },
     })
 
@@ -16,7 +15,22 @@ describe('FormatToolbar', () => {
     expect(wrapper.find('[data-testid="toolbar-group-list"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="toolbar-group-insert"]').exists()).toBe(true)
     expect(wrapper.findAllComponents({ name: 'AppIcon' }).length).toBeGreaterThan(0)
-    expect(wrapper.get('.char-count').text()).toContain('42')
+    expect(wrapper.find('.char-count').exists()).toBe(false)
+  })
+
+  it('renders view mode dropdown when viewMode is provided', () => {
+    const wrapper = mount(FormatToolbar, {
+      props: { viewMode: 'live' },
+      global: { stubs: { AppIcon: true, ViewModeDropdown: true } },
+    })
+    expect(wrapper.findComponent({ name: 'ViewModeDropdown' }).exists()).toBe(true)
+  })
+
+  it('does not render view mode dropdown without viewMode', () => {
+    const wrapper = mount(FormatToolbar, {
+      global: { stubs: { AppIcon: true, ViewModeDropdown: true } },
+    })
+    expect(wrapper.findComponent({ name: 'ViewModeDropdown' }).exists()).toBe(false)
   })
   it('emits the original table event from grouped insert actions', async () => {
     const wrapper = mount(FormatToolbar)

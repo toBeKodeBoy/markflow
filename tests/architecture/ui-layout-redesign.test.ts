@@ -39,10 +39,10 @@ describe('壳层布局 DOM', () => {
   const appSrc = readSrc('src/App.vue')
   const toolbarSrc = readSrc('src/components/Toolbar.vue')
 
-  it('模式切换应位于 workspace-main（Tab 上方），而非 Toolbar 顶栏中部', () => {
-    expect(appSrc).toMatch(/view-mode-switcher|ViewModeSwitcher/)
-    expect(appSrc).toMatch(/workspace-main[\s\S]*view-mode-switcher|ViewModeSwitcher[\s\S]*EditorTabBar/)
-    expect(toolbarSrc).not.toMatch(/view-mode-switcher/)
+  it('模式切换应使用工具栏下拉，而非 Toolbar 顶栏', () => {
+    expect(appSrc).toMatch(/:view-mode="viewMode"/)
+    expect(readSrc('src/components/FormatToolbar.vue')).toMatch(/ViewModeDropdown/)
+    expect(toolbarSrc).not.toMatch(/view-mode-switcher|ViewModeDropdown|ViewModeHoverPanel/)
   })
 
   it('编辑舞台应使用 editor-stage 包裹编辑/预览区', () => {

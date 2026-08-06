@@ -2,8 +2,8 @@
   <div class="editor-pane wysiwyg-pane">
     <FormatToolbar
       v-if="!focusMode"
-      :char-count="charCount"
       :show-task-list-button="!focusMode"
+      :view-mode="viewMode"
       @bold="onToolbarBold"
       @italic="onToolbarItalic"
       @strike="onToolbarStrike"
@@ -21,6 +21,7 @@
       @table="onToolbarTable"
       @link="onToolbarLink"
       @image-upload="onToolbarImageUpload"
+      @set-view-mode="(mode) => emit('setViewMode', mode)"
     />
     <div class="wysiwyg-body">
       <div ref="containerRef" :class="['milkdown-host', { 'milkdown-dark': isDark }]"></div>
@@ -42,6 +43,7 @@
     <FocusFormatToolbar
       v-if="focusMode"
       :visible="focusToolbarVisible"
+      :view-mode="viewMode"
       @mouseenter="onFocusToolbarEnter"
       @mouseleave="onFocusToolbarLeave"
       @bold="onToolbarBold"
@@ -52,6 +54,7 @@
       @bullet-list="onToolbarBulletList"
       @ordered-list="onToolbarOrderedList"
       @image-upload="onToolbarImageUpload"
+      @set-view-mode="(mode) => emit('setViewMode', mode)"
     />
     <LinkDialog
       :visible="linkDialogVisible"
@@ -111,6 +114,7 @@ import {
 import { resolveMarkdownForDisplay, persistMarkdownAssets } from '../utils/resolveMarkdownAssets'
 import FormatToolbar from './FormatToolbar.vue'
 import FocusFormatToolbar from './FocusFormatToolbar.vue'
+import type { ViewMode } from '../types'
 import HighlightTextModal from './HighlightTextModal.vue'
 import LinkDialog from './LinkDialog.vue'
 import TableToolbar from './TableToolbar.vue'
@@ -172,7 +176,9 @@ function sanitizePastedHTML(html: string): string {
   return body.innerHTML
 }
 
-const props = defineProps<{ noteId: string; focusMode?: boolean }>()
+const props = defineProps<{ noteId: string; focusMode?: boolean; viewMode?: ViewMode }>()
+const emit = defineEmits<{ setViewMode: [mode: ViewMode] }>()
+const viewMode = computed(() => props.viewMode ?? 'live')
 
 const store = useNoteStore()
 const tabsStore = useEditorTabsStore()
@@ -186,11 +192,6 @@ let pendingLinkSelection: WysiwygLinkSelection | null = null
 let pendingHighlightSelection: ReturnType<typeof readWysiwygHighlightSelection> = null
 
 const isActive = computed(() => tabsStore.activeTabId === props.noteId)
-
-const charCount = computed(() => {
-  const tab = tabsStore.tabs.find((t) => t.noteId === props.noteId)
-  return tab?.liveContent.length ?? 0
-})
 
 const focusModeEnabled = computed(() => props.focusMode === true)
 const { visible: focusToolbarVisible, onToolbarEnter: onFocusToolbarEnter, onToolbarLeave: onFocusToolbarLeave } =

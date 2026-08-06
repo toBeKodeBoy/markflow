@@ -1,7 +1,7 @@
 <template>
   <div class="editor-pane">
     <FormatToolbar
-      :char-count="charCount"
+      :view-mode="viewMode"
       @bold="insertMarkdown('**', '**', '粗体')"
       @italic="insertMarkdown('*', '*', '斜体')"
       @strike="insertMarkdown('~~', '~~', '删除线')"
@@ -19,6 +19,7 @@
       @table="insertTable()"
       @link="openLinkDialog()"
       @image-upload="onToolbarImageUpload"
+      @set-view-mode="(mode) => emit('setViewMode', mode)"
     />
     <div ref="editorEl" class="cm-host"></div>
     <LinkDialog
@@ -61,8 +62,12 @@ import { showAppNotification } from '../utils/notify'
 import FormatToolbar from './FormatToolbar.vue'
 import HighlightTextModal from './HighlightTextModal.vue'
 import LinkDialog from './LinkDialog.vue'
+import type { ViewMode } from '../types'
 
-const props = defineProps<{ noteId: string }>()
+const props = defineProps<{ noteId: string; viewMode?: ViewMode }>()
+const emit = defineEmits<{ setViewMode: [mode: ViewMode] }>()
+
+const viewMode = computed(() => props.viewMode ?? 'live')
 
 const store = useNoteStore()
 const tabsStore = useEditorTabsStore()
@@ -72,10 +77,6 @@ let view: EditorView | null = null
 
 const isActive = computed(() => tabsStore.activeTabId === props.noteId)
 const isDark = computed(() => document.documentElement.getAttribute('data-theme') === 'dark')
-const charCount = computed(() => {
-  const tab = tabsStore.tabs.find((t) => t.noteId === props.noteId)
-  return tab?.liveContent.length ?? 0
-})
 
 const linkDialogVisible = ref(false)
 const linkDraft = ref<LinkDraft>(getInitialLinkDraft(''))

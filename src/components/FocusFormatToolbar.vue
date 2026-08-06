@@ -1,7 +1,7 @@
 <template>
   <div
     class="focus-format-toolbar"
-    :class="{ 'is-hidden': !visible }"
+    :class="{ 'is-hidden': !visible && !viewModeMenuOpen }"
     data-testid="focus-format-toolbar"
     @mouseenter="$emit('mouseenter')"
     @mouseleave="$emit('mouseleave')"
@@ -13,7 +13,7 @@
       aria-label="粗体"
       @click="$emit('bold')"
     >
-      <b>B</b>
+      <AppIcon name="bold" :size="14" />
     </button>
     <button
       type="button"
@@ -22,7 +22,7 @@
       aria-label="斜体"
       @click="$emit('italic')"
     >
-      <i>I</i>
+      <AppIcon name="italic" :size="14" />
     </button>
     <button
       type="button"
@@ -31,9 +31,9 @@
       aria-label="高亮显示"
       @click="$emit('highlight')"
     >
-      高亮
+      <AppIcon name="highlight" :size="14" />
     </button>
-    <span class="sep" aria-hidden="true">|</span>
+    <span class="sep" aria-hidden="true" />
     <button
       type="button"
       data-testid="focus-toolbar-h1"
@@ -41,7 +41,8 @@
       aria-label="标题 1"
       @click="$emit('h1')"
     >
-      H1
+      <AppIcon name="heading" :size="14" />
+      <span class="toolbar-btn-badge">1</span>
     </button>
     <button
       type="button"
@@ -50,9 +51,10 @@
       aria-label="标题 2"
       @click="$emit('h2')"
     >
-      H2
+      <AppIcon name="heading" :size="14" />
+      <span class="toolbar-btn-badge">2</span>
     </button>
-    <span class="sep" aria-hidden="true">|</span>
+    <span class="sep" aria-hidden="true" />
     <button
       type="button"
       data-testid="focus-toolbar-bullet-list"
@@ -60,7 +62,7 @@
       aria-label="无序列表"
       @click="$emit('bulletList')"
     >
-      ≡
+      <AppIcon name="list" :size="14" />
     </button>
     <button
       type="button"
@@ -69,9 +71,9 @@
       aria-label="有序列表"
       @click="$emit('orderedList')"
     >
-      1.
+      <AppIcon name="list-ordered" :size="14" />
     </button>
-    <span class="sep" aria-hidden="true">|</span>
+    <span class="sep" aria-hidden="true" />
     <button
       type="button"
       data-testid="focus-toolbar-image-button"
@@ -79,7 +81,7 @@
       aria-label="上传图片"
       @click="triggerImageUpload"
     >
-      📷
+      <AppIcon name="image" :size="14" />
     </button>
     <input
       ref="imageInputRef"
@@ -89,13 +91,23 @@
       class="settings-hidden-input"
       @change="onImageFileChange"
     >
+    <ViewModeDropdown
+      v-if="viewMode"
+      placement="top"
+      :view-mode="viewMode"
+      @update:open="(v) => (viewModeMenuOpen = v)"
+      @set-view-mode="(mode) => $emit('setViewMode', mode)"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import AppIcon from './AppIcon.vue'
+import ViewModeDropdown from './ViewModeDropdown.vue'
+import type { ViewMode } from '../types'
 
-defineProps<{ visible: boolean }>()
+defineProps<{ visible: boolean; viewMode?: ViewMode }>()
 
 const emit = defineEmits<{
   bold: []
@@ -108,9 +120,11 @@ const emit = defineEmits<{
   imageUpload: [file: File]
   mouseenter: []
   mouseleave: []
+  setViewMode: [mode: ViewMode]
 }>()
 
 const imageInputRef = ref<HTMLInputElement>()
+const viewModeMenuOpen = ref(false)
 
 function triggerImageUpload() {
   imageInputRef.value?.click()
