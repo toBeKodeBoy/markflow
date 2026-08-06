@@ -2040,6 +2040,9 @@ input:focus { border-color: var(--primary); }
   padding: 14px 16px;
   overflow-x: auto;
   margin: 0;
+  /* 自身折行：避免 pre 按最长行 min-content 撑宽后再出横向滚动条 */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .code-block-wrapper {
@@ -2162,9 +2165,14 @@ input:focus { border-color: var(--primary); }
   background: #2a2a3e;
 }
 
-.markdown-body pre code {
+/* 预览区代码块自动折行：保留缩进/换行，超长行（含无空格长 token）折行展示，
+   与打印样式 printStyles 行为一致；特异性 (0,2,2) 高于 hljs 主题 `pre code.hljs` (0,1,2)，
+   并显式覆盖 hljs 的 overflow-x: auto，避免折行后仍出现内层滚动条 */
+.markdown-body pre code.hljs {
   display: block;
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow-x: visible;
   background: none;
   padding: 0;
   color: inherit;
@@ -2998,7 +3006,8 @@ img.ProseMirror-separator {
 
 .ProseMirror pre code {
   display: block;
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   background: none;
   padding: 0;
   font-size: 0.9em;
@@ -3029,9 +3038,12 @@ img.ProseMirror-separator {
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.6;
-  white-space: pre;
+  /* live/专注默认视图：与预览一致自动折行，高亮层与编辑层共用同一 white-space 以保持叠层对齐；
+     overflow-x: visible 覆盖 hljs `pre code.hljs` 的 overflow-x: auto */
+  white-space: pre-wrap;
   word-break: normal;
-  overflow-wrap: normal;
+  overflow-wrap: anywhere;
+  overflow-x: visible;
 }
 
 .ProseMirror .code-block-wrapper .code-block-layers > code.code-block-highlight {
