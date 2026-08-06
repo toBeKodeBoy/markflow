@@ -82,13 +82,14 @@
       @click.stop
     />
     <div v-else class="note-title">{{ row.note!.title }}</div>
-    <div class="note-meta">{{ formatDate(row.note!.updatedAt) }}</div>
+    <div class="note-meta">{{ formatRelativeTime(row.note!.updatedAt) }}</div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { SidebarTreeRow } from '../utils/sidebarTree'
+import { formatRelativeTime } from '../utils/formatRelativeTime'
 import AppIcon from './AppIcon.vue'
 
 const props = defineProps<{
@@ -161,14 +162,5 @@ function onNoteDragOver(e: DragEvent, noteId: string) {
 
 function onNoteDrop(e: DragEvent, noteId: string) {
   emit('drop-on-note', noteId, noteDropPosition(e))
-}
-
-function formatDate(ts: number) {
-  const d = new Date(ts)
-  const now = new Date()
-  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000)
-  if (diffDays === 0) return d.toLocaleTimeString('zh', { hour: '2-digit', minute: '2-digit' })
-  if (diffDays < 7) return `${diffDays}天前`
-  return d.toLocaleDateString('zh', { month: 'short', day: 'numeric' })
 }
 </script>

@@ -20,11 +20,7 @@
 
       </button>
 
-      <div v-if="store.currentNote && folderPath" class="note-context">
-        <div class="note-context-path">{{ folderPath }}</div>
-      </div>
-
-      <div v-else class="app-logo">
+      <div class="app-logo">
 
         <span class="logo-icon">M↓</span>
 
@@ -32,54 +28,8 @@
 
       </div>
 
-    </div>
-
-
-
-    <div class="topbar-center">
-
-      <div class="view-mode-switcher">
-
-        <button
-
-          :class="{ active: viewMode === 'live' }"
-
-          @click="emitSetViewMode('live')"
-
-          title="纯文档预览"
-
-        >预览</button>
-
-        <button
-
-          :class="{ active: viewMode === 'split' }"
-
-          @click="emitSetViewMode('split')"
-
-          title="分屏编辑"
-
-        >分屏</button>
-
-        <button
-
-          :class="{ active: viewMode === 'source' }"
-
-          @click="emitSetViewMode('source')"
-
-          title="源代码模式"
-
-        >源码</button>
-
-        <button
-
-          :class="{ active: viewMode === 'focus' }"
-
-          @click="emitSetViewMode('focus')"
-
-          title="专注模式"
-
-        >专注</button>
-
+      <div v-if="store.currentNote && folderPath" class="note-context">
+        <div class="note-context-path">{{ folderPath }}</div>
       </div>
 
     </div>
@@ -88,7 +38,7 @@
 
     <div class="topbar-right">
 
-      <button class="btn-action" @click="openCreateModal('note')" title="新建笔记" aria-label="新建笔记">
+      <button class="btn-primary btn-action" @click="openCreateModal('note')" title="新建笔记" aria-label="新建笔记">
 
         <AppIcon name="plus" :size="14" />
 
@@ -279,23 +229,15 @@ import CreateEntryModal from './CreateEntryModal.vue'
 
 import AppIcon from './AppIcon.vue'
 
-import type { AppSettings, ImportFolderScanResult, PdfExportOptions, ViewMode } from '../types'
+import type { AppSettings, ImportFolderScanResult, PdfExportOptions } from '../types'
 
 import { useAppSettings } from '../composables/useAppSettings'
 
 
 
-defineProps<{ viewMode: ViewMode; tocVisible: boolean }>()
+defineProps<{ tocVisible: boolean }>()
 
-const emit = defineEmits<{ toggleSidebar: []; setViewMode: [mode: ViewMode]; toggleToc: [] }>()
-
-
-
-function emitSetViewMode(mode: ViewMode) {
-
-  emit('setViewMode', mode)
-
-}
+defineEmits<{ toggleSidebar: []; toggleToc: [] }>()
 
 
 

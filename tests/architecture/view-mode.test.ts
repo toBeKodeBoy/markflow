@@ -18,11 +18,10 @@ describe('ViewMode 类型', () => {
     expect(src).toMatch(/export type ViewMode = 'live' \| 'split' \| 'source' \| 'focus'/)
   })
 
-  it('App.vue 与 Toolbar.vue 应引用共享 ViewMode', () => {
+  it('App.vue 应引用共享 ViewMode；Toolbar 不再承载模式切换', () => {
     expect(readSrc('src/App.vue')).toMatch(/import type \{ ViewMode \} from '\.\/types'/)
-    expect(readSrc('src/components/Toolbar.vue')).toMatch(
-      /import type \{ AppSettings, ImportFolderScanResult, PdfExportOptions, ViewMode \} from '\.\.\/types'/
-    )
+    expect(readSrc('src/components/ViewModeSwitcher.vue')).toMatch(/import type \{ ViewMode \} from '\.\.\/types'/)
+    expect(readSrc('src/components/Toolbar.vue')).not.toMatch(/ViewMode/)
   })
 })
 
@@ -81,9 +80,9 @@ describe('编辑器卸载 flush', () => {
 describe('视图模式样式', () => {
   const css = readSrc('src/style.css')
 
-  it('topbar 使用 grid 布局避免模式按钮被左右区域遮挡', () => {
-    expect(css).toMatch(/\.topbar[\s\S]*?grid-template-columns:\s*1fr auto 1fr/)
-    expect(css).toMatch(/\.topbar-center[\s\S]*?justify-self:\s*center/)
+  it('workspace-main 内模式切换居中（segmented）', () => {
+    expect(css).toMatch(/\.workspace-mode-bar[\s\S]*?justify-content:\s*center/)
+    expect(css).toMatch(/\.view-mode-switcher button\.active[\s\S]*?background:\s*var\(--primary\)/)
   })
 
   it('不应使用无效的 sidebar-pane 选择器', () => {

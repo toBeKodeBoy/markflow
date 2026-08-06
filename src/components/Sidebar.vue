@@ -266,7 +266,7 @@ function openNoteTab(noteId: string) {
 }
 const appSettings = useAppSettings()
 
-const sidebarWidth = ref(clampSidebarWidth(appSettings.get().sidebarWidth ?? 240))
+const sidebarWidth = ref(clampSidebarWidth(appSettings.get().sidebarWidth ?? 260))
 const treeRef = ref<HTMLElement>()
 const scrollTop = ref(0)
 const createModalVisible = ref(false)

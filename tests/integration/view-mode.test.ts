@@ -70,14 +70,21 @@ describe('四视图模式切换', () => {
     expect(wrapper.find('.stub-preview').exists()).toBe(false)
   })
 
-  it('非专注模式下页签栏位于右侧主内容列，侧栏上移为 workspace 首列', () => {
+  it('非专注模式下页签栏位于右侧主内容列，侧栏上移为 workspace 首列；模式切换在 Tab 上方', () => {
     const wrapper = mountApp()
     const workspace = wrapper.get('.workspace')
     const children = workspace.element.children
 
     expect(children[0]).toBe(wrapper.get('.stub-sidebar').element)
     expect(children[1]).toBe(wrapper.get('.workspace-main').element)
-    expect(wrapper.get('.workspace-main').find('.editor-tab-bar-stub').exists()).toBe(true)
+    const main = wrapper.get('.workspace-main')
+    expect(main.find('.view-mode-switcher').exists()).toBe(true)
+    expect(main.find('.editor-tab-bar-stub').exists()).toBe(true)
+    const mainChildren = [...main.element.children]
+    const modeIdx = mainChildren.findIndex((el) => el.classList.contains('workspace-mode-bar') || el.querySelector?.('.view-mode-switcher'))
+    const tabIdx = mainChildren.findIndex((el) => el.classList.contains('editor-tab-bar-stub'))
+    expect(modeIdx).toBeGreaterThanOrEqual(0)
+    expect(tabIdx).toBeGreaterThan(modeIdx)
     expect(Array.from(children).some((child) => child.classList.contains('editor-tab-bar-stub'))).toBe(false)
   })
 
