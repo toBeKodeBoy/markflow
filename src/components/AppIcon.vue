@@ -49,13 +49,100 @@
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5l3 2" />
     </template>
+    <template v-else-if="name === 'sun'">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </template>
+    <template v-else-if="name === 'moon'">
+      <path d="M21 14.5A8.5 8.5 0 0 1 9.5 3 7 7 0 1 0 21 14.5z" />
+    </template>
+    <template v-else-if="name === 'bold'">
+      <path d="M7 5h6a3.5 3.5 0 0 1 0 7H7zM7 12h7a3.5 3.5 0 0 1 0 7H7z" />
+    </template>
+    <template v-else-if="name === 'italic'">
+      <path d="M10 5h8M6 19h8M14 5l-4 14" />
+    </template>
+    <template v-else-if="name === 'strike'">
+      <path d="M5 12h14M16 7a4 4 0 0 0-8 0c0 2 2 3 4 3.5S16 12 16 14a4 4 0 0 1-8 0" />
+    </template>
+    <template v-else-if="name === 'underline'">
+      <path d="M7 5v6a5 5 0 0 0 10 0V5M5 19h14" />
+    </template>
+    <template v-else-if="name === 'highlight'">
+      <path d="M4 20h16M9 4l-3 9h12l-3-9z" />
+    </template>
+    <template v-else-if="name === 'heading'">
+      <path d="M6 5v14M18 5v14M6 12h12" />
+    </template>
+    <template v-else-if="name === 'list'">
+      <path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01" />
+    </template>
+    <template v-else-if="name === 'list-ordered'">
+      <path d="M10 6h11M10 12h11M10 18h11M4 6h1v4M4 10h2M4 16h2v2H4" />
+    </template>
+    <template v-else-if="name === 'task'">
+      <path d="M9 11l3 3L22 4" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+    </template>
+    <template v-else-if="name === 'quote'">
+      <path d="M3 21h6l2-8H5L3 21zM13 21h6l2-8h-6l-2 8zM5 13V6a3 3 0 0 1 3-3h1M15 13V6a3 3 0 0 1 3-3h1" />
+    </template>
+    <template v-else-if="name === 'code'">
+      <path d="M8 8l-4 4 4 4M16 8l4 4-4 4" />
+    </template>
+    <template v-else-if="name === 'code-block'">
+      <path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13 5l-2 14" />
+    </template>
+    <template v-else-if="name === 'table'">
+      <path d="M4 5h16v14H4zM4 10h16M4 15h16M10 5v14M16 5v14" />
+    </template>
+    <template v-else-if="name === 'link'">
+      <path d="M10 13a5 5 0 0 0 7.07 0l2.12-2.12a5 5 0 0 0-7.07-7.07L10.7 5.23" />
+      <path d="M14 11a5 5 0 0 0-7.07 0L4.81 13.12a5 5 0 0 0 7.07 7.07L13.3 18.77" />
+    </template>
+    <template v-else-if="name === 'image'">
+      <path d="M4 5h16v14H4z" />
+      <circle cx="9" cy="10" r="1.5" />
+      <path d="M4 16l5-4 3 3 3-2 5 3" />
+    </template>
   </svg>
 </template>
 
 <script setup lang="ts">
+export type AppIconName =
+  | 'menu'
+  | 'folder'
+  | 'file'
+  | 'settings'
+  | 'toc'
+  | 'plus'
+  | 'file-menu'
+  | 'chevron-down'
+  | 'chevron-right'
+  | 'trash'
+  | 'close'
+  | 'clock'
+  | 'sun'
+  | 'moon'
+  | 'bold'
+  | 'italic'
+  | 'strike'
+  | 'underline'
+  | 'highlight'
+  | 'heading'
+  | 'list'
+  | 'list-ordered'
+  | 'task'
+  | 'quote'
+  | 'code'
+  | 'code-block'
+  | 'table'
+  | 'link'
+  | 'image'
+
 withDefaults(
   defineProps<{
-    name: 'menu' | 'folder' | 'file' | 'settings' | 'toc' | 'plus' | 'file-menu' | 'chevron-down' | 'chevron-right' | 'trash' | 'close' | 'clock'
+    name: AppIconName
     size?: number
   }>(),
   { size: 16 }

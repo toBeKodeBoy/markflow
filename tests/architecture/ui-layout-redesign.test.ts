@@ -1,0 +1,88 @@
+/**
+ * UI 布局复刻架构约束（docs/plans/markflow-ui-layout-redesign-plan.md）
+ */
+import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+const root = resolve(import.meta.dirname, '../..')
+
+function readSrc(rel: string) {
+  return readFileSync(resolve(root, rel), 'utf-8')
+}
+
+describe('Design Token', () => {
+  const css = readSrc('src/style.css')
+
+  it('浅色主题主色应为 #5243E8', () => {
+    expect(css).toMatch(/:root\s*\{[^}]*--primary:\s*#5243E8/i)
+  })
+
+  it('浅色主题背景应为 #f8f9fa', () => {
+    expect(css).toMatch(/:root\s*\{[^}]*--bg:\s*#f8f9fa/i)
+  })
+
+  it('应声明内容区最大宽度 860px', () => {
+    expect(css).toMatch(/--content-max:\s*860px/)
+  })
+
+  it('应声明侧栏默认宽度 260px', () => {
+    expect(css).toMatch(/--sidebar-width:\s*260px/)
+  })
+
+  it('UI 字体栈应优先 Inter', () => {
+    expect(css).toMatch(/--font-ui:\s*['"]?Inter['"]?/)
+  })
+})
+
+describe('壳层布局 DOM', () => {
+  const appSrc = readSrc('src/App.vue')
+  const toolbarSrc = readSrc('src/components/Toolbar.vue')
+
+  it('模式切换应位于 workspace-main（Tab 上方），而非 Toolbar 顶栏中部', () => {
+    expect(appSrc).toMatch(/view-mode-switcher|ViewModeSwitcher/)
+    expect(appSrc).toMatch(/workspace-main[\s\S]*view-mode-switcher|ViewModeSwitcher[\s\S]*EditorTabBar/)
+    expect(toolbarSrc).not.toMatch(/view-mode-switcher/)
+  })
+
+  it('编辑舞台应使用 editor-stage 包裹编辑/预览区', () => {
+    expect(appSrc).toMatch(/class="editor-stage"/)
+  })
+
+  it('顶栏应始终展示 MarkFlow Logo', () => {
+    expect(toolbarSrc).toMatch(/class="app-logo"/)
+    expect(toolbarSrc).toMatch(/logo-name[\s\S]*MarkFlow|MarkFlow[\s\S]*logo-name/)
+  })
+
+  it('新建按钮应使用主色按钮样式', () => {
+    expect(toolbarSrc).toMatch(/btn-primary|btn-action/)
+    expect(toolbarSrc).toMatch(/新建/)
+  })
+
+  it('顶栏不应再提供主题快捷切换入口（主题仅在设置面板）', () => {
+    expect(toolbarSrc).not.toMatch(/title=["']切换主题["']/)
+    expect(toolbarSrc).not.toMatch(/aria-label=["']切换主题["']/)
+    expect(toolbarSrc).not.toMatch(/toggleTheme/)
+  })
+})
+
+describe('内容区留白样式', () => {
+  const css = readSrc('src/style.css')
+
+  it('live 模式 editor-stage 应限制最大宽度并水平居中', () => {
+    expect(css).toMatch(/\.mode-live \.editor-stage[\s\S]*?max-width:\s*var\(--content-max\)/)
+    expect(css).toMatch(/\.editor-stage[\s\S]*?margin(?:-left|-right|):\s*0\s+auto|margin:\s*0\s+auto/)
+  })
+
+  it('分屏/源码模式不应被 content-max 限制舞台宽度', () => {
+    const baseBlock = css.match(/\.editor-stage\s*\{[^}]*\}/)?.[0] ?? ''
+    expect(baseBlock).not.toMatch(/max-width:\s*var\(--content-max\)/)
+    expect(css).not.toMatch(/\.mode-split \.editor-stage[\s\S]*?max-width:\s*var\(--content-max\)/)
+    expect(css).not.toMatch(/\.mode-source \.editor-stage[\s\S]*?max-width:\s*var\(--content-max\)/)
+  })
+
+  it('专注模式内容宽应使用 content-max（不再硬编码 800px）', () => {
+    expect(css).toMatch(/\.mode-focus \.wysiwyg-pane[\s\S]*?max-width:\s*var\(--content-max\)/)
+    expect(css).not.toMatch(/\.mode-focus \.wysiwyg-pane[\s\S]*?max-width:\s*800px/)
+  })
+})

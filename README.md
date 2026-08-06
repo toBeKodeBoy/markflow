@@ -75,8 +75,7 @@ MarkFlow 是一个面向日常 Markdown 写作的 uTools 插件。解决本地�
 - 一键复制预览内容为 HTML
 
 **界面与设置**
-- 工具栏 ⚙ **设置面板**（`SettingsModal`）：主题、源码字号、等宽字体、PDF 选项、存储用量、备份与清空
-- 明暗主题快捷切换，或自动跟随 uTools / 系统深色模式
+- 工具栏 ⚙ **设置面板**（`SettingsModal`）：主题（浅色 / 深色 / 跟随系统或 uTools）、源码字号、等宽字体、PDF 选项、存储用量、备份与清空
 - 可独立隐藏侧边栏与目录面板（侧边栏显隐会记住）
 - 专注模式隐藏工具栏与侧边栏，居中宽屏写作，按 `Esc` 退出
 - **全屏模式**（`useFullscreen`）：编辑区独立全屏，配合专注模式沉浸写作
@@ -185,7 +184,7 @@ markflow/
 │   ├── extensions/
 │   │   └── autoCloseBrackets.ts  # CodeMirror 括号自动闭合扩展
 │   ├── components/          # 界面组件（22 个）
-│   │   ├── Toolbar.vue          # 工具栏（视图切换/导入导出/主题）
+│   │   ├── Toolbar.vue          # 工具栏（新建/导入导出/目录/设置）
 │   │   ├── Sidebar.vue          # 侧边栏（文件夹树/笔记/搜索/标签云）
 │   │   ├── EditorTabBar.vue     # 多文档页签栏
 │   │   ├── CreateEntryModal.vue # 新建笔记/文件夹弹窗

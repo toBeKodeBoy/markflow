@@ -1,11 +1,19 @@
 <template>
   <div class="editor-toolbar" data-testid="format-toolbar">
     <div class="toolbar-group" data-testid="toolbar-group" data-group="text">
-      <span class="toolbar-group-label" data-testid="toolbar-group-text">文字</span>
-      <button type="button" title="粗体 (Ctrl+B)" aria-label="粗体" @click="$emit('bold')"><b>B</b></button>
-      <button type="button" title="斜体 (Ctrl+I)" aria-label="斜体" @click="$emit('italic')"><i>I</i></button>
-      <button type="button" title="删除线" aria-label="删除线" @click="$emit('strike')"><s>S</s></button>
-      <button type="button" title="下划线 (Ctrl+U)" aria-label="下划线" @click="$emit('underline')"><u>U</u></button>
+      <span class="toolbar-group-label sr-only" data-testid="toolbar-group-text">文字</span>
+      <button type="button" title="粗体 (Ctrl+B)" aria-label="粗体" @click="$emit('bold')">
+        <AppIcon name="bold" :size="14" />
+      </button>
+      <button type="button" title="斜体 (Ctrl+I)" aria-label="斜体" @click="$emit('italic')">
+        <AppIcon name="italic" :size="14" />
+      </button>
+      <button type="button" title="删除线" aria-label="删除线" @click="$emit('strike')">
+        <AppIcon name="strike" :size="14" />
+      </button>
+      <button type="button" title="下划线 (Ctrl+U)" aria-label="下划线" @click="$emit('underline')">
+        <AppIcon name="underline" :size="14" />
+      </button>
       <button
         type="button"
         data-testid="toolbar-highlight"
@@ -13,25 +21,38 @@
         aria-label="高亮显示"
         @click="$emit('highlight')"
       >
-        高亮
+        <AppIcon name="highlight" :size="14" />
       </button>
     </div>
 
-    <span class="sep" aria-hidden="true">|</span>
+    <span class="sep" aria-hidden="true" />
 
     <div class="toolbar-group" data-testid="toolbar-group" data-group="heading">
-      <span class="toolbar-group-label" data-testid="toolbar-group-heading">标题</span>
-      <button type="button" title="标题 1" aria-label="标题 1" @click="$emit('h1')">H1</button>
-      <button type="button" title="标题 2" aria-label="标题 2" @click="$emit('h2')">H2</button>
-      <button type="button" title="标题 3" aria-label="标题 3" @click="$emit('h3')">H3</button>
+      <span class="toolbar-group-label sr-only" data-testid="toolbar-group-heading">标题</span>
+      <button type="button" title="标题 1" aria-label="标题 1" @click="$emit('h1')">
+        <AppIcon name="heading" :size="14" />
+        <span class="toolbar-btn-badge">1</span>
+      </button>
+      <button type="button" title="标题 2" aria-label="标题 2" @click="$emit('h2')">
+        <AppIcon name="heading" :size="14" />
+        <span class="toolbar-btn-badge">2</span>
+      </button>
+      <button type="button" title="标题 3" aria-label="标题 3" @click="$emit('h3')">
+        <AppIcon name="heading" :size="14" />
+        <span class="toolbar-btn-badge">3</span>
+      </button>
     </div>
 
-    <span class="sep" aria-hidden="true">|</span>
+    <span class="sep" aria-hidden="true" />
 
     <div class="toolbar-group" data-testid="toolbar-group" data-group="list">
-      <span class="toolbar-group-label" data-testid="toolbar-group-list">列表</span>
-      <button type="button" title="无序列表" aria-label="无序列表" @click="$emit('bulletList')">≡</button>
-      <button type="button" title="有序列表" aria-label="有序列表" @click="$emit('orderedList')">1.</button>
+      <span class="toolbar-group-label sr-only" data-testid="toolbar-group-list">列表</span>
+      <button type="button" title="无序列表" aria-label="无序列表" @click="$emit('bulletList')">
+        <AppIcon name="list" :size="14" />
+      </button>
+      <button type="button" title="有序列表" aria-label="有序列表" @click="$emit('orderedList')">
+        <AppIcon name="list-ordered" :size="14" />
+      </button>
       <button
         v-if="showTaskListButton"
         type="button"
@@ -40,17 +61,23 @@
         aria-label="任务列表"
         @click="$emit('taskList')"
       >
-        [x]
+        <AppIcon name="task" :size="14" />
       </button>
-      <button type="button" title="引用块" aria-label="引用块" @click="$emit('blockquote')">❝</button>
+      <button type="button" title="引用块" aria-label="引用块" @click="$emit('blockquote')">
+        <AppIcon name="quote" :size="14" />
+      </button>
     </div>
 
-    <span class="sep" aria-hidden="true">|</span>
+    <span class="sep" aria-hidden="true" />
 
     <div class="toolbar-group" data-testid="toolbar-group" data-group="insert">
-      <span class="toolbar-group-label" data-testid="toolbar-group-insert">插入</span>
-      <button type="button" title="行内代码 (Ctrl/Cmd+E)" aria-label="行内代码" @click="$emit('inlineCode')">`</button>
-      <button type="button" title="代码块" aria-label="代码块" @click="$emit('codeBlock')">&lt;/&gt;</button>
+      <span class="toolbar-group-label sr-only" data-testid="toolbar-group-insert">插入</span>
+      <button type="button" title="行内代码 (Ctrl/Cmd+E)" aria-label="行内代码" @click="$emit('inlineCode')">
+        <AppIcon name="code" :size="14" />
+      </button>
+      <button type="button" title="代码块" aria-label="代码块" @click="$emit('codeBlock')">
+        <AppIcon name="code-block" :size="14" />
+      </button>
       <button
         type="button"
         data-testid="toolbar-table"
@@ -58,9 +85,11 @@
         aria-label="插入表格"
         @click="$emit('table')"
       >
-        ⊞
+        <AppIcon name="table" :size="14" />
       </button>
-      <button type="button" title="插入链接" aria-label="插入链接" @click="$emit('link')">🔗</button>
+      <button type="button" title="插入链接" aria-label="插入链接" @click="$emit('link')">
+        <AppIcon name="link" :size="14" />
+      </button>
       <button
         type="button"
         data-testid="toolbar-image-button"
@@ -68,7 +97,7 @@
         aria-label="上传图片"
         @click="triggerImageUpload"
       >
-        📷
+        <AppIcon name="image" :size="14" />
       </button>
       <input
         ref="imageInputRef"
@@ -80,13 +109,14 @@
       >
     </div>
 
-    <span class="sep" aria-hidden="true">|</span>
+    <span class="sep" aria-hidden="true" />
     <span v-if="charCount !== undefined" class="char-count">{{ charCount }} 字</span>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import AppIcon from './AppIcon.vue'
 
 withDefaults(defineProps<{ charCount?: number; showTaskListButton?: boolean }>(), {
   showTaskListButton: true,

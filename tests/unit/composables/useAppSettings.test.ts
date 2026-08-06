@@ -2,7 +2,12 @@
  * @file tests/unit/composables/useAppSettings.test.ts
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { clampFontSize, applyEditorCssVars, useAppSettings } from '../../../src/composables/useAppSettings'
+import {
+  clampFontSize,
+  clampSidebarWidth,
+  applyEditorCssVars,
+  useAppSettings,
+} from '../../../src/composables/useAppSettings'
 
 describe('clampFontSize', () => {
   it('应限制在 12–24 范围内', () => {
@@ -13,6 +18,19 @@ describe('clampFontSize', () => {
 
   it('非法值应回退到 14', () => {
     expect(clampFontSize(NaN)).toBe(14)
+  })
+})
+
+describe('clampSidebarWidth', () => {
+  it('默认与下限应为 260', () => {
+    expect(clampSidebarWidth(NaN)).toBe(260)
+    expect(clampSidebarWidth(100)).toBe(260)
+    expect(clampSidebarWidth(260)).toBe(260)
+  })
+
+  it('应限制在 260–360 范围内', () => {
+    expect(clampSidebarWidth(400)).toBe(360)
+    expect(clampSidebarWidth(300.6)).toBe(301)
   })
 })
 

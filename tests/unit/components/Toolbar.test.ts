@@ -32,7 +32,6 @@ vi.mock('../../../src/utils/exportMarkdownAssets', () => ({
 function mountToolbar() {
   return mount(Toolbar, {
     props: {
-      viewMode: 'live',
       tocVisible: false,
     },
     global: {
@@ -193,6 +192,59 @@ describe('Toolbar', () => {
     expect(wrapper.text()).toContain('新建内容')
     expect(wrapper.text()).toContain('新建文件')
     expect(wrapper.text()).toContain('新建文件夹')
+  })
+
+  it('顶栏不应再展示主题快捷切换按钮', () => {
+    const wrapper = mountToolbar()
+
+    expect(wrapper.find('[title="切换主题"]').exists()).toBe(false)
+    expect(wrapper.find('[aria-label="切换主题"]').exists()).toBe(false)
+  })
+
+  it('设置确认后应应用主题到 document', async () => {
+    const wrapper = mount(Toolbar, {
+      props: { tocVisible: false },
+      global: {
+        plugins: [pinia],
+        stubs: {
+          PdfExportModal: true,
+          SettingsModal: {
+            name: 'SettingsModal',
+            emits: ['confirm', 'cancel', 'import-folder', 'backup-restored', 'library-cleared'],
+            template:
+              '<button data-testid="settings-confirm" @click="$emit(\'confirm\', payload)" />',
+            setup() {
+              return {
+                payload: {
+                  theme: 'dark' as const,
+                  fontSize: 16,
+                  editorFontFamily: 'monospace',
+                  previewVisible: true,
+                  sidebarVisible: true,
+                  imageExport: {
+                    mode: 'note-assets-folder' as const,
+                    customTemplate: './${filename}.assets',
+                    fileNameTemplate: '${filename}-${index}',
+                    overwriteStrategy: 'rename' as const,
+                    bindNoteOnExport: true,
+                    downloadRemoteImages: true,
+                    syncUnusedAssets: true,
+                    unusedAssetsFolderName: '_unused',
+                  },
+                },
+              }
+            },
+          },
+          ImportFolderModal: true,
+          AppIcon: true,
+        },
+      },
+    })
+
+    await wrapper.find('[data-testid="settings-confirm"]').trigger('click')
+    await flushPromises()
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
   })
 
   it('顶部新建切换目标目录后应同步更新当前目录', async () => {

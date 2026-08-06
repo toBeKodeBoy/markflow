@@ -12,9 +12,11 @@ export const EDITOR_FONT_OPTIONS: { value: string; label: string }[] = [
 
 const MIN_FONT_SIZE = 12
 const MAX_FONT_SIZE = 24
-const MIN_SIDEBAR_WIDTH = 200
+const MIN_SIDEBAR_WIDTH = 260
 const MAX_SIDEBAR_WIDTH = 360
-const DEFAULT_SIDEBAR_WIDTH = 240
+const DEFAULT_SIDEBAR_WIDTH = 260
+
+export { DEFAULT_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH }
 
 const settingsRef = ref<AppSettings | null>(null)
 
