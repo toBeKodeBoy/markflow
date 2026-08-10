@@ -20,7 +20,7 @@
           @keydown.enter.prevent="confirmSelection"
           @keydown.tab.prevent="trapFocus"
         />
-        <kbd class="search-modal-kbd">Ctrl+K</kbd>
+        <kbd class="search-modal-kbd">Ctrl/Cmd+K</kbd>
       </div>
 
       <div v-if="draft.trim() && results.length === 0" class="search-modal-empty">

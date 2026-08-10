@@ -54,7 +54,7 @@
 
         data-testid="toolbar-search-btn"
 
-        title="搜索笔记（Ctrl+K）"
+        title="搜索笔记（Ctrl/Cmd+K）"
 
         aria-label="搜索笔记"
 
