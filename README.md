@@ -47,8 +47,7 @@ MarkFlow 是一个面向日常 Markdown 写作的 uTools 插件。解决本地�
 - 创建、重命名、删除笔记，自动从首个标题提取笔记名；**新建笔记/文件夹弹窗**（`CreateEntryModal`）支持一步创建
 - 文件夹创建、重命名与删除，多级文件夹树、拖拽移动、虚拟列表（>150 行）
 - **多文档页签**（`EditorTabBar`）：同时打开多个笔记，页签切换、拖拽排序、关闭，上限 10 个（`MAX_EDITOR_TABS`）
-- **全文搜索**：标题 + 正文 + 标签联合搜索，匹配摘要高亮，300ms 防抖（`SearchModal`）
-- **标签**：笔记标签编辑（`TagInput`）、顶栏展示（`NoteTagsBar`）、侧栏标签云过滤（`TagCloud` / `TagCloudPanel`）
+- **全文搜索**：标题 + 正文联合搜索，匹配摘要高亮（`SearchModal`，顶栏入口与 `Ctrl+K`）
 - **排序**：置顶/取消置顶，同文件夹内拖拽重排（`sortOrder`）
 - 导入/导出 `.md` 文件；**批量导入文件夹**（`ImportFolderModal`，可选保留目录结构与图片）
 - 导出 **PDF**（`PdfExportModal` 配置选项，uTools 环境走 Chromium `printToPDF`，浏览器环境回退系统打印）
@@ -183,9 +182,9 @@ markflow/
 │   │   └── task.ts          # 任务列表类型
 │   ├── extensions/
 │   │   └── autoCloseBrackets.ts  # CodeMirror 括号自动闭合扩展
-│   ├── components/          # 界面组件（22 个）
-│   │   ├── Toolbar.vue          # 工具栏（新建/导入导出/目录/设置）
-│   │   ├── Sidebar.vue          # 侧边栏（文件夹树/笔记/搜索/标签云）
+│   ├── components/          # 界面组件
+│   │   ├── Toolbar.vue          # 工具栏（新建/搜索/导入导出/目录/设置）
+│   │   ├── Sidebar.vue          # 侧边栏（文件夹树/最近/笔记）
 │   │   ├── EditorTabBar.vue     # 多文档页签栏
 │   │   ├── CreateEntryModal.vue # 新建笔记/文件夹弹窗
 │   │   ├── SearchModal.vue      # 全文搜索弹窗
@@ -196,15 +195,13 @@ markflow/
 │   │   ├── FocusFormatToolbar.vue # 专注模式浮动格式工具栏
 │   │   ├── TableToolbar.vue     # 表格编辑工具栏
 │   │   ├── Toc.vue              # 文档目录导航
-│   │   ├── TagInput.vue         # 笔记标签编辑
-│   │   ├── NoteTagsBar.vue      # 顶栏笔记标签展示
-│   │   ├── TagCloud.vue         # 标签云视图
-│   │   ├── TagCloudPanel.vue    # 标签云面板容器
 │   │   ├── SidebarTreeRow.vue   # 侧栏树行组件
 │   │   ├── ImageLightbox.vue    # 图片全屏预览灯箱
 │   │   ├── ImportFolderModal.vue# 批量导入文件夹弹窗
 │   │   ├── SettingsModal.vue    # 设置、备份、清空数据
 │   │   ├── PdfExportModal.vue   # PDF 导出配置弹窗
+│   │   ├── LinkDialog.vue       # 链接编辑弹窗
+│   │   ├── HighlightTextModal.vue # 高亮文本弹窗
 │   │   └── AppIcon.vue          # 应用图标 / 状态指示
 │   ├── stores/              # Pinia 状态管理
 │   │   ├── note.ts              # 笔记 CRUD 与状态
@@ -226,7 +223,6 @@ markflow/
 │   │   ├── useAutoBackup.ts     # 自动备份
 │   │   ├── useBackup.ts         # 手动备份/恢复
 │   │   ├── useFocusToolbarVisibility.ts # 专注模式工具栏显隐
-│   │   ├── useTagCloudLayout.ts # 标签云布局计算
 │   │   ├── useFullscreen.ts     # 全屏状态管理
 │   │   └── useTableToolbar.ts   # 表格工具栏逻辑
 │   ├── plugins/             # Milkdown 插件（14 个）
@@ -285,8 +281,6 @@ markflow/
 │       ├── generateTocMarkdown.ts   # 目录 Markdown 生成
 │       ├── previewFragmentNav.ts    # 预览片段导航
 │       ├── searchSnippet.ts     # 搜索摘要高亮
-│       ├── tagNormalize.ts      # 标签规范化
-│       ├── tagStats.ts          # 标签统计
 │       ├── storageStats.ts      # 存储用量统计
 │       ├── inlineCode.ts        # 行内代码处理
 │       ├── notify.ts            # 通知提示

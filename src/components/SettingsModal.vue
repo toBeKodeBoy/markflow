@@ -38,7 +38,7 @@
       </label>
 
       <p class="settings-tip">
-        PDF 导出选项（纸张、页边距等）可在工具栏「PDF」按钮中配置，设置会自动记住。
+        PDF 导出选项（纸张、页边距等）可在顶栏「文件 → 导出 PDF」中配置，设置会自动记住。
       </p>
 
       <div class="settings-section">

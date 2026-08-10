@@ -46,6 +46,10 @@ function mountToolbar() {
   })
 }
 
+async function openFileMenu(wrapper: ReturnType<typeof mountToolbar>) {
+  await wrapper.find('[data-testid="toolbar-file-btn"]').trigger('click')
+}
+
 describe('Toolbar', () => {
   let originalMarkflow: typeof window.markflow | undefined
   let originalFileReader: typeof window.FileReader
@@ -81,7 +85,7 @@ describe('Toolbar', () => {
     const noteStore = useNoteStore()
     const tabsStore = useEditorTabsStore()
 
-    await wrapper.find('.btn-icon.btn-icon-text').trigger('click')
+    await openFileMenu(wrapper)
     await wrapper
       .findAll('[role="menuitem"]')
       .find((button) => button.text().includes('导入文件'))!
@@ -129,7 +133,7 @@ describe('Toolbar', () => {
     const tabsStore = useEditorTabsStore()
     const createNoteSpy = vi.spyOn(noteStore, 'createNoteWithContent')
 
-    await wrapper.find('.btn-icon.btn-icon-text').trigger('click')
+    await openFileMenu(wrapper)
     await wrapper
       .findAll('[role="menuitem"]')
       .find((button) => button.text().includes('导入文件'))!
@@ -174,7 +178,7 @@ describe('Toolbar', () => {
     const wrapper = mountToolbar()
     const noteStore = useNoteStore()
 
-    await wrapper.find('.btn-icon.btn-icon-text').trigger('click')
+    await openFileMenu(wrapper)
     await wrapper
       .findAll('[role="menuitem"]')
       .find((button) => button.text().includes('导入文件'))!
@@ -299,7 +303,7 @@ describe('Toolbar', () => {
     noteStore.currentNote = note
     noteStore.liveContent = '![图](markflow-asset://asset-1)'
 
-    await wrapper.find('.btn-icon.btn-icon-text').trigger('click')
+    await openFileMenu(wrapper)
     await wrapper
       .findAll('[role="menuitem"]')
       .find((button) => button.text().includes('导出 Markdown'))!
@@ -335,7 +339,7 @@ describe('Toolbar', () => {
     noteStore.currentNote = note
     noteStore.liveContent = '![图](markflow-asset://asset-1)'
 
-    await wrapper.find('.btn-icon.btn-icon-text').trigger('click')
+    await openFileMenu(wrapper)
     await wrapper
       .findAll('[role="menuitem"]')
       .find((button) => button.text().includes('导出 Markdown'))!
@@ -373,7 +377,7 @@ describe('Toolbar', () => {
     noteStore.currentNote = note
     noteStore.liveContent = '![remote](https://example.com/a.png)'
 
-    await wrapper.find('.btn-icon.btn-icon-text').trigger('click')
+    await openFileMenu(wrapper)
     await wrapper
       .findAll('[role="menuitem"]')
       .find((button) => button.text().includes('导出 Markdown'))!

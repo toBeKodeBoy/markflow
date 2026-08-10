@@ -69,7 +69,9 @@
     @dragleave.stop="!row.isRecentView && $emit('drag-leave-note')"
     @drop.prevent.stop="!row.isRecentView && onNoteDrop($event, row.note!.id)"
   >
-    <span v-if="row.note!.pinned" class="note-pin-icon" title="已置顶">📌</span>
+    <span v-if="row.note!.pinned" class="note-pin-icon" title="已置顶" aria-label="已置顶">
+      <AppIcon name="pin" :size="12" />
+    </span>
     <input
       v-if="renamingNoteId === row.note!.id"
       :value="renamingNoteName"
