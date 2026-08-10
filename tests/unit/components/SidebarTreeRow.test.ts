@@ -186,4 +186,42 @@ describe('SidebarTreeRow', () => {
 
     expect(wrapper.emitted('commit-rename-note')).toBeTruthy()
   })
+
+  it('置顶笔记应渲染 AppIcon pin 而非 emoji', () => {
+    const wrapper = mount(SidebarTreeRow, {
+      props: {
+        row: {
+          kind: 'note',
+          depth: 0,
+          note: {
+            id: 'note-1',
+            title: '置顶笔记',
+            updatedAt: Date.now(),
+            pinned: true,
+          },
+        },
+        expanded: false,
+        activeFolderId: null,
+        currentNoteId: undefined,
+        renamingFolderId: null,
+        renamingFolderName: '',
+        renamingNoteId: null,
+        renamingNoteName: '',
+        dragOverFolderId: null,
+      },
+      global: {
+        stubs: {
+          AppIcon: {
+            props: ['name', 'size'],
+            template: '<span class="stub-app-icon" :data-name="name" />',
+          },
+        },
+      },
+    })
+
+    const pin = wrapper.find('.note-pin-icon .stub-app-icon')
+    expect(pin.exists()).toBe(true)
+    expect(pin.attributes('data-name')).toBe('pin')
+    expect(wrapper.text()).not.toContain('📌')
+  })
 })

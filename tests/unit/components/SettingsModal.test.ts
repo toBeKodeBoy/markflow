@@ -25,6 +25,15 @@ describe('SettingsModal', () => {
     vi.unstubAllGlobals()
   })
 
+  it('PDF 提示应指向文件菜单而非顶栏 PDF 按钮', () => {
+    const wrapper = mountSettings()
+    const tip = wrapper.find('.settings-tip')
+    expect(tip.exists()).toBe(true)
+    expect(tip.text()).toMatch(/文件/)
+    expect(tip.text()).toMatch(/导出 PDF|PDF/)
+    expect(tip.text()).not.toContain('工具栏「PDF」按钮')
+  })
+
   describe('clear all library data (1.4.4)', () => {
     it('renders 清空全部数据 button in data management section', () => {
       const wrapper = mountSettings()

@@ -384,4 +384,15 @@ describe('Toolbar', () => {
       '导出完成，但有 2 张外链图片下载失败，已保留原链接。外链图片下载失败：https://example.com/a.png（HTTP 404）；另有 1 条同类问题'
     )
   })
+
+  it('点击搜索按钮应派发 openSearch', async () => {
+    const wrapper = mountToolbar()
+    const btn = wrapper.find('[data-testid="toolbar-search-btn"]')
+    expect(btn.exists()).toBe(true)
+    expect(btn.attributes('aria-label')).toBe('搜索笔记')
+    expect(btn.attributes('title')).toMatch(/Ctrl\+K|Cmd\+K|搜索/)
+
+    await btn.trigger('click')
+    expect(wrapper.emitted('openSearch')).toEqual([[]])
+  })
 })

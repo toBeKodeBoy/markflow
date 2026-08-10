@@ -38,6 +38,26 @@ describe('SearchModal', () => {
     expect(wrapper.find('.search-modal-input').exists()).toBe(true)
   })
 
+  it('头部应使用 AppIcon search 而非 emoji', () => {
+    const wrapper = mount(SearchModal, {
+      props: { visible: true },
+      global: {
+        plugins: [pinia],
+        stubs: {
+          Teleport: true,
+          AppIcon: {
+            props: ['name', 'size'],
+            template: '<span class="stub-app-icon" :data-name="name" />',
+          },
+        },
+      },
+    })
+    const icon = wrapper.find('.stub-app-icon')
+    expect(icon.exists()).toBe(true)
+    expect(icon.attributes('data-name')).toBe('search')
+    expect(wrapper.text()).not.toContain('🔍')
+  })
+
   it('输入关键字后展示匹配的笔记结果', async () => {
     const store = useNoteStore()
     store.createNoteWithContent('# 项目周报\n')
