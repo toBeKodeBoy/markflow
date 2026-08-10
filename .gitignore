@@ -35,4 +35,6 @@ docs/*
 !docs/plans/
 docs/plans/*
 !docs/plans/unordered-list-paste-into-code-block-plan.md
+!docs/plans/ui-optimization-opportunities-plan.md
+!docs/plans/ui-phase-a-implementation-report.md
 AGENTS.md
