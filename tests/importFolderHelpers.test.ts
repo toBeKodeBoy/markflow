@@ -15,8 +15,12 @@ import {
   isImportableImageFilename,
   isImportableFilename,
   formatImportTextContent,
+  mimeFromImageExtension,
+  isMarkdownFilename,
+  compareImportRelativePaths,
   normalizeRelativePath,
   hasRelativeImageReferences,
+  rewriteRelativeImages,
 } from '../src/utils/importFolderHelpers'
 import type { Folder } from '../src/types'
 
@@ -47,6 +51,35 @@ describe('importFolderHelpers', () => {
 
     it('falls back to content when filename has no stem', () => {
       expect(extractImportTitle('# Hello\n\nbody', '.md')).toBe('Hello')
+    })
+
+    it('剥离标题中的内联 Markdown 语法', () => {
+      expect(extractImportTitle('# **加粗** 内容', '.md')).toBe('加粗 内容')
+    })
+
+    it('无标题但有正文内容时返回正文前 30 字符', () => {
+      // 覆盖 `if (chunk.trim()) return chunk.trim().slice(0, 30)` 分支
+      expect(extractImportTitle('这是正文内容', '.md')).toBe('这是正文内容')
+    })
+
+    it('超长正文截断为 30 个字符', () => {
+      // 覆盖 slice(0, 30) 截断路径
+      expect(extractImportTitle('A'.repeat(40), '.md')).toBe('A'.repeat(30))
+    })
+
+    it('全空白且超过 50 行无标题时返回无标题', () => {
+      // 覆盖 while 循环耗尽（line >= TITLE_SCAN_LINES）与 `return '无标题'` 分支
+      expect(extractImportTitle('\n'.repeat(51), '.md')).toBe('无标题')
+    })
+
+    it('空内容直接走到底返回无标题（覆盖 end===-1 break）', () => {
+      // 覆盖 `if (end === -1) break` 真分支
+      expect(extractImportTitle('', '.md')).toBe('无标题')
+    })
+
+    it('标题文本仅空白时剥离为空回退原文（空串）', () => {
+      // 覆盖 `stripInlineMarkdown(raw) || raw` 右侧回退分支
+      expect(extractImportTitle('#   \n', '.md')).toBe('')
     })
   })
 
@@ -87,6 +120,21 @@ describe('importFolderHelpers', () => {
     it('sorts sequenced folders before non-sequenced ones', () => {
       const names = ['附录', '10 API', '02-进阶', '01-基础']
       expect(names.sort(compareImportFolderNames)).toEqual(['01-基础', '02-进阶', '10 API', '附录'])
+    })
+
+    it('纯数字文件夹名回退到完整 trimmed 文本', () => {
+      // 覆盖 `restName: match[2].trim() || trimmed` 右侧回退分支
+      expect(parseFolderSequence('10')).toEqual({
+        hasSequence: true,
+        sequence: 10,
+        restName: '10',
+      })
+    })
+
+    it('无序号文件夹排在有序号文件夹之后', () => {
+      // 覆盖 `parsedA.hasSequence ? -1 : 1` 中返回 1 的分支
+      expect(compareImportFolderNames('附录', '10 API')).toBe(1)
+      expect(compareImportFolderNames('10 API', '附录')).toBe(-1)
     })
   })
 
@@ -164,6 +212,11 @@ describe('importFolderHelpers', () => {
       expect(isImportableFilename('app.exe')).toBe(false)
       expect(isImportableFilename('archive.zip')).toBe(false)
     })
+
+    it('无扩展名且非已知基名时不可导入', () => {
+      // 覆盖 isImportableTextFilename 的 `if (!ext) return false` 分支
+      expect(isImportableTextFilename('randomfile')).toBe(false)
+    })
   })
 
   describe('formatImportTextContent', () => {
@@ -177,6 +230,18 @@ describe('importFolderHelpers', () => {
     it('keeps markdown content unchanged', () => {
       const md = '# Title\n\nbody'
       expect(formatImportTextContent(md, 'readme.md')).toBe(md)
+    })
+
+    it('未知扩展名回退为纯标题+正文（不走代码围栏）', () => {
+      // 覆盖 `if (lang)` 为假分支与 `return # ${stem}\n\n${content}` 路径
+      const out = formatImportTextContent('hello', 'notes.unknownext')
+      expect(out).toBe('# notes\n\nhello')
+    })
+
+    it('内容以换行结尾时围栏体去除末尾换行', () => {
+      // 覆盖 `content.endsWith('\n') ? content.slice(0, -1) : content` 真分支
+      const out = formatImportTextContent('{"a":1}\n', 'data/config.json')
+      expect(out).toContain('```json\n{"a":1}\n```')
     })
   })
 
@@ -196,6 +261,59 @@ describe('importFolderHelpers', () => {
       expect(hasRelativeImageReferences('![alt](https://example.com/a.png)')).toBe(false)
       expect(hasRelativeImageReferences('![alt](markflow-asset://a1)')).toBe(false)
       expect(hasRelativeImageReferences('plain text')).toBe(false)
+    })
+  })
+
+  describe('mimeFromImageExtension', () => {
+    it('maps common image extensions to mime types', () => {
+      expect(mimeFromImageExtension('photo.jpg')).toBe('image/jpeg')
+      expect(mimeFromImageExtension('icon.svg')).toBe('image/svg+xml')
+      expect(mimeFromImageExtension('fav.ico')).toBe('image/x-icon')
+      expect(mimeFromImageExtension('pic.bmp')).toBe('image/bmp')
+    })
+
+    it('falls back to image/<ext> for other extensions', () => {
+      expect(mimeFromImageExtension('shot.png')).toBe('image/png')
+      expect(mimeFromImageExtension('noext')).toBe('image/')
+    })
+  })
+
+  describe('isMarkdownFilename (deprecated alias)', () => {
+    it('delegates to isImportableTextFilename', () => {
+      expect(isMarkdownFilename('a.md')).toBe(true)
+      expect(isMarkdownFilename('app.exe')).toBe(false)
+    })
+  })
+
+  describe('compareImportRelativePaths', () => {
+    it('根级文件排在嵌套文件之前（segment 为空时返回 ±1）', () => {
+      // 覆盖 `if (segmentA == null) return -1` 与 `if (segmentB == null) return 1`
+      expect(compareImportRelativePaths('file.md', 'docs/file.md')).toBe(-1)
+      expect(compareImportRelativePaths('docs/file.md', 'file.md')).toBe(1)
+    })
+
+    it('同级文件按文件名排序', () => {
+      expect(compareImportRelativePaths('a.md', 'b.md')).toBeLessThan(0)
+    })
+  })
+
+  describe('rewriteRelativeImages', () => {
+    it('将匹配的相对图片路径改写为 markflow-asset 引用（含 title）', () => {
+      // 覆盖 `if (!assetId) return match` 假分支、titleMatch 真分支
+      const out = rewriteRelativeImages('![alt](assets/img.png "标题")', new Map([['assets/img.png', 'a1']]))
+      expect(out).toBe('![alt](markflow-asset://a1 "标题")')
+    })
+
+    it('无 title 时省略 title 后缀', () => {
+      // 覆盖 titleMatch 假分支
+      const out = rewriteRelativeImages('![alt](assets/img.png)', new Map([['assets/img.png', 'a1']]))
+      expect(out).toBe('![alt](markflow-asset://a1)')
+    })
+
+    it('未匹配到 assetId 时保持原文不变', () => {
+      // 覆盖 `if (!assetId) return match` 真分支
+      const md = '![alt](assets/img.png)'
+      expect(rewriteRelativeImages(md, new Map())).toBe(md)
     })
   })
 })
@@ -248,5 +366,17 @@ describe('ensureFolderForPath', () => {
     expect(id).toBe('f-2')
     expect(folders[1]).toMatchObject({ name: 'docs', parentId: 'root' })
     expect(folders[2]).toMatchObject({ name: 'guide', parentId: 'f-1' })
+  })
+
+  it('throws on empty dirPath', async () => {
+    // 覆盖 `if (segments.length === 0) throw` 分支
+    const { ensureFolderForPath } = await import('../src/utils/importFolderHelpers')
+    expect(() =>
+      ensureFolderForPath('', [], () => ({ id: 'x', name: '', order: 0 }))
+    ).toThrow()
+    // 仅分隔符的路径同样过滤为空段
+    expect(() =>
+      ensureFolderForPath('///', [], () => ({ id: 'x', name: '', order: 0 }))
+    ).toThrow()
   })
 })

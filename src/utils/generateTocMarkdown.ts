@@ -32,11 +32,11 @@ function parseTocTitleLine(title: string): { level: number; text: string } | nul
   return { level: m[1].length, text: m[2].trim() }
 }
 
-/** 同一 level+text 在列表中的第 n 次出现（0-based） */
+/** 同一 level+rawText 在列表中的第 n 次出现（0-based） */
 function headingOccurrence(headings: TocHeading[], target: TocHeading): number {
   let n = 0
   for (const h of headings) {
-    if (h.level === target.level && h.text === target.text) {
+    if (h.level === target.level && h.rawText === target.rawText) {
       if (h.index === target.index) return n
       n++
     }
@@ -44,11 +44,11 @@ function headingOccurrence(headings: TocHeading[], target: TocHeading): number {
   return 0
 }
 
-/** 与 marked / WYSIWYG headingId 一致：按文档顺序为标题分配 slug */
+/** 与 marked / WYSIWYG headingId 一致：按文档顺序为标题分配 slug（基于原始文本） */
 function assignHeadingSlugs(content: string): string[] {
   const headings = parseHeadings(content)
   const slugger = new HeadingSlugger()
-  return headings.map((h) => slugger.slug(h.text))
+  return headings.map((h) => slugger.slug(h.rawText))
 }
 
 /** 在 stripped 文档中插入目录块（与 applyTocToContent 插入位置一致） */
@@ -71,18 +71,18 @@ function slugAtOccurrence(
   simulatedHeadings: TocHeading[],
   simulatedSlugs: string[],
   level: number,
-  text: string,
+  rawText: string,
   occurrence: number
 ): string {
   let n = 0
   for (let i = 0; i < simulatedHeadings.length; i++) {
     const h = simulatedHeadings[i]
-    if (h.level === level && h.text === text) {
+    if (h.level === level && h.rawText === rawText) {
       if (n === occurrence) return simulatedSlugs[i]
       n++
     }
   }
-  return new HeadingSlugger().slug(text)
+  return new HeadingSlugger().slug(rawText)
 }
 
 /**
@@ -99,11 +99,11 @@ function resolveSlugForHeading(
   if (
     tocTitle
     && heading.level === tocTitle.level
-    && heading.text === tocTitle.text
+    && heading.rawText === tocTitle.text
   ) {
     occurrence += 1
   }
-  return slugAtOccurrence(simulatedHeadings, simulatedSlugs, heading.level, heading.text, occurrence)
+  return slugAtOccurrence(simulatedHeadings, simulatedSlugs, heading.level, heading.rawText, occurrence)
 }
 
 /** 根据文档标题生成 Markdown 目录块（页内锚点链接，预览内可跳转） */

@@ -1,15 +1,19 @@
 import { shallowRef, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useNoteStore } from '../stores/note'
 import { TOC_PARSE_DEBOUNCE_MS } from '../constants'
+import { stripInlineMarkdown } from '../utils/stripInlineMarkdown'
 
 export interface TocHeading {
   level: number
+  /** 剥离内联语法后的展示文本 */
   text: string
+  /** 原始标题文本（用于算 slug，与 marked 预览侧 id 保持一致） */
+  rawText: string
   line: number
   index: number
 }
 
-/** Single-pass heading parse — avoids split('\\n') on very large files. */
+/** Single-pass heading parse — avoids split('\n') on very large files. */
 export function parseHeadings(content: string): TocHeading[] {
   const result: TocHeading[] = []
   let line = 0
@@ -20,7 +24,14 @@ export function parseHeadings(content: string): TocHeading[] {
     const chunk = content.slice(start, lineEnd)
     const m = chunk.match(/^(#{1,6})\s+(.+)/)
     if (m) {
-      result.push({ level: m[1].length, text: m[2].trim(), line, index: result.length })
+      const raw = m[2].trim()
+      result.push({
+        level: m[1].length,
+        text: stripInlineMarkdown(raw) || raw,
+        rawText: raw,
+        line,
+        index: result.length,
+      })
     }
     line++
     if (end === -1) break

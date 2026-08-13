@@ -1,4 +1,5 @@
 import type { Folder } from '../types'
+import { stripInlineMarkdown } from './stripInlineMarkdown'
 
 const TITLE_SCAN_LINES = 50
 const SKIP_DIR_NAMES = new Set(['.git', 'node_modules', '.svn', '__pycache__', '.idea', 'dist', 'build'])
@@ -227,7 +228,10 @@ export function extractImportTitle(content: string, relativePath: string): strin
     const lineEnd = end === -1 ? content.length : end
     const chunk = content.slice(start, lineEnd)
     const heading = chunk.match(/^#+\s+(.+)/)
-    if (heading) return heading[1].trim()
+    if (heading) {
+      const raw = heading[1].trim()
+      return stripInlineMarkdown(raw) || raw
+    }
     if (chunk.trim()) return chunk.trim().slice(0, 30)
     line++
     if (end === -1) break

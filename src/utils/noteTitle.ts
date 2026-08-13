@@ -1,3 +1,5 @@
+import { stripInlineMarkdown } from './stripInlineMarkdown'
+
 const TITLE_SCAN_LINES = 50
 
 function extractFilenameStem(pathOrName?: string): string {
@@ -20,7 +22,10 @@ export function extractNoteTitle(content: string, pathOrName?: string): string {
     const lineEnd = end === -1 ? content.length : end
     const chunk = content.slice(start, lineEnd)
     const heading = chunk.match(/^#\s+(.+)/)
-    if (heading) return heading[1].trim()
+    if (heading) {
+      const raw = heading[1].trim()
+      return stripInlineMarkdown(raw) || raw
+    }
     line++
     if (end === -1) break
     start = end + 1

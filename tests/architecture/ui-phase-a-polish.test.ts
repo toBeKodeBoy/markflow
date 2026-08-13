@@ -1,5 +1,5 @@
 /**
- * UI Phase A 优化约束（docs/plans/ui-optimization-opportunities-plan.md）
+ * UI Phase A 优化约束（docs/plans/界面优化机会说明.md）
  * A1 顶栏搜索入口 · A2 死 CSS/文档清债 · A3 PDF 文案 · A4 图标统一
  */
 import { describe, it, expect } from 'vitest'
