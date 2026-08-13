@@ -1,5 +1,5 @@
 <template>
-  <div class="editor-pane wysiwyg-pane">
+  <div class="editor-pane wysiwyg-pane editor-canvas">
     <FormatToolbar
       v-if="!focusMode"
       :show-task-list-button="!focusMode"

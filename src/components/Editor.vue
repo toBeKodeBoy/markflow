@@ -1,5 +1,5 @@
 <template>
-  <div class="editor-pane">
+  <div class="editor-pane editor-canvas">
     <FormatToolbar
       :view-mode="viewMode"
       @bold="insertMarkdown('**', '**', '粗体')"

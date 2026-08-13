@@ -1,5 +1,5 @@
 <template>
-  <div class="preview-pane">
+  <div class="preview-pane editor-canvas">
     <div class="preview-toolbar">
       <span class="preview-label">预览</span>
       <span v-if="previewLoading" class="preview-loading">渲染中…</span>

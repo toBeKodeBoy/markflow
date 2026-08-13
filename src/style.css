@@ -1,12 +1,16 @@
 /* ===== CSS Variables & Themes ===== */
 :root {
   --bg: #f8f9fa;
+  --bg-app: #f8f9fa;
+  --bg-stage: #f3f4f8;
+  --bg-canvas: #ffffff;
   --bg-sidebar: #f3f4f6;
   --bg-editor: #ffffff;
   --bg-toolbar: #ffffff;
   --bg-hover: #eef0f4;
   --bg-active: #e8eafc;
   --border: #e5e7eb;
+  --border-subtle: color-mix(in srgb, var(--border) 78%, transparent);
   --text: #1f2937;
   --text-muted: #6b7280;
   --text-task-done: #9ca3af;
@@ -16,10 +20,13 @@
   --danger: #ef4444;
   --code-bg: #f1f3f5;
   --shadow: none;
+  --canvas-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
   --radius: 8px;
-  --content-max: 860px;
+  --canvas-radius: 14px;
+  --content-max: 1040px;
+  --content-max-focus: 960px;
   --sidebar-width: 260px;
-  --content-pad-x: 32px;
+  --content-pad-x: 24px;
   --content-pad-y: 24px;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
   --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -29,12 +36,16 @@
 
 [data-theme="dark"] {
   --bg: #1e1e2e;
+  --bg-app: #181825;
+  --bg-stage: #1e1e2e;
+  --bg-canvas: #202235;
   --bg-sidebar: #181825;
   --bg-editor: #1e1e2e;
   --bg-toolbar: #181825;
   --bg-hover: #2a2a3e;
   --bg-active: #2d3a5e;
   --border: #313244;
+  --border-subtle: color-mix(in srgb, #45475a 72%, transparent);
   --text: #cdd6f4;
   --text-muted: #7f849c;
   --text-task-done: #a6adc8;
@@ -44,12 +55,13 @@
   --danger: #f38ba8;
   --code-bg: #11111b;
   --shadow: 0 1px 3px rgba(0,0,0,0.3);
+  --canvas-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
 }
 
 /* ===== Reset ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #app { height: 100%; }
-body { font-family: var(--font-ui); background: var(--bg); color: var(--text); overflow: hidden; }
+body { font-family: var(--font-ui); background: var(--bg-app); color: var(--text); overflow: hidden; }
 
 button {
   cursor: pointer;
@@ -84,7 +96,7 @@ input:focus { border-color: var(--primary); }
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: var(--bg);
+  background: var(--bg-app);
 }
 
 .workspace {
@@ -100,7 +112,7 @@ input:focus { border-color: var(--primary); }
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg);
+  background: var(--bg-stage);
 }
 
 .workspace-editor-row {
@@ -109,7 +121,7 @@ input:focus { border-color: var(--primary); }
   min-height: 0;
   display: flex;
   overflow: hidden;
-  background: var(--bg);
+  background: var(--bg-stage);
 }
 
 .editor-stage {
@@ -121,7 +133,11 @@ input:focus { border-color: var(--primary); }
   overflow: hidden;
   width: 100%;
   margin: 0 auto;
-  background: var(--bg-editor);
+  padding: 18px var(--content-pad-x);
+  box-sizing: border-box;
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--primary) 8%, transparent), transparent 42%),
+    var(--bg-stage);
 }
 
 /* 单栏写作模式限制阅读宽度；分屏/源码需占满可用空间 */
@@ -1544,6 +1560,13 @@ input:focus { border-color: var(--primary); }
   overflow: hidden;
 }
 
+.editor-canvas {
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--canvas-radius);
+  box-shadow: var(--canvas-shadow);
+}
+
 .editor-toolbar {
   display: flex;
   align-items: center;
@@ -1741,13 +1764,13 @@ input:focus { border-color: var(--primary); }
 .cm-host {
   flex: 1;
   overflow: hidden;
-  background: var(--bg-editor);
+  background: transparent;
 }
 
 /* CodeMirror overrides */
 .cm-host .cm-editor {
   height: 100%;
-  background: var(--bg-editor);
+  background: transparent;
   color: var(--text);
 }
 
@@ -1763,7 +1786,7 @@ input:focus { border-color: var(--primary); }
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg-editor);
+  background: var(--bg-canvas);
 }
 
 .preview-toolbar {
@@ -2576,7 +2599,7 @@ input:focus { border-color: var(--primary); }
   flex-direction: column;
   flex: 1;
   overflow: hidden;
-  background: var(--bg-editor);
+  background: var(--bg-canvas);
 }
 
 .wysiwyg-body {
@@ -2595,7 +2618,7 @@ input:focus { border-color: var(--primary); }
 /* Milkdown root wrapper */
 .milkdown {
   height: 100%;
-  background: var(--bg-editor);
+  background: transparent;
   color: var(--text);
 }
 
@@ -2608,7 +2631,7 @@ input:focus { border-color: var(--primary); }
   -webkit-font-variant-ligatures: none;
   font-variant-ligatures: none;
   font-feature-settings: "liga" 0;
-  padding: 24px 32px;
+  padding: var(--content-pad-y) var(--content-pad-x);
   font-size: var(--editor-font-size, 15px);
   line-height: 1.8;
   font-family: var(--font-ui);
@@ -3120,26 +3143,32 @@ img.ProseMirror-separator {
 /* Milkdown dark mode - override Nord theme bg/text */
 .milkdown-dark .milkdown,
 .milkdown-dark .ProseMirror {
-  background: var(--bg-editor);
+  background: transparent;
   color: var(--text);
 }
 
 /* Focus mode - center the wysiwyg pane */
 .mode-focus .wysiwyg-pane {
-  max-width: var(--content-max);
+  max-width: var(--content-max-focus);
   width: 100%;
   margin: 0 auto;
-  padding: 40px var(--content-pad-x);
-  background: var(--bg-editor);
+  padding: 24px 0;
+  background: var(--bg-canvas);
 }
 
 .mode-focus .editor-stage {
   max-width: none;
 }
 
-.mode-live .ProseMirror,
-.mode-focus .ProseMirror {
+.mode-live .ProseMirror {
   max-width: var(--content-max);
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+}
+
+.mode-focus .ProseMirror {
+  max-width: var(--content-max-focus);
   margin-left: auto;
   margin-right: auto;
   box-sizing: border-box;
@@ -3307,7 +3336,17 @@ img.ProseMirror-separator {
 }
 
 /* ===== Responsive Topbar ===== */
+@media (max-width: 1100px) {
+  :root {
+    --content-pad-x: 20px;
+  }
+}
+
 @media (max-width: 720px) {
+  :root {
+    --content-pad-x: 16px;
+  }
+
   .btn-action-label,
   .btn-icon-label {
     display: none;
