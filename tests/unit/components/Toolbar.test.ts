@@ -46,6 +46,10 @@ function mountToolbar() {
   })
 }
 
+async function openFileMenu(wrapper: ReturnType<typeof mountToolbar>) {
+  await wrapper.find('[data-testid="toolbar-file-btn"]').trigger('click')
+}
+
 describe('Toolbar', () => {
   let originalMarkflow: typeof window.markflow | undefined
   let originalFileReader: typeof window.FileReader
@@ -81,7 +85,7 @@ describe('Toolbar', () => {
     const noteStore = useNoteStore()
     const tabsStore = useEditorTabsStore()
 
-    await wrapper.find('.btn-icon.btn-icon-text').trigger('click')
+    await openFileMenu(wrapper)
     await wrapper
       .findAll('[role="menuitem"]')
       .find((button) => button.text().includes('导入文件'))!
@@ -129,7 +133,7 @@ describe('Toolbar', () => {
     const tabsStore = useEditorTabsStore()
     const createNoteSpy = vi.spyOn(noteStore, 'createNoteWithContent')
 
-    await wrapper.find('.btn-icon.btn-icon-text').trigger('click')
+    await openFileMenu(wrapper)
     await wrapper
       .findAll('[role="menuitem"]')
       .find((button) => button.text().includes('导入文件'))!
@@ -174,7 +178,7 @@ describe('Toolbar', () => {
     const wrapper = mountToolbar()
     const noteStore = useNoteStore()
 
-    await wrapper.find('.btn-icon.btn-icon-text').trigger('click')
+    await openFileMenu(wrapper)
     await wrapper
       .findAll('[role="menuitem"]')
       .find((button) => button.text().includes('导入文件'))!
@@ -299,7 +303,7 @@ describe('Toolbar', () => {
     noteStore.currentNote = note
     noteStore.liveContent = '![图](markflow-asset://asset-1)'
 
-    await wrapper.find('.btn-icon.btn-icon-text').trigger('click')
+    await openFileMenu(wrapper)
     await wrapper
       .findAll('[role="menuitem"]')
       .find((button) => button.text().includes('导出 Markdown'))!
@@ -335,7 +339,7 @@ describe('Toolbar', () => {
     noteStore.currentNote = note
     noteStore.liveContent = '![图](markflow-asset://asset-1)'
 
-    await wrapper.find('.btn-icon.btn-icon-text').trigger('click')
+    await openFileMenu(wrapper)
     await wrapper
       .findAll('[role="menuitem"]')
       .find((button) => button.text().includes('导出 Markdown'))!
@@ -373,7 +377,7 @@ describe('Toolbar', () => {
     noteStore.currentNote = note
     noteStore.liveContent = '![remote](https://example.com/a.png)'
 
-    await wrapper.find('.btn-icon.btn-icon-text').trigger('click')
+    await openFileMenu(wrapper)
     await wrapper
       .findAll('[role="menuitem"]')
       .find((button) => button.text().includes('导出 Markdown'))!
@@ -383,5 +387,16 @@ describe('Toolbar', () => {
     expect(window.markflow.showNotification).toHaveBeenCalledWith(
       '导出完成，但有 2 张外链图片下载失败，已保留原链接。外链图片下载失败：https://example.com/a.png（HTTP 404）；另有 1 条同类问题'
     )
+  })
+
+  it('点击搜索按钮应派发 openSearch', async () => {
+    const wrapper = mountToolbar()
+    const btn = wrapper.find('[data-testid="toolbar-search-btn"]')
+    expect(btn.exists()).toBe(true)
+    expect(btn.attributes('aria-label')).toBe('搜索笔记')
+    expect(btn.attributes('title')).toMatch(/Ctrl\+K|Cmd\+K|搜索/)
+
+    await btn.trigger('click')
+    expect(wrapper.emitted('openSearch')).toEqual([[]])
   })
 })

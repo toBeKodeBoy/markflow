@@ -49,6 +49,14 @@
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5l3 2" />
     </template>
+    <template v-else-if="name === 'search'">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M20 20l-3.5-3.5" />
+    </template>
+    <template v-else-if="name === 'pin'">
+      <path d="M12 17v5" />
+      <path d="M9 3h6l-1 7h3l-5 5-5-5h3z" />
+    </template>
     <template v-else-if="name === 'sun'">
       <circle cx="12" cy="12" r="4" />
       <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
@@ -142,6 +150,8 @@ export type AppIconName =
   | 'trash'
   | 'close'
   | 'clock'
+  | 'search'
+  | 'pin'
   | 'sun'
   | 'moon'
   | 'bold'

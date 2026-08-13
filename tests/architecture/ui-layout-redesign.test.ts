@@ -22,8 +22,10 @@ describe('Design Token', () => {
     expect(css).toMatch(/:root\s*\{[^}]*--bg:\s*#f8f9fa/i)
   })
 
-  it('应声明内容区最大宽度 860px', () => {
-    expect(css).toMatch(/--content-max:\s*860px/)
+  it('应声明更适合宽屏的内容区最大宽度与横向边距', () => {
+    expect(css).toMatch(/--content-max:\s*1040px/)
+    expect(css).toMatch(/--content-max-focus:\s*960px/)
+    expect(css).toMatch(/--content-pad-x:\s*24px/)
   })
 
   it('应声明侧栏默认宽度 260px', () => {
@@ -81,8 +83,18 @@ describe('内容区留白样式', () => {
     expect(css).not.toMatch(/\.mode-source \.editor-stage[\s\S]*?max-width:\s*var\(--content-max\)/)
   })
 
-  it('专注模式内容宽应使用 content-max（不再硬编码 800px）', () => {
-    expect(css).toMatch(/\.mode-focus \.wysiwyg-pane[\s\S]*?max-width:\s*var\(--content-max\)/)
+  it('专注模式内容宽应使用独立的 focus 最大宽度', () => {
+    expect(css).toMatch(/\.mode-focus \.wysiwyg-pane[\s\S]*?max-width:\s*var\(--content-max-focus\)/)
     expect(css).not.toMatch(/\.mode-focus \.wysiwyg-pane[\s\S]*?max-width:\s*800px/)
+  })
+
+  it('正文和预览应共享内容内边距语义，避免重复扩大留白', () => {
+    expect(css).toMatch(/\.preview-content\s*\{[\s\S]*padding:\s*var\(--content-pad-y\)\s+var\(--content-pad-x\)/)
+    expect(css).toMatch(/\.ProseMirror,\s*\n\.milkdown \.editor\s*\{[\s\S]*padding:\s*var\(--content-pad-y\)\s+var\(--content-pad-x\)/)
+  })
+
+  it('窄窗口应收缩内容横向边距', () => {
+    expect(css).toMatch(/@media\s*\(max-width:\s*1100px\)[\s\S]*--content-pad-x:\s*20px/)
+    expect(css).toMatch(/@media\s*\(max-width:\s*720px\)[\s\S]*--content-pad-x:\s*16px/)
   })
 })

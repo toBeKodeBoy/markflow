@@ -2,7 +2,7 @@
   <div v-if="visible" class="search-modal-overlay" @click.self="emit('close')">
     <div class="search-modal" role="dialog" aria-modal="true" aria-label="搜索笔记">
       <div class="search-modal-header">
-        <span class="search-modal-icon">🔍</span>
+        <AppIcon name="search" :size="16" class="search-modal-icon" />
         <input
           ref="inputRef"
           v-model="draft"
@@ -20,7 +20,7 @@
           @keydown.enter.prevent="confirmSelection"
           @keydown.tab.prevent="trapFocus"
         />
-        <kbd class="search-modal-kbd">Ctrl+K</kbd>
+        <kbd class="search-modal-kbd">Ctrl/Cmd+K</kbd>
       </div>
 
       <div v-if="draft.trim() && results.length === 0" class="search-modal-empty">
@@ -62,6 +62,7 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { useNoteStore } from '../stores/note'
 import { storeToRefs } from 'pinia'
 import { fuzzyMatch, buildSearchSnippet, type SnippetSegment } from '../utils/searchSnippet'
+import AppIcon from './AppIcon.vue'
 
 const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ close: []; select: [noteId: string] }>()

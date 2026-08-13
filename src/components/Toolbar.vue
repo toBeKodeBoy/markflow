@@ -48,11 +48,35 @@
 
 
 
+      <button
+
+        class="btn-icon btn-icon-text"
+
+        data-testid="toolbar-search-btn"
+
+        title="搜索笔记（Ctrl/Cmd+K）"
+
+        aria-label="搜索笔记"
+
+        @click="$emit('openSearch')"
+
+      >
+
+        <AppIcon name="search" :size="16" />
+
+        <span class="btn-icon-label">搜索</span>
+
+      </button>
+
+
+
       <div class="import-menu-wrap" ref="fileMenuRef">
 
         <button
 
           class="btn-icon btn-icon-text"
+
+          data-testid="toolbar-file-btn"
 
           :class="{ active: fileMenuOpen }"
 
@@ -237,7 +261,7 @@ import { useAppSettings } from '../composables/useAppSettings'
 
 defineProps<{ tocVisible: boolean }>()
 
-defineEmits<{ toggleSidebar: []; toggleToc: [] }>()
+defineEmits<{ toggleSidebar: []; toggleToc: []; openSearch: [] }>()
 
 
 

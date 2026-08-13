@@ -55,7 +55,6 @@ describe('WysiwygEditor 任务列表工具栏接线', () => {
         stubs: {
           FormatToolbar: FormatToolbarStub,
           FocusFormatToolbar: FocusFormatToolbarStub,
-          NoteTagsBar: true,
           TableToolbar: true,
         },
       },
@@ -87,7 +86,6 @@ describe('WysiwygEditor 任务列表工具栏接线', () => {
         stubs: {
           FormatToolbar: FormatToolbarStub,
           FocusFormatToolbar: FocusFormatToolbarStub,
-          NoteTagsBar: true,
           TableToolbar: true,
         },
       },
@@ -115,7 +113,6 @@ describe('WysiwygEditor 任务列表工具栏接线', () => {
         stubs: {
           FormatToolbar: FormatToolbarStub,
           FocusFormatToolbar: FocusFormatToolbarStub,
-          NoteTagsBar: true,
           TableToolbar: true,
         },
       },

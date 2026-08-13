@@ -4,6 +4,7 @@
       :tocVisible="tocVisible"
       @toggleSidebar="sidebarVisible = !sidebarVisible"
       @toggleToc="toggleToc"
+      @openSearch="toggleSearchModal"
     />
 
     <button
@@ -271,6 +272,10 @@ function onSearchSelect(noteId: string) {
   tabsStore.openTab(noteId)
 }
 
+function toggleSearchModal() {
+  searchModalVisible.value = !searchModalVisible.value
+}
+
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'F11') {
     e.preventDefault()
@@ -292,7 +297,7 @@ function onKeydown(e: KeyboardEvent) {
   }
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
     e.preventDefault()
-    searchModalVisible.value = !searchModalVisible.value
+    toggleSearchModal()
     return
   }
   if (e.key !== 'Escape') return
