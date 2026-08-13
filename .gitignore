@@ -32,9 +32,13 @@ coverage
 docs
 !docs/
 docs/*
+!docs/prds/
+docs/prds/*
+!docs/prds/暗色模式滚动条适配.md
 !docs/plans/
 docs/plans/*
 !docs/plans/unordered-list-paste-into-code-block-plan.md
-!docs/plans/ui-optimization-opportunities-plan.md
+!docs/plans/界面优化机会说明.md
 !docs/plans/ui-phase-a-implementation-report.md
+!docs/plans/暗色模式滚动条适配技术方案.md
 AGENTS.md

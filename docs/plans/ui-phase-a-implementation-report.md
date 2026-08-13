@@ -2,7 +2,7 @@
 
 ## 摘要
 
-按 [`ui-optimization-opportunities-plan.md`](./ui-optimization-opportunities-plan.md) **Phase A** 以 TDD 落地：顶栏搜索入口、标签遗留清债、PDF 文案修正、图标去 emoji。全量 **135 文件 / 782 用例**通过；Bugbot 与 Security Review **无中高风险未修项**。原有搜索 / 导入导出 / 视图切换行为保持不变。
+按 [`界面优化机会说明.md`](./界面优化机会说明.md) **Phase A** 以 TDD 落地：顶栏搜索入口、标签遗留清债、PDF 文案修正、图标去 emoji。全量 **135 文件 / 782 用例**通过；Bugbot 与 Security Review **无中高风险未修项**。原有搜索 / 导入导出 / 视图切换行为保持不变。
 
 | 项 | 值 |
 | --- | --- |

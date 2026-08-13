@@ -5,6 +5,7 @@ import {
   generateTocMarkdown,
   applyTocToContent,
 } from '../src/utils/generateTocMarkdown'
+import { slugifyHeading } from '../src/utils/headingSlug'
 
 describe('generateTocMarkdown', () => {
   it('returns empty string when document has no headings', () => {
@@ -63,11 +64,30 @@ describe('generateTocMarkdown', () => {
     expect(toc).not.toContain('## 目录')
   })
 
+  // 标题与 TOC 标题同名时，正文标题应占用递增 slug（覆盖 occurrence += 1 分支）
+  it('shifts slug when a heading collides with the toc title', () => {
+    const content = '## 目录\n## Other'
+    const toc = generateTocMarkdown(content, { minLevel: 2 })
+    // TOC 标题“目录”占用首个 slug，正文“目录”标题应为“目录-1”
+    expect(toc).toContain('- [目录](#目录-1)')
+    expect(toc).toContain('- [Other](#other)')
+  })
+
   it('handles Chinese heading slugs', () => {
     const content = '## 项目介绍\n### 快速开始'
     const toc = generateTocMarkdown(content, { minLevel: 2 })
     expect(toc).toContain('- [项目介绍](#项目介绍)')
     expect(toc).toContain('  - [快速开始](#快速开始)')
+  })
+
+  // Major：含 HTML 标签标题的 TOC 锚点 slug 须与 marked 预览侧一致
+  it('含 HTML 标签标题的 TOC 锚点 slug 与 slugifyHeading(rawText) 一致', () => {
+    const content = '# <u>text</u>'
+    const toc = generateTocMarkdown(content, { minLevel: 1 })
+    const expectedSlug = slugifyHeading('<u>text</u>')
+    expect(toc).toContain(`#${expectedSlug}`)
+    // 展示文本仍为剥离后的纯文本
+    expect(toc).toContain('[text]')
   })
 })
 
@@ -120,5 +140,13 @@ describe('parseMarkdown fragment links', () => {
     expect(html).toContain('class="md-fragment-link"')
     expect(html).toContain('href="#section"')
     expect(html).toContain('id="section"')
+  })
+
+  // Major：marked 预览侧对含 HTML 标签标题生成的 id 须与 TOC 锚点一致
+  it('含 HTML 标签标题的预览 id 与 slugifyHeading(rawText) 一致', async () => {
+    const { parseMarkdown } = await import('../src/utils/markedSetup')
+    const html = parseMarkdown('# <u>text</u>')
+    const expectedSlug = slugifyHeading('<u>text</u>')
+    expect(html).toContain(`id="${expectedSlug}"`)
   })
 })
