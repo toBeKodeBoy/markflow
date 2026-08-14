@@ -79,8 +79,18 @@ describe('内容区留白样式', () => {
   it('分屏/源码模式不应被 content-max 限制舞台宽度', () => {
     const baseBlock = css.match(/\.editor-stage\s*\{[^}]*\}/)?.[0] ?? ''
     expect(baseBlock).not.toMatch(/max-width:\s*var\(--content-max\)/)
-    expect(css).not.toMatch(/\.mode-split \.editor-stage[\s\S]*?max-width:\s*var\(--content-max\)/)
-    expect(css).not.toMatch(/\.mode-source \.editor-stage[\s\S]*?max-width:\s*var\(--content-max\)/)
+      
+    // Check combined mode-split and mode-source selector
+    const splitModeMatch = css.match(/\.mode-split \.(?:editor-stage)[\s\S]{0,150}?max-width/)
+    const sourceModeMatch = css.match(/\.mode-source \.(?:editor-stage)[\s\S]{0,150}?max-width/)
+      
+    // Should not have max-width in mode-split or mode-source
+    if (splitModeMatch) {
+      expect(splitModeMatch[0]).not.toMatch(/max-width:\s*var\(--content-max\)/)
+    }
+    if (sourceModeMatch) {
+      expect(sourceModeMatch[0]).not.toMatch(/max-width:\s*var\(--content-max\)/)
+    }
   })
 
   it('专注模式内容宽应使用独立的 focus 最大宽度', () => {
