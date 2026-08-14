@@ -27,6 +27,23 @@
         未找到匹配笔记「{{ draft.trim() }}」
       </div>
 
+      <!-- 最近打开的笔记区域 -->
+      <div v-if="!draft.trim() && recentNotes.length > 0" class="search-modal-recent-section">
+        <div class="search-modal-recent-header">最近打开</div>
+        <div class="search-modal-results">
+          <button
+            v-for="note in recentNotes"
+            :key="note.id"
+            class="search-modal-item"
+            role="option"
+            :aria-selected="false"
+            @click="selectNote(note.id)"
+          >
+            <span class="search-modal-item-title">{{ note.title }}</span>
+          </button>
+        </div>
+      </div>
+
       <div
         v-if="results.length > 0"
         id="search-results-list"
@@ -62,7 +79,10 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { useNoteStore } from '../stores/note'
 import { storeToRefs } from 'pinia'
 import { fuzzyMatch, buildSearchSnippet, type SnippetSegment } from '../utils/searchSnippet'
+import { buildRecentNotesFromAccess, recordRecentNoteClick } from '../utils/searchHistory'
+import { useAppSettings } from '../composables/useAppSettings'
 import AppIcon from './AppIcon.vue'
+import type { NoteListItem } from '../types'
 
 const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ close: []; select: [noteId: string] }>()
@@ -73,6 +93,12 @@ const { noteList, contentSearchIndex } = storeToRefs(store)
 const inputRef = ref<HTMLInputElement>()
 const draft = ref('')
 const selectedIndex = ref(0)
+
+// 用于存储最近打开的笔记列表
+const recentNotes = ref<NoteListItem[]>([])
+
+// 组件挂载时立即加载最近笔记
+loadRecentNotes()
 
 interface SearchResult {
   note: { id: string; title: string; updatedAt: number }
@@ -123,6 +149,21 @@ const results = computed<SearchResult[]>(() => {
   return scored
 })
 
+/** 加载最近打开的笔记列表 */
+function loadRecentNotes(): void {
+  const store = useNoteStore()
+  const appSettings = useAppSettings()
+  // 直接从 store 和 settings 获取
+  const access = appSettings.settings?.value?.recentNoteAccess ?? []
+  const noteList = store.noteList
+  recentNotes.value = buildRecentNotesFromAccess(access, noteList, 10)
+}
+
+/** 重置最近笔记列表 */
+function resetRecentNotes(): void {
+  recentNotes.value = []
+}
+
 watch(
   () => props.visible,
   (v) => {
@@ -130,10 +171,14 @@ watch(
       draft.value = ''
       selectedIndex.value = 0
       store.searchQuery = ''
+      // 加载最近笔记
+      loadRecentNotes()
       nextTick(() => inputRef.value?.focus())
     } else {
       // 关闭弹窗时清空侧边栏搜索态，避免残留过滤
       store.searchQuery = ''
+      // 重置最近笔记列表
+      resetRecentNotes()
     }
   }
 )
@@ -162,6 +207,8 @@ function confirmSelection() {
 }
 
 function selectNote(noteId: string) {
+  // 记录此次搜索交互（独立 LocalStorage）
+  recordRecentNoteClick(noteId)
   emit('select', noteId)
   emit('close')
 }

@@ -20,10 +20,13 @@ function mountModal(props?: Partial<InstanceType<typeof SearchModal>['$props']>)
 }
 
 describe('SearchModal', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     localStorage.clear()
     pinia = createPinia()
     setActivePinia(pinia)
+    // 初始化 appSettings
+    const { useAppSettings } = await import('../../../src/composables/useAppSettings')
+    useAppSettings().load()
   })
 
   it('visible=false 时不渲染弹窗内容', () => {
@@ -206,5 +209,122 @@ describe('SearchModal', () => {
     await wrapper.setProps({ visible: false })
     await flushPromises()
     expect(store.searchQuery).toBe('')
+  })
+
+  describe('最近打开笔记功能', () => {
+    it('弹窗打开时应展示最近打开的笔记列表', async () => {
+      const store = useNoteStore()
+      // 创建一些笔记
+      store.createNoteWithContent('# 笔记 A')
+      store.createNoteWithContent('# 笔记 B')
+
+      // 先设置访问记录（在挂载组件之前）
+      const appSettings = (await import('../../../src/composables/useAppSettings')).useAppSettings()
+      appSettings.save({
+        recentNoteAccess: [
+          { noteId: store.noteList[0].id, openedAt: Date.now() - 2000 },
+          { noteId: store.noteList[1].id, openedAt: Date.now() },
+        ],
+      })
+
+      const wrapper = mountModal({ visible: true })
+      await flushPromises()
+
+      // 应该显示最近笔记区域
+      const recentSection = wrapper.find('.search-modal-recent-section')
+      expect(recentSection.exists()).toBe(true)
+
+      // 应该显示标题
+      const header = wrapper.find('.search-modal-recent-header')
+      expect(header.exists()).toBe(true)
+      expect(header.text()).toBe('最近打开')
+
+      // 应该显示笔记条目
+      const items = wrapper.findAll('.search-modal-item')
+      expect(items.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('输入关键词后应隐藏最近笔记区域', async () => {
+      const store = useNoteStore()
+      store.createNoteWithContent('# 测试笔记')
+
+      // 先设置访问记录（在挂载组件之前）
+      const appSettings = (await import('../../../src/composables/useAppSettings')).useAppSettings()
+      appSettings.save({
+        recentNoteAccess: [{ noteId: store.noteList[0].id, openedAt: Date.now() }],
+      })
+
+      const wrapper = mountModal({ visible: true })
+      await flushPromises()
+
+      // 初始时显示最近笔记
+      expect(wrapper.find('.search-modal-recent-section').exists()).toBe(true)
+
+      // 输入关键词
+      await wrapper.find('.search-modal-input').setValue('测试')
+      await flushPromises()
+
+      // 最近笔记区域应消失
+      expect(wrapper.find('.search-modal-recent-section').exists()).toBe(false)
+    })
+
+    it('无最近笔记时应不显示最近笔记区域', async () => {
+      const store = useNoteStore()
+      // 不创建任何访问记录
+
+      const wrapper = mountModal({ visible: true })
+      await flushPromises()
+
+      // 不应该显示最近笔记区域
+      expect(wrapper.find('.search-modal-recent-section').exists()).toBe(false)
+    })
+
+    it('点击最近笔记应触发 select 事件并关闭弹窗', async () => {
+      const store = useNoteStore()
+      store.createNoteWithContent('# 可点击笔记')
+
+      // 先设置访问记录（在挂载组件之前）
+      const appSettings = (await import('../../../src/composables/useAppSettings')).useAppSettings()
+      appSettings.save({
+        recentNoteAccess: [{ noteId: store.noteList[0].id, openedAt: Date.now() }],
+      })
+
+      const wrapper = mountModal({ visible: true })
+      await flushPromises()
+
+      // 点击第一个最近笔记
+      const firstItem = wrapper.find('.search-modal-item')
+      await firstItem.trigger('click')
+      await flushPromises()
+
+      // 应该触发了 select 事件
+      expect(wrapper.emitted('select')).toHaveLength(1)
+      expect(wrapper.emitted('close')).toHaveLength(1)
+    })
+
+    it('点击最近笔记应记录搜索交互', async () => {
+      const store = useNoteStore()
+      store.createNoteWithContent('# 记录测试笔记')
+      const noteId = store.noteList[0].id
+
+      // 先设置访问记录（在挂载组件之前）
+      const appSettings = (await import('../../../src/composables/useAppSettings')).useAppSettings()
+      appSettings.save({
+        recentNoteAccess: [{ noteId, openedAt: Date.now() }],
+      })
+
+      const wrapper = mountModal({ visible: true })
+      await flushPromises()
+
+      // 点击最近笔记
+      await wrapper.find('.search-modal-item').trigger('click')
+      await flushPromises()
+
+      // 检查 localStorage 中是否记录了搜索交互
+      const history = JSON.parse(localStorage.getItem('markflow.searchHistory') ?? '[]')
+      expect(history).toHaveLength(1)
+      expect(history[0].noteId).toBe(noteId)
+      expect(history[0].searchedAt).toBeDefined()
+    })
   })
 })
