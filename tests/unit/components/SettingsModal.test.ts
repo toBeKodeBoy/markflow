@@ -127,11 +127,13 @@ describe('SettingsModal', () => {
         openBackupDirectory: vi.fn(() => true),
         writeBackupFileSilent: vi.fn(() => ({ ok: true, path: 'D:\\Backup\\MarkFlow\\markflow-backup.json' })),
         cleanOldBackupFiles: vi.fn(() => ({ ok: true, deleted: 0 })),
-        getAssetIndex: () => [],
-        getAsset: () => null,
-        saveAssetIndex: vi.fn(),
-        saveAsset: vi.fn(),
-        removeAsset: vi.fn(),
+        
+        // 回收站相关
+        getTrashNotes: () => [],
+        saveTrashNotes: vi.fn(),
+        // 文件夹回收站相关（useStorage 桥接包装要求方法存在）
+        getTrashFolders: () => [],
+        saveTrashFolders: vi.fn()
       })
     })
 

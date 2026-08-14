@@ -279,7 +279,13 @@ async function startImport() {
     } else {
       const name = folderLabel.value || '导入'
       const existing = findRootFolderByName(store.folderList, name)
-      targetFolderId = existing?.id ?? store.createFolder(name).id
+      // 修复（Code Review #4）：createFolder 可能返回 null（根目录创建实际不会），为空时中止导入
+      const created = existing ?? store.createFolder(name)
+      if (!created) {
+        phase.value = 'preview'
+        return
+      }
+      targetFolderId = created.id
     }
   }
 

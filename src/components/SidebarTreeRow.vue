@@ -1,22 +1,32 @@
 <template>
+  <!-- 置顶区分隔线（PRD 要求分区标题为「常用文件夹」） -->
+  <div v-if="row.isPinnedSeparator" class="pinned-separator" :style="rowStyle">
+    <span class="pinned-separator-label">常用文件夹</span>
+  </div>
+
+  <!-- 文件夹行 -->
   <div
-    v-if="row.kind === 'folder'"
+    v-else-if="row.kind === 'folder'"
     class="folder-item"
     :class="{
       active: !row.isSystemFolder && activeFolderId === row.folder!.id,
-      'drag-over': !row.isSystemFolder && dragOverFolderId === row.folder!.id,
+      'drag-over': (!row.isSystemFolder || row.isMyFolder) && dragOverFolderId === row.folder!.id,
+      'drag-over-top': !row.isSystemFolder && dragOverFolderId === row.folder!.id && dragOverFolderPosition === 'before',
+      'drag-over-bottom': !row.isSystemFolder && dragOverFolderId === row.folder!.id && dragOverFolderPosition === 'after',
       'is-empty': (row.noteCount ?? 0) === 0,
       'system-folder': row.isSystemFolder,
+      'pinned-folder': row.folder?.pinned,
     }"
+    :data-folder-id="row.folder?.id"
     :style="rowStyle"
     :draggable="!row.isSystemFolder"
     @click="$emit('folder-click', row.folder!.id, row.hasChildren)"
     @dblclick.stop="!row.isSystemFolder && $emit('start-rename-folder', row.folder!)"
     @contextmenu.prevent="!row.isSystemFolder && $emit('folder-context', $event, row.folder!.id)"
     @dragstart.stop="!row.isSystemFolder && onDragStart('folder', row.folder!.id, $event)"
-    @dragover.prevent.stop="!row.isSystemFolder && $emit('drag-over-folder', row.folder!.id)"
-    @dragleave.stop="!row.isSystemFolder && $emit('drag-leave-folder')"
-    @drop.prevent.stop="!row.isSystemFolder && $emit('drop-on-folder', row.folder!.id)"
+    @dragover.prevent.stop="(!row.isSystemFolder || row.isMyFolder) && onFolderDragOver($event, row.folder!.id)"
+    @dragleave.stop="(!row.isSystemFolder || row.isMyFolder) && $emit('drag-leave-folder')"
+    @drop.prevent.stop="(!row.isSystemFolder || row.isMyFolder) && onFolderDrop($event, row.folder!.id)"
   >
     <button
       v-if="row.hasChildren"
@@ -28,11 +38,31 @@
       <AppIcon :name="expanded ? 'chevron-down' : 'chevron-right'" :size="12" />
     </button>
     <span v-else class="folder-toggle-spacer" aria-hidden="true" />
+    <span
+      v-if="row.folder?.pinned && !row.isSystemFolder"
+      class="folder-pin-icon"
+      title="已置顶"
+      aria-label="已置顶"
+    >
+      <AppIcon name="pin" :size="12" />
+    </span>
     <AppIcon
-      v-if="row.isSystemFolder"
+      v-if="row.isMyFolder"
+      name="folder"
+      :size="14"
+      class="system-folder-icon my-folder-icon"
+    />
+    <AppIcon
+      v-else-if="row.isSystemFolder"
       name="clock"
       :size="14"
       class="system-folder-icon"
+    />
+    <AppIcon
+      v-else
+      name="folder"
+      :size="14"
+      class="folder-icon"
     />
     <input
       v-if="!row.isSystemFolder && renamingFolderId === row.folder!.id"
@@ -49,19 +79,23 @@
     <span v-if="(row.noteCount ?? 0) > 0" class="folder-note-count">{{ row.noteCount }}</span>
   </div>
 
+  <!-- 笔记行 -->
   <div
     v-else
     class="note-item tree-note-item"
     :class="{
       active: currentNoteId === row.note!.id,
       pinned: row.note!.pinned,
+      selected: selectedNoteIds?.has(row.note!.id) ?? false,
+      highlighted: highlightedNoteId === row.note!.id,
       'recent-view': row.isRecentView,
       'drag-over-top': !row.isRecentView && dragOverNoteId === row.note!.id && dragOverNotePosition === 'before',
       'drag-over-bottom': !row.isRecentView && dragOverNoteId === row.note!.id && dragOverNotePosition === 'after',
     }"
+    :data-note-id="row.note!.id"
     :style="rowStyle"
     :draggable="!row.isRecentView"
-    @click="$emit('note-click', row.note!.id)"
+    @click="onNoteClick($event, row.note!.id)"
     @dblclick.stop="$emit('start-rename-note', row.note!.id)"
     @contextmenu.prevent="$emit('note-context', $event, row.note!.id)"
     @dragstart.stop="!row.isRecentView && onDragStart('note', row.note!.id, $event)"
@@ -106,6 +140,9 @@ const props = defineProps<{
   dragOverFolderId: string | null
   dragOverNoteId?: string | null
   dragOverNotePosition?: 'before' | 'after' | null
+  dragOverFolderPosition?: 'before' | 'after' | null
+  highlightedNoteId?: string | null
+  selectedNoteIds?: Set<string>
   virtual?: boolean
   virtualStyle?: Record<string, string>
 }>()
@@ -118,14 +155,15 @@ const emit = defineEmits<{
   'cancel-rename-folder': []
   'start-rename-folder': [folder: { id: string; name: string }]
   'note-click': [noteId: string]
+  'note-ctrl-click': [noteId: string]
   'start-rename-note': [noteId: string]
   'commit-rename-note': []
   'cancel-rename-note': []
   'note-context': [event: MouseEvent, noteId: string]
   'drag-start': [payload: { kind: 'note' | 'folder'; id: string }]
-  'drag-over-folder': [folderId: string]
+  'drag-over-folder': [folderId: string, position: 'before' | 'after' | 'inside']
   'drag-leave-folder': []
-  'drop-on-folder': [folderId: string]
+  'drop-on-folder': [folderId: string, position: 'before' | 'after' | 'inside']
   'drag-over-note': [noteId: string, position: 'before' | 'after']
   'drag-leave-note': []
   'drop-on-note': [noteId: string, position: 'before' | 'after']
@@ -152,10 +190,38 @@ function onDragStart(kind: 'note' | 'folder', id: string, e: DragEvent) {
   emit('drag-start', { kind, id })
 }
 
+/** 笔记拖放位置：上半部分 = before，下半部分 = after */
 function noteDropPosition(e: DragEvent): 'before' | 'after' {
   const el = e.currentTarget as HTMLElement
   const rect = el.getBoundingClientRect()
   return e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+}
+
+/** 文件夹拖放位置：上 25% = before，下 25% = after，中间 = inside */
+function folderDropPosition(e: DragEvent): 'before' | 'after' | 'inside' {
+  const el = e.currentTarget as HTMLElement
+  const rect = el.getBoundingClientRect()
+  const relativeY = e.clientY - rect.top
+  const threshold = rect.height * 0.25
+  if (relativeY < threshold) return 'before'
+  if (relativeY > rect.height - threshold) return 'after'
+  return 'inside'
+}
+
+function onFolderDragOver(e: DragEvent, folderId: string) {
+  emit('drag-over-folder', folderId, folderDropPosition(e))
+}
+
+function onFolderDrop(e: DragEvent, folderId: string) {
+  emit('drop-on-folder', folderId, folderDropPosition(e))
+}
+
+function onNoteClick(e: MouseEvent, noteId: string) {
+  if (e.ctrlKey || e.metaKey) {
+    emit('note-ctrl-click', noteId)
+  } else {
+    emit('note-click', noteId)
+  }
 }
 
 function onNoteDragOver(e: DragEvent, noteId: string) {

@@ -1,5 +1,18 @@
 <template>
   <aside class="sidebar" :style="{ width: sidebarWidth + 'px' }">
+    <!-- 侧栏工具栏：折叠/展开 -->
+    <div class="sidebar-toolbar">
+      <button class="sidebar-toolbar-btn" @click="collapseAllFolders" title="全部折叠">折叠</button>
+      <button class="sidebar-toolbar-btn" @click="cycleExpandLevel" :title="expandButtonLabel">{{ expandButtonLabel }}</button>
+    </div>
+
+    <!-- 批量操作工具栏 -->
+    <div v-if="selectedNoteIds.size > 0" class="sidebar-batch-bar">
+      <span class="batch-count">已选 {{ selectedNoteIds.size }} 篇</span>
+      <button class="batch-btn" @click="startBatchMove">移动到</button>
+      <button class="batch-btn" @click="clearSelection">取消选择</button>
+    </div>
+
     <div v-if="store.activeFolderId" class="sidebar-scope-bar">
       <button
         type="button"
@@ -40,6 +53,9 @@
               :drag-over-folder-id="dragOverFolderId"
               :drag-over-note-id="dragOverNoteId"
               :drag-over-note-position="dragOverNotePosition"
+              :drag-over-folder-position="dragOverFolderPosition"
+              :highlighted-note-id="highlightedNoteId"
+              :selected-note-ids="selectedNoteIds"
               virtual
               :virtual-style="{ top: (virtualStart + i) * SIDEBAR_ROW_HEIGHT + 'px' }"
               @folder-click="onFolderClick"
@@ -49,13 +65,14 @@
               @cancel-rename-folder="renamingFolderId = null"
               @start-rename-folder="startRenameFolder"
               @note-click="openNoteTab"
+              @note-ctrl-click="onNoteCtrlClick"
               @start-rename-note="startRenameNote"
               @commit-rename-note="commitRenameNote"
               @cancel-rename-note="cancelRenameNote"
               @note-context="openNoteContextMenu"
               @drag-start="onDragStart"
               @drag-over-folder="onFolderDragOver"
-              @drag-leave-folder="dragOverFolderId = null"
+              @drag-leave-folder="onFolderDragLeave"
               @drop-on-folder="onDropOnFolder"
               @drag-over-note="onNoteDragOver"
               @drag-leave-note="onNoteDragLeave"
@@ -79,6 +96,9 @@
             :drag-over-folder-id="dragOverFolderId"
             :drag-over-note-id="dragOverNoteId"
             :drag-over-note-position="dragOverNotePosition"
+            :drag-over-folder-position="dragOverFolderPosition"
+            :highlighted-note-id="highlightedNoteId"
+            :selected-note-ids="selectedNoteIds"
             @folder-click="onFolderClick"
             @toggle-expand="toggleExpand"
             @folder-context="openFolderContextMenu"
@@ -86,13 +106,14 @@
             @cancel-rename-folder="renamingFolderId = null"
             @start-rename-folder="startRenameFolder"
             @note-click="openNoteTab"
+            @note-ctrl-click="onNoteCtrlClick"
             @start-rename-note="startRenameNote"
             @commit-rename-note="commitRenameNote"
             @cancel-rename-note="cancelRenameNote"
             @note-context="openNoteContextMenu"
             @drag-start="onDragStart"
             @drag-over-folder="onFolderDragOver"
-            @drag-leave-folder="dragOverFolderId = null"
+            @drag-leave-folder="onFolderDragLeave"
             @drop-on-folder="onDropOnFolder"
             @drag-over-note="onNoteDragOver"
             @drag-leave-note="onNoteDragLeave"
@@ -120,6 +141,8 @@
         <button @click="togglePin(noteContextMenu.noteId)">
           {{ isNotePinned(noteContextMenu.noteId) ? '取消置顶' : '置顶' }}
         </button>
+        <button @click="cloneNoteAction(noteContextMenu.noteId)">复制</button>
+        <button @click="locateFolder(noteContextMenu.noteId)">定位文件夹</button>
         <button class="danger" @click="deleteNote(noteContextMenu.noteId)">删除</button>
       </div>
 
@@ -133,7 +156,10 @@
         <button @click="openCreateModal('note', folderContextMenu.folderId, true)">新建笔记</button>
         <button @click="startRenameFolderById(folderContextMenu.folderId)">重命名</button>
         <button @click="startMoveFolder(folderContextMenu.folderId)">移动到</button>
-        <button class="danger" @click="promptDeleteFolder(folderContextMenu.folderId)">删除</button>
+        <button @click="toggleFolderPin(folderContextMenu.folderId)">
+          {{ isFolderPinned(folderContextMenu.folderId) ? '取消置顶' : '置顶' }}
+        </button>
+        <button class="danger" @click="promptDeleteFolder(folderContextMenu.folderId)">移入回收站</button>
       </div>
     </Teleport>
 
@@ -147,7 +173,7 @@
             :disabled="movingNoteFolderId === undefined"
             @click="commitMoveNote(undefined)"
           >
-            无文件夹（根目录）
+            无文件夹（{{ myFolderName }}）
             <span v-if="movingNoteFolderId === undefined" class="move-folder-tag">当前</span>
           </button>
           <button
@@ -169,6 +195,33 @@
       </div>
     </div>
 
+    <!-- 批量移动弹窗 -->
+    <div v-if="batchMoveVisible" class="modal-overlay" @click.self="closeBatchMoveModal">
+      <div class="modal">
+        <div class="modal-title">移动 {{ selectedNoteIds.size }} 篇笔记到</div>
+        <div class="move-folder-list">
+          <button
+            class="move-folder-item"
+            @click="commitBatchMove(undefined)"
+          >
+            无文件夹（{{ myFolderName }}）
+          </button>
+          <button
+            v-for="row in moveFolderRows"
+            :key="'bm-' + row.folder.id"
+            class="move-folder-item"
+            :style="{ paddingLeft: (16 + row.depth * 16) + 'px' }"
+            @click="commitBatchMove(row.folder.id)"
+          >
+            {{ row.folder.name }}
+          </button>
+        </div>
+        <div class="modal-actions">
+          <button @click="closeBatchMoveModal">取消</button>
+        </div>
+      </div>
+    </div>
+
     <div v-if="movingFolderId" class="modal-overlay" @click.self="closeMoveFolderModal">
       <div class="modal">
         <div class="modal-title">移动文件夹到</div>
@@ -179,7 +232,7 @@
             :disabled="isMoveFolderTargetDisabled(undefined)"
             @click="commitMoveFolder(undefined)"
           >
-            根目录
+            {{ myFolderName }}
           </button>
           <button
             v-for="row in moveFolderRows"
@@ -201,14 +254,14 @@
 
     <div v-if="deleteFolderTarget" class="modal-overlay" @click.self="deleteFolderTarget = null">
       <div class="modal">
-        <div class="modal-title">删除文件夹</div>
+        <div class="modal-title">移入回收站</div>
         <p class="modal-body-text">
-          将删除 <strong>{{ deleteFolderTarget.impact.folderCount }}</strong> 个文件夹，
-          <strong>{{ deleteFolderTarget.impact.noteCount }}</strong> 篇笔记将移动到
-          {{ deleteMoveTargetLabel }}。
+          将移入回收站，30 天内可恢复。包含
+          <strong>{{ deleteFolderTarget.impact.folderCount }}</strong> 个文件夹、
+          <strong>{{ deleteFolderTarget.impact.noteCount }}</strong> 篇笔记。
         </p>
         <div class="modal-actions">
-          <button class="btn-primary danger" @click="confirmDeleteFolder">删除</button>
+          <button class="btn-primary danger" @click="confirmDeleteFolder">移入回收站</button>
           <button @click="deleteFolderTarget = null">取消</button>
         </div>
       </div>
@@ -224,11 +277,32 @@
       @cancel="closeCreateModal"
       @created="handleCreateEntry"
     />
+
+    <!-- 回收站入口按钮 -->
+    <div class="sidebar-bottom-bar">
+      <button 
+        @click="showTrashPanel = !showTrashPanel" 
+        class="sidebar-bottom-btn trash-btn"
+        :class="{ 'has-items': trashCount > 0 }"
+        title="回收站"
+      >
+        <AppIcon name="trash" class="sidebar-bottom-icon" />
+        <span v-if="trashCount > 0" class="trash-badge">{{ trashCount }}</span>
+        <span class="trash-label">回收站</span>
+      </button>
+    </div>
+
+    <!-- 回收站面板 -->
+    <TrashPanel 
+      v-if="showTrashPanel" 
+      :visible="true" 
+      @close="showTrashPanel = false"
+    />
   </aside>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useNoteStore } from '../stores/note'
 import { useEditorTabsStore } from '../stores/editorTabs'
 import { showAppNotification } from '../utils/notify'
@@ -243,25 +317,36 @@ import {
   flattenSidebarTree,
   collectAncestorIdsForNote,
   collectExpandIdsForSearch,
+  wrapWithMyFolder,
   type SidebarTreeRow,
 } from '../utils/sidebarTree'
 import { buildTreeIndex } from '../utils/treeIndex'
 import CreateEntryModal from './CreateEntryModal.vue'
 import SidebarTreeRowView from './SidebarTreeRow.vue'
+import TrashPanel from './TRashPanel.vue'
+import AppIcon from './AppIcon.vue'
 import { useAppSettings, clampSidebarWidth } from '../composables/useAppSettings'
 import { useNoteSort } from '../composables/useNoteSort'
 import { sortNotes } from '../utils/noteSort'
 import { buildRecentNoteList } from '../utils/recentNotes'
 import { RECENT_FOLDER_ID, RECENT_FOLDER_NAME } from '../constants/recentFolder'
+import { MY_FOLDER_ID, MY_FOLDER_NAME } from '../constants/myFolder'
 
 const SIDEBAR_ROW_HEIGHT = 42
 const VIRTUAL_THRESHOLD = 150
 const VIRTUAL_BUFFER = 8
 
+// 模板中使用：根目录对外统一展示为「我的文件夹」
+const myFolderName = MY_FOLDER_NAME
+
 const store = useNoteStore()
 const tabsStore = useEditorTabsStore()
 
 function openNoteTab(noteId: string) {
+  // 普通点击：清空多选并打开笔记
+  if (selectedNoteIds.value.size > 0) {
+    selectedNoteIds.value = new Set()
+  }
   tabsStore.openTab(noteId)
 }
 const appSettings = useAppSettings()
@@ -273,6 +358,15 @@ const createModalVisible = ref(false)
 const createModalKind = ref<'note' | 'folder'>('folder')
 const createModalDefaultParentId = ref<string | undefined>(undefined)
 const createModalLockedParentId = ref<string | undefined>(undefined)
+
+// 回收站相关
+const showTrashPanel = ref(false)
+// 修复（R6 遗留）：角标同时统计回收站中的笔记与文件夹数量
+// 依赖 trashVersion：存储层数据非响应式，需通过版本号触发重新计算
+const trashCount = computed(() => {
+  void store.trashVersion
+  return store.getTrashNotes().length + store.getTrashFolders().length
+})
 
 const renamingFolderId = ref<string | null>(null)
 const renamingFolderName = ref('')
@@ -292,6 +386,25 @@ const dragOverFolderId = ref<string | null>(null)
 const dragOverNoteId = ref<string | null>(null)
 const dragOverNotePosition = ref<'before' | 'after' | null>(null)
 const dragOverRoot = ref(false)
+
+// Task 9: 置顶文件夹 ID 集合
+const pinnedFolderIds = computed(() => {
+  const ids = new Set<string>()
+  for (const f of store.folderList) {
+    if (f.pinned) ids.add(f.id)
+  }
+  return ids
+})
+
+// Task 8: 定位高亮
+const highlightedNoteId = ref<string | null>(null)
+
+// Task 10: 文件夹拖拽位置
+const dragOverFolderPosition = ref<'before' | 'after' | null>(null)
+
+// Task 11: 多选笔记
+const selectedNoteIds = ref(new Set<string>())
+const batchMoveVisible = ref(false)
 
 const noteSort = useNoteSort({
   getSiblings: (noteId) => {
@@ -313,15 +426,22 @@ const baseSidebarRows = computed(() =>
   flattenSidebarTree(store.folderList, store.searchedNoteList, expandedFolderIds.value, {
     hideEmptyFolders: isSearching.value,
     index: treeIndex.value,
+    pinnedFolderIds: pinnedFolderIds.value,
   })
 )
 
 const sidebarRows = computed(() => {
   const base = baseSidebarRows.value
   const recent = recentNotes.value
+  // 「我的文件夹」虚拟容器：包裹所有真实文件夹/笔记，与「最新」同级
+  const myFolderRows = wrapWithMyFolder(
+    base,
+    expandedFolderIds.value.has(MY_FOLDER_ID),
+    store.searchedNoteList.length
+  )
 
   if (isSearching.value && recent.length === 0) {
-    return base
+    return myFolderRows
   }
 
   const recentExpanded = expandedFolderIds.value.has(RECENT_FOLDER_ID)
@@ -344,7 +464,7 @@ const sidebarRows = computed(() => {
       }))
     : []
 
-  return [recentFolderRow, ...recentNoteRows, ...base]
+  return [recentFolderRow, ...recentNoteRows, ...myFolderRows]
 })
 
 const useVirtualTree = computed(() => sidebarRows.value.length > VIRTUAL_THRESHOLD)
@@ -380,12 +500,6 @@ const activeFolderLabel = computed(() => {
   return getFolderPathLabel(store.folderList, store.activeFolderId) || '未知文件夹'
 })
 
-const deleteMoveTargetLabel = computed(() => {
-  const to = deleteFolderTarget.value?.impact.moveNotesTo
-  if (to === undefined) return '根目录'
-  return getFolderPathLabel(store.folderList, to) || '父文件夹'
-})
-
 const moveFolderRows = computed(() =>
   flattenFolderTree(store.folderList, new Set(store.folderList.map((f) => f.id)))
 )
@@ -404,6 +518,9 @@ function persistSidebarState() {
   appSettings.save({
     sidebarExpandedFolderIds: [...expandedFolderIds.value],
     sidebarActiveFolderId: store.activeFolderId,
+    // 用户已对展开状态做出显式选择，同步写入迁移标记，
+    // 避免下次启动时一次性迁移覆盖用户折叠容器的意图
+    myFolderIntroMigrated: true,
   })
 }
 
@@ -447,8 +564,13 @@ function handleCreateEntry(payload: { kind: 'note' | 'folder'; id: string; paren
   persistSidebarState()
 }
 
+/** 虚拟系统文件夹（「最新」/「我的文件夹」）：不参与激活、右键、拖拽 */
+function isVirtualFolder(folderId: string) {
+  return folderId === RECENT_FOLDER_ID || folderId === MY_FOLDER_ID
+}
+
 function onFolderClick(folderId: string, hasChildren: boolean) {
-  if (folderId === RECENT_FOLDER_ID) {
+  if (isVirtualFolder(folderId)) {
     toggleExpand(folderId)
     return
   }
@@ -484,7 +606,9 @@ function commitRenameFolder() {
 }
 
 function openFolderContextMenu(e: MouseEvent, folderId: string) {
-  if (folderId === RECENT_FOLDER_ID) return
+  if (isVirtualFolder(folderId)) return
+  // 修复：打开右键菜单时关闭回收站面板，避免遮罩层拦截菜单点击
+  showTrashPanel.value = false
   noteContextMenu.value = null
   folderContextMenu.value = { folderId, x: e.clientX, y: e.clientY }
 }
@@ -540,6 +664,8 @@ function closeMoveFolderModal() {
 }
 
 function openNoteContextMenu(e: MouseEvent, noteId: string) {
+  // 修复：打开右键菜单时关闭回收站面板，避免遮罩层拦截菜单点击
+  showTrashPanel.value = false
   folderContextMenu.value = null
   noteContextMenu.value = { noteId, x: e.clientX, y: e.clientY }
 }
@@ -551,6 +677,155 @@ function isNotePinned(noteId: string) {
 function togglePin(noteId: string) {
   store.toggleNotePinned(noteId)
   noteContextMenu.value = null
+}
+
+// ===== Task 8: 文件夹置顶 =====
+function isFolderPinned(folderId: string) {
+  return store.folderList.find((f) => f.id === folderId)?.pinned === true
+}
+
+function toggleFolderPin(folderId: string) {
+  store.toggleFolderPinned(folderId)
+  folderContextMenu.value = null
+}
+
+// ===== Task 8: 复制笔记 =====
+function cloneNoteAction(noteId: string) {
+  const cloned = store.cloneNote(noteId)
+  noteContextMenu.value = null
+  if (cloned) {
+    showAppNotification(`已复制笔记：${cloned.title}`)
+  }
+}
+
+// ===== Task 8: 定位文件夹 =====
+function locateFolder(noteId: string) {
+  noteContextMenu.value = null
+  const ancestorIds = store.locateNoteFolder(noteId)
+  if (ancestorIds.length === 0) {
+    showAppNotification(`该笔记位于${MY_FOLDER_NAME}`)
+    return
+  }
+  const next = new Set(expandedFolderIds.value)
+  next.add(MY_FOLDER_ID)
+  for (const id of ancestorIds) next.add(id)
+  expandedFolderIds.value = next
+  persistSidebarState()
+  highlightedNoteId.value = noteId
+  nextTick(() => {
+    const noteEl = treeRef.value?.querySelector(`[data-note-id="${noteId}"]`) as HTMLElement | null
+    if (noteEl) {
+      noteEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  })
+  setTimeout(() => {
+    highlightedNoteId.value = null
+  }, 2000)
+}
+
+// ===== Task 11: 多选笔记 =====
+function onNoteCtrlClick(noteId: string) {
+  const next = new Set(selectedNoteIds.value)
+  if (next.has(noteId)) {
+    next.delete(noteId)
+  } else {
+    next.add(noteId)
+  }
+  selectedNoteIds.value = next
+}
+
+function clearSelection() {
+  selectedNoteIds.value = new Set()
+}
+
+// ===== Task 11: 批量移动 =====
+function startBatchMove() {
+  batchMoveVisible.value = true
+}
+
+function commitBatchMove(folderId: string | undefined) {
+  if (selectedNoteIds.value.size === 0) return
+  store.batchMoveNotes([...selectedNoteIds.value], folderId)
+  showAppNotification(`已移动 ${selectedNoteIds.value.size} 篇笔记到：${folderLabel(folderId)}`)
+  selectedNoteIds.value = new Set()
+  batchMoveVisible.value = false
+}
+
+function closeBatchMoveModal() {
+  batchMoveVisible.value = false
+}
+
+// ===== Task 14: 折叠/展开 =====
+// 修复（R6）：展开按钮多档循环：折叠全部 → 展开1级 → 展开2级 → 展开全部
+const expandLevelCycle = ref(0)
+const expandButtonLabel = computed(() => {
+  // 文案表示「下一次点击将执行的动作」
+  return ['展开1级', '展开2级', '展开全部', '折叠全部'][expandLevelCycle.value]
+})
+
+function collapseAllFolders() {
+  // 折叠全部：仅保留「最新」展开，「我的文件夹」一并折叠
+  expandedFolderIds.value = new Set([RECENT_FOLDER_ID])
+  // 手动折叠后重置循环档位，避免展开按钮状态与实际不一致
+  expandLevelCycle.value = 0
+  persistSidebarState()
+}
+
+/** 展开全部：所有有子项的文件夹都展开 */
+function expandAllFolders() {
+  const next = new Set(expandedFolderIds.value)
+  next.add(RECENT_FOLDER_ID)
+  next.add(MY_FOLDER_ID)
+  for (const folder of store.folderList) {
+    const hasChildren =
+      store.folderList.some((f) => f.parentId === folder.id) ||
+      store.noteList.some((n) => n.folderId === folder.id)
+    if (hasChildren) next.add(folder.id)
+  }
+  expandedFolderIds.value = next
+  persistSidebarState()
+}
+
+/** 点击展开按钮：在 4 个档位间循环切换 */
+function cycleExpandLevel() {
+  expandLevelCycle.value = (expandLevelCycle.value + 1) % 4
+  if (expandLevelCycle.value === 0) {
+    collapseAllFolders()
+  } else if (expandLevelCycle.value === 3) {
+    expandAllFolders()
+  } else {
+    // depth 为 0-based：展开 N 级对应 expandToLevel(N - 1)
+    expandToLevel(expandLevelCycle.value - 1)
+  }
+}
+
+function expandToLevel(level: number) {
+  const next = new Set(expandedFolderIds.value)
+  next.add(RECENT_FOLDER_ID)
+  next.add(MY_FOLDER_ID)
+  // 计算每个文件夹的深度
+  const folderDepth = new Map<string, number>()
+  function computeDepth(parentId: string | undefined, depth: number) {
+    const children = store.folderList.filter((f) => f.parentId === parentId)
+    for (const child of children) {
+      folderDepth.set(child.id, depth)
+      computeDepth(child.id, depth + 1)
+    }
+  }
+  computeDepth(undefined, 0)
+  for (const folder of store.folderList) {
+    const depth = folderDepth.get(folder.id) ?? 0
+    if (depth <= level) {
+      const hasChildren =
+        store.folderList.some((f) => f.parentId === folder.id) ||
+        store.noteList.some((n) => n.folderId === folder.id)
+      if (hasChildren) {
+        next.add(folder.id)
+      }
+    }
+  }
+  expandedFolderIds.value = next
+  persistSidebarState()
 }
 
 function startRenameNote(id: string) {
@@ -584,7 +859,7 @@ function startMoveNote(id: string) {
 }
 
 function folderLabel(folderId: string | undefined) {
-  if (folderId === undefined) return '根目录'
+  if (folderId === undefined) return MY_FOLDER_NAME
   return getFolderPathLabel(store.folderList, folderId) || '未知文件夹'
 }
 
@@ -636,9 +911,15 @@ function onDropOnNote(targetId: string, position: 'before' | 'after') {
   noteSort.handleNoteDrop(payload.id, targetId, position, dragged.folderId)
 }
 
-function onFolderDragOver(folderId: string) {
+function onFolderDragOver(folderId: string, position: 'before' | 'after' | 'inside') {
   if (folderId === RECENT_FOLDER_ID) return
   if (!dragPayload.value) return
+  if (folderId === MY_FOLDER_ID) {
+    // 容器行承载根目录语义：任何位置都视为拖入「我的文件夹」
+    dragOverFolderId.value = folderId
+    dragOverFolderPosition.value = null
+    return
+  }
   if (dragPayload.value.kind === 'folder' && dragPayload.value.id === folderId) return
   if (
     dragPayload.value.kind === 'folder' &&
@@ -647,20 +928,62 @@ function onFolderDragOver(folderId: string) {
     return
   }
   dragOverFolderId.value = folderId
+  dragOverFolderPosition.value = position === 'inside' ? null : position
 }
 
-function onDropOnFolder(folderId: string) {
+function onFolderDragLeave() {
+  dragOverFolderId.value = null
+  dragOverFolderPosition.value = null
+}
+
+function onDropOnFolder(folderId: string, position: 'before' | 'after' | 'inside') {
   if (folderId === RECENT_FOLDER_ID) return
   dragOverFolderId.value = null
+  dragOverFolderPosition.value = null
   const payload = dragPayload.value
   dragPayload.value = null
   if (!payload) return
+
+  if (folderId === MY_FOLDER_ID) {
+    // 释放在容器行 = 移动到「我的文件夹」（根目录）
+    if (payload.kind === 'note') {
+      store.moveNote(payload.id, undefined)
+      showAppNotification(`已移动到：${MY_FOLDER_NAME}`)
+    } else {
+      const ok = store.moveFolder(payload.id, undefined)
+      if (ok) showAppNotification(`文件夹已移动到：${MY_FOLDER_NAME}`)
+    }
+    persistSidebarState()
+    return
+  }
+
   if (payload.kind === 'note') {
     store.moveNote(payload.id, folderId)
     showAppNotification(`已移动到：${folderLabel(folderId)}`)
   } else if (payload.id !== folderId) {
-    const ok = store.moveFolder(payload.id, folderId)
-    if (ok) showAppNotification(`文件夹已移动到：${folderLabel(folderId)}`)
+    if (position === 'before' || position === 'after') {
+      // 同级排序：将拖拽文件夹插入到目标文件夹的前/后位置
+      const folder = store.folderList.find((f) => f.id === folderId)
+      if (folder) {
+        const parentId = folder.parentId
+        const siblings = store.folderList
+          .filter((f) => f.parentId === parentId)
+          .sort((a, b) => a.order - b.order)
+        const orderedIds = siblings.map((f) => f.id)
+        const draggedIdx = orderedIds.indexOf(payload.id)
+        if (draggedIdx !== -1) {
+          orderedIds.splice(draggedIdx, 1)
+        }
+        const targetIdx = orderedIds.indexOf(folderId)
+        const insertIdx = position === 'before' ? targetIdx : targetIdx + 1
+        orderedIds.splice(insertIdx, 0, payload.id)
+        store.reorderFolders(parentId, orderedIds)
+      }
+    } else {
+      // 移动为子级
+      const ok = store.moveFolder(payload.id, folderId)
+      if (ok) showAppNotification(`文件夹已移动到：${folderLabel(folderId)}`)
+    }
   }
   const next = new Set(expandedFolderIds.value)
   next.add(folderId)
@@ -684,10 +1007,10 @@ function onRootDrop() {
   if (!payload) return
   if (payload.kind === 'note') {
     store.moveNote(payload.id, undefined)
-    showAppNotification('已移动到：根目录')
+    showAppNotification(`已移动到：${MY_FOLDER_NAME}`)
   } else {
     const ok = store.moveFolder(payload.id, undefined)
-    if (ok) showAppNotification('文件夹已移动到：根目录')
+    if (ok) showAppNotification(`文件夹已移动到：${MY_FOLDER_NAME}`)
   }
   persistSidebarState()
 }
@@ -719,8 +1042,9 @@ function onGlobalClick() {
 watch(
   () => store.activeFolderId,
   (folderId) => {
-    if (!folderId || folderId === RECENT_FOLDER_ID) return
+    if (!folderId || isVirtualFolder(folderId)) return
     const next = new Set(expandedFolderIds.value)
+    next.add(MY_FOLDER_ID)
     for (const id of collectAncestorFolderIds(folderId, store.folderList)) next.add(id)
     expandedFolderIds.value = next
   }
@@ -733,6 +1057,7 @@ watch(
     const note = store.noteList.find((n) => n.id === noteId)
     if (!note) return
     const next = new Set(expandedFolderIds.value)
+    next.add(MY_FOLDER_ID)
     for (const id of collectAncestorIdsForNote(note, store.folderList)) next.add(id)
     expandedFolderIds.value = next
   }
@@ -743,7 +1068,7 @@ watch(
   (query) => {
     if (!query.trim()) return
     const ids = collectExpandIdsForSearch(store.folderList, store.searchedNoteList)
-    expandedFolderIds.value = new Set([...expandedFolderIds.value, ...ids])
+    expandedFolderIds.value = new Set([...expandedFolderIds.value, MY_FOLDER_ID, ...ids])
   }
 )
 
@@ -751,7 +1076,13 @@ watch(
   () => store.sidebarStateRevision,
   () => {
     const settings = appSettings.get()
-    expandedFolderIds.value = new Set(settings.sidebarExpandedFolderIds ?? [])
+    const ids = new Set(settings.sidebarExpandedFolderIds ?? [])
+    // 备份恢复等配置重载场景同样需要容器展开迁移
+    if (!settings.myFolderIntroMigrated) {
+      ids.add(MY_FOLDER_ID)
+      appSettings.save({ myFolderIntroMigrated: true })
+    }
+    expandedFolderIds.value = ids
     if (settings.sidebarActiveFolderId !== undefined) {
       store.activeFolderId = settings.sidebarActiveFolderId
     }
@@ -765,9 +1096,27 @@ onMounted(() => {
   // 若用户显式折叠导致配置为空数组（[]），应保持折叠状态。
   const expandedFromSettings = settings.sidebarExpandedFolderIds
   if (expandedFromSettings !== undefined) {
-    expandedFolderIds.value = new Set(expandedFromSettings)
+    const ids = new Set(expandedFromSettings)
+    // 老用户一次性迁移：容器 ID 在旧配置中不可能存在，默认展开，
+    // 避免升级后整个资料库在侧边栏不可见；迁移后用户手动折叠的意图正常保留
+    if (!settings.myFolderIntroMigrated) {
+      ids.add(MY_FOLDER_ID)
+      appSettings.save({ myFolderIntroMigrated: true })
+    }
+    expandedFolderIds.value = ids
   } else {
-    expandedFolderIds.value = new Set([RECENT_FOLDER_ID])
+    // 首次启动：默认展开「最新」+「我的文件夹」+ 一级文件夹（depth=0 且有子项的文件夹）
+    const initialExpanded = new Set([RECENT_FOLDER_ID, MY_FOLDER_ID])
+    const topLevelFolders = store.folderList.filter((f) => !f.parentId)
+    for (const folder of topLevelFolders) {
+      const hasChildren =
+        store.folderList.some((f) => f.parentId === folder.id) ||
+        store.noteList.some((n) => n.folderId === folder.id)
+      if (hasChildren) {
+        initialExpanded.add(folder.id)
+      }
+    }
+    expandedFolderIds.value = initialExpanded
   }
   if (settings.sidebarActiveFolderId) {
     store.activeFolderId = settings.sidebarActiveFolderId
@@ -776,3 +1125,121 @@ onMounted(() => {
 
 onUnmounted(() => document.removeEventListener('click', onGlobalClick))
 </script>
+
+<style scoped>
+/* 回收站底部栏 */
+.sidebar-bottom-bar {
+  padding: 8px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.sidebar-bottom-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.sidebar-bottom-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.sidebar-bottom-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.trash-btn.has-items {
+  color: var(--color-warning);
+}
+
+.trash-btn.has-items:hover {
+  color: var(--color-warning);
+  border-color: var(--color-warning);
+}
+
+.trash-badge {
+  background: var(--color-danger);
+  color: white;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+  margin-left: auto;
+}
+
+.trash-label {
+  flex: 1;
+  text-align: left;
+}
+
+/* 侧栏工具栏 */
+.sidebar-toolbar {
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.sidebar-toolbar-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.sidebar-toolbar-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* 批量操作工具栏 */
+.sidebar-batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--color-primary, #4f8cff) 8%, transparent);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.batch-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.batch-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.batch-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+</style>

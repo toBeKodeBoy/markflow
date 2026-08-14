@@ -66,7 +66,7 @@
             v-model="parentValue"
             class="create-entry-select"
           >
-            <option value="__root__">根目录</option>
+            <option value="__root__">{{ myFolderName }}</option>
             <option
               v-for="option in folderOptions"
               :key="option.folder.id"
@@ -102,11 +102,14 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Folder } from '../types'
 import { flattenFolderTree, getFolderPathLabel } from '../utils/folderTree'
 import { useNoteStore } from '../stores/note'
+import { MY_FOLDER_NAME } from '../constants/myFolder'
 import AppIcon from './AppIcon.vue'
 
 type CreateEntryKind = 'note' | 'folder'
 
 const ROOT_VALUE = '__root__'
+// 根目录对外统一展示为「我的文件夹」
+const myFolderName = MY_FOLDER_NAME
 
 const props = defineProps<{
   visible: boolean
@@ -143,8 +146,8 @@ const resolvedParentId = computed(() => {
 })
 
 const currentParentLabel = computed(() => {
-  if (resolvedParentId.value === undefined) return '根目录'
-  return getFolderPathLabel(props.folders, resolvedParentId.value) || '根目录'
+  if (resolvedParentId.value === undefined) return MY_FOLDER_NAME
+  return getFolderPathLabel(props.folders, resolvedParentId.value) || MY_FOLDER_NAME
 })
 
 const canSubmit = computed(() => kind.value === 'note' || name.value.trim().length > 0)
@@ -180,6 +183,8 @@ async function submit() {
   }
 
   const folder = store.createFolder(name.value.trim(), resolvedParentId.value)
+  // 修复（Code Review #4）：createFolder 超深度时返回 null，创建失败时保持弹窗不关闭
+  if (!folder) return
   emit('created', { kind: 'folder', id: folder.id, parentId: folder.parentId })
 }
 

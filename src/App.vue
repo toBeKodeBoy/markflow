@@ -120,6 +120,7 @@ import { showAppNotification } from './utils/notify'
 import { collectAncestorFolderIds } from './utils/folderTree'
 import { useAutoBackup } from './composables/useAutoBackup'
 import { useFullscreen } from './composables/useFullscreen'
+import { autoPurgeTrash } from './utils/autoPurgeTrash'
 import {
   createViewModeFlashRegistry,
   provideViewModeFlash,
@@ -315,6 +316,9 @@ function onKeydown(e: KeyboardEvent) {
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
   startScheduler()
+  // 异步清理过期回收站条目，不阻塞首屏；保留天数读取用户设置（默认 30 天）
+  const retentionDays = appSettings.settings.value?.trashRetentionDays ?? 30
+  autoPurgeTrash(retentionDays).catch(err => console.error('[回收站] 自动清理失败:', err))
 })
 
 onBeforeUnmount(() => {

@@ -6,7 +6,7 @@ import { getAssetStorage } from '../composables/useAssetStorage'
 import { collectAllNoteContents } from '../utils/resolveMarkdownAssets'
 import { LARGE_FILE_THRESHOLD } from '../constants'
 import { applyTocToContent } from '../utils/generateTocMarkdown'
-import { migrateLegacyPathFolders, collectDescendantFolderIds, nextSiblingOrder, wouldCreateFolderCycle, getFolderDeleteImpact } from '../utils/folderTree'
+import { migrateLegacyPathFolders, collectDescendantFolderIds, collectAncestorFolderIds, nextSiblingOrder, wouldCreateFolderCycle, getFolderDeleteImpact, reorderSiblingFolders, validateFolderDepth } from '../utils/folderTree'
 import { buildBackupAsync, applyBackup, parseBackup, downloadBackupJson, type MarkFlowBackup } from '../utils/backup'
 import { planSortOrderMigration } from '../utils/migrateNoteSortOrder'
 import { sortNotes } from '../utils/noteSort'
@@ -17,11 +17,17 @@ import { extractAssetIds } from '../utils/assetUri'
 import { sanitizeFilename } from '../utils/exportPdf'
 import { renderPathTemplate } from '../utils/pathTemplate'
 import type { ImportFolderOptions, ImportFolderProgress, ImportFolderResult, ImportFolderScanResult } from '../types/import'
-import type { Note, NoteListItem, Folder, TocJumpTarget, EditorContentPush, ImportedMarkdownFile } from '../types'
+import type { Note, NoteListItem, Folder, TocJumpTarget, EditorContentPush, ImportedMarkdownFile, TrashNote, TrashFolderEntry } from '../types'
 import { extractNoteTitle } from '../utils/noteTitle'
 import { getTabContentCache, setTabContentCache } from './tabContentCache'
 import { notifyNoteDeleted, notifyLibraryReset } from './editorTabsBridge'
 import { touchRecentNote, clearRecentNote } from '../utils/recentNotes'
+import { showAppNotification } from '../utils/notify'
+
+/** 显示通知（封装 showAppNotification） */
+function showNotification(message: string) {
+  showAppNotification(message)
+}
 
 /** 将笔记正文规范化为可搜索文本（小写），截断到 2000 字节省内存 */
 function normalizeForSearch(text: string): string {
@@ -112,6 +118,8 @@ export const useNoteStore = defineStore('note', () => {
   const folderList = ref<Folder[]>([])
   const searchQuery = ref('')
   const activeFolderId = ref<string | null>(null)
+  /** 回收站版本号：任何回收站变更后递增，驱动面板/角标等 computed 重新计算 */
+  const trashVersion = ref(0)
   /** 递增时 Sidebar 从 settings 重载展开/选中状态 */
   const sidebarStateRevision = ref(0)
   /** 笔记正文搜索索引（id → 小写正文），loadNoteList 时重建 */
@@ -120,6 +128,8 @@ export const useNoteStore = defineStore('note', () => {
   const tocJumpTarget = ref<TocJumpTarget | null>(null)
   const editorContentPush = ref<EditorContentPush | null>(null)
   const pendingLargeFileSwitch = ref(false)
+  /** 回收站容量上限 */
+  const TRASH_MAX_ITEMS = 200
   let tocJumpSeq = 0
   let editorContentPushSeq = 0
 
@@ -342,20 +352,279 @@ export const useNoteStore = defineStore('note', () => {
     return true
   }
 
-  /** 删除笔记：移除存储，若为当前笔记则导航到列表首项或清空 */
-  function deleteNote(id: string) {
+  /** 内部硬删除逻辑（不经过回收站，用于软删除时实际移除） */
+  function _hardDeleteNoteInternal(id: string) {
     storage.removeNote(id)
     noteList.value = storage.getNoteList()
     const nextIndex = { ...contentSearchIndex.value }
     delete nextIndex[id]
     contentSearchIndex.value = nextIndex
-    const contents = collectAllNoteContents(
-      () => storage.getNoteList(),
-      (noteId) => storage.getNote(noteId)
-    )
-    void getAssetStorage().gcOrphans(contents)
     clearRecentNote(id)
+    if (currentNote.value?.id === id) {
+      currentNote.value = null
+      liveContent.value = ''
+      editorContentPush.value = { content: '', id: ++editorContentPushSeq }
+    }
     notifyNoteDeleted(id)
+  }
+
+  /** 软删除笔记：移入回收站而非永久删除 */
+  function softDeleteNote(id: string) {
+    // 1. 检查回收站容量
+    const trashNotes = storage.getTrashNotes()
+    if (trashNotes.length >= TRASH_MAX_ITEMS) {
+      showNotification('回收站已满，请先清空部分笔记')
+      return
+    }
+    
+    // 2. 读取原笔记内容
+    const note = storage.getNote(id)
+    if (!note) return
+    
+    // 3. 构建 TrashNote 对象
+    const trashNote: TrashNote = {
+      ...note,
+      deletedAt: Date.now(),
+      deletedBy: 'user' as const
+    }
+    
+    // 4. 保存到回收站
+    storage.saveTrashNote(trashNote)
+    
+    // 5. 从主列表移除（调用硬删除逻辑）
+    _hardDeleteNoteInternal(id)
+    trashVersion.value++
+  }
+
+  /** 恢复回收站笔记到主列表 */
+  function restoreNote(id: string): Note | null {
+    // 1. 从存储层恢复（已包含重建逻辑）
+    const restored = storage.restoreTrashNote(id)
+    if (!restored) return null
+    
+    // 2. 刷新主列表
+    noteList.value = storage.getNoteList()
+    
+    // 3. 重建搜索索引
+    rebuildSearchIndex()
+    
+    // 4. 自动导航到恢复的笔记
+    setActiveNote(restored, restored.content)
+    trashVersion.value++
+    
+    return restored
+  }
+
+  function collectRemainingNoteContents(): string[] {
+    const activeContents = collectAllNoteContents(
+      () => noteList.value,
+      (id) => storage.getNote(id),
+    )
+    const trashContents = storage.getTrashNotes().map((note) => note.content).filter(Boolean)
+    return [...activeContents, ...trashContents]
+  }
+
+  function scheduleAssetGc(contents = collectRemainingNoteContents()): void {
+    try {
+      void getAssetStorage().gcOrphans(contents)
+    } catch {
+      // 资源清理失败不阻塞元数据操作
+    }
+  }
+
+  /** 永久删除笔记（从回收站彻底清除） */
+  function permanentDeleteNote(id: string) {
+    storage.permanentlyDeleteNote(id)
+    noteList.value = storage.getNoteList()
+    rebuildSearchIndex()
+    scheduleAssetGc()
+    trashVersion.value++
+  }
+
+  /** 清空整个回收站 */
+  function clearTrash() {
+    storage.clearTrash()
+    triggerTrashRefresh()
+    scheduleAssetGc()
+  }
+
+  /** 获取回收站笔记列表（按删除时间倒序） */
+  function getTrashNotes(): TrashNote[] {
+    const notes = storage.getTrashNotes()
+    return notes.sort((a, b) => ((b.deletedAt ?? 0) - (a.deletedAt ?? 0)))
+  }
+
+  /** 触发回收站 UI 刷新 */
+  function triggerTrashRefresh() {
+    noteList.value = storage.getNoteList()
+    rebuildSearchIndex()
+    trashVersion.value++
+  }
+
+  /** 自动清理超过 N 天的回收站笔记 */
+  async function purgeOldTrash(maxDays: number = 30) {
+    const safeDays = Number.isInteger(maxDays) && maxDays >= 1 && maxDays <= 3650 ? maxDays : 30
+    const cutoffDate = Date.now() - safeDays * 24 * 60 * 60 * 1000
+    const oldNotes = storage.getTrashNotes().filter(
+      (note) => typeof note.deletedAt === 'number' && note.deletedAt < cutoffDate,
+    )
+
+    for (const note of oldNotes) {
+      const current = storage.getTrashNotes().find((candidate) => candidate.id === note.id)
+      if (current?.deletedAt !== note.deletedAt) continue
+      await storage.permanentlyDeleteNote(note.id)
+    }
+    if (oldNotes.length > 0) {
+      triggerTrashRefresh()
+      scheduleAssetGc()
+    }
+  }
+  
+  /** 检查是否可以向回收站添加新笔记 */
+  function canAddToTrash(): boolean {
+    return storage.getTrashNotes().length < TRASH_MAX_ITEMS
+  }
+
+  // ===== 文件夹回收站方法 =====
+
+  /** 软删除文件夹：将文件夹及其子文件夹移入回收站，子树内笔记也一并软删除 */
+  function softDeleteFolder(id: string) {
+    // 1. 收集子树
+    const target = folderList.value.find(f => f.id === id)
+    if (!target) return
+    const descendantIds = collectDescendantFolderIds(id, folderList.value)
+    const descendantFolders = folderList.value.filter(f => descendantIds.has(f.id))
+    // 3. 收集子树内笔记 ID
+    const noteIdsInSubtree = noteList.value
+      .filter(n => !!n.folderId && descendantIds.has(n.folderId!))
+      .map(n => n.id)
+    // 修复（Code Review #7）：容量检查统一计算文件夹 + 笔记条目总数
+    const trashFolders = storage.getTrashFolders()
+    const trashNotes = storage.getTrashNotes()
+    const totalAfter = trashFolders.length + trashNotes.length + descendantFolders.length + noteIdsInSubtree.length + 1
+    if (totalAfter > TRASH_MAX_ITEMS) {
+      showNotification('回收站容量不足，请先清空部分条目')
+      return
+    }
+    // 4. 构建 TrashFolderEntry 快照
+    const entry: TrashFolderEntry = {
+      folder: { ...target },
+      descendantFolders: descendantFolders.filter(f => f.id !== id).map(f => ({ ...f })),
+      noteIds: noteIdsInSubtree,
+      deletedAt: Date.now(),
+      deletedBy: 'user' as const,
+      originalParentId: target.parentId,
+    }
+    // 5. 保存到回收站
+    storage.saveTrashFolderEntry(entry)
+    // 6. 子树笔记软删除（跳过单条容量检查，直接写入回收站再硬删除）
+    for (const noteId of noteIdsInSubtree) {
+      const note = storage.getNote(noteId)
+      if (note) {
+        const trashNote: TrashNote = { ...note, deletedAt: Date.now(), deletedBy: 'user' as const }
+        storage.saveTrashNote(trashNote)
+        _hardDeleteNoteInternal(noteId)
+      }
+    }
+    // 7. 从 folderList 移除子树
+    folderList.value = folderList.value.filter(f => !descendantIds.has(f.id))
+    storage.saveFolderList(folderList.value)
+    // 8. 更新当前笔记/文件夹引用
+    if (currentNote.value?.folderId && descendantIds.has(currentNote.value.folderId)) {
+      currentNote.value.folderId = target.parentId
+    }
+    if (activeFolderId.value && descendantIds.has(activeFolderId.value)) {
+      activeFolderId.value = null
+    }
+  }
+
+  /** 恢复文件夹到原父级（原父级不存在时恢复到根目录） */
+  function restoreFolder(id: string): Folder | null {
+    // 修复（Code Review #8）：先读取快照（不删除），写入 folderList 成功后再从回收站移除，避免中途失败导致数据丢失
+    const entry = storage.getTrashFolders().find(e => e.folder.id === id)
+    if (!entry) return null
+    // 2. 恢复文件夹子树
+    const foldersToRestore = [entry.folder, ...entry.descendantFolders]
+    const restoredIds = new Set(foldersToRestore.map((folder) => folder.id))
+    if (foldersToRestore.some((folder) => folderList.value.some((active) => active.id === folder.id))) {
+      return null
+    }
+    // 检查原父级是否存在，且快照内部父级引用完整
+    const parentIdsValid = foldersToRestore.every(
+      (folder) => !folder.parentId || restoredIds.has(folder.parentId) || folder.parentId === entry.originalParentId,
+    )
+    if (!parentIdsValid) return null
+    const parentExists = !entry.originalParentId || folderList.value.some(f => f.id === entry.originalParentId)
+    if (!parentExists) {
+      entry.folder.parentId = undefined
+    }
+    folderList.value = [...folderList.value, ...foldersToRestore]
+    storage.saveFolderList(folderList.value)
+    // 3. 写入成功后，从回收站移除
+    storage.removeTrashFolder(id)
+    // 4. 恢复关联笔记
+    for (const noteId of entry.noteIds) {
+      storage.restoreTrashNote(noteId)
+    }
+    // 5. 刷新主列表
+    noteList.value = storage.getNoteList()
+    rebuildSearchIndex()
+    triggerTrashRefresh()
+    return entry.folder
+  }
+
+  /** 永久删除文件夹（从回收站彻底清除，关联笔记也一并永久删除） */
+  function permanentDeleteFolder(id: string) {
+    const entry = storage.getTrashFolders().find(e => e.folder.id === id)
+    if (!entry) return
+    // 修复（Code Review #2）：仅删除仍留在笔记回收站中的笔记，
+    // 避免误删用户已单独恢复到主列表的笔记
+    const trashNoteIds = new Set(storage.getTrashNotes().map(n => n.id))
+    for (const noteId of entry.noteIds) {
+      if (trashNoteIds.has(noteId)) {
+        storage.permanentlyDeleteNote(noteId)
+      }
+    }
+    // 从回收站移除
+    storage.permanentlyDeleteFolder(id)
+    noteList.value = storage.getNoteList()
+    rebuildSearchIndex()
+    scheduleAssetGc()
+    trashVersion.value++
+  }
+
+  /** 清空全部文件夹回收站 */
+  function clearTrashFolders() {
+    storage.clearTrashFolders()
+    triggerTrashRefresh()
+    scheduleAssetGc()
+  }
+
+  /** 获取文件夹回收站列表（按删除时间倒序） */
+  function getTrashFolders(): TrashFolderEntry[] {
+    const entries = storage.getTrashFolders()
+    return entries.sort((a, b) => b.deletedAt - a.deletedAt)
+  }
+
+  /** 自动清理超过 N 天的文件夹回收站条目 */
+  async function purgeOldTrashFolders(maxDays: number = 30) {
+    const safeDays = Number.isInteger(maxDays) && maxDays >= 1 && maxDays <= 3650 ? maxDays : 30
+    const cutoffDate = Date.now() - safeDays * 24 * 60 * 60 * 1000
+    const oldEntries = storage.getTrashFolders().filter(
+      (entry) => typeof entry.deletedAt === 'number' && entry.deletedAt < cutoffDate,
+    )
+    for (const entry of oldEntries) {
+      const current = storage.getTrashFolders().find(
+        (candidate) => candidate.folder.id === entry.folder.id,
+      )
+      if (current?.deletedAt !== entry.deletedAt) continue
+      permanentDeleteFolder(entry.folder.id)
+    }
+  }
+
+  /** 删除笔记：标记为软删除（移入回收站） */
+  function deleteNote(id: string) {
+    softDeleteNote(id)
   }
 
   /** 重命名笔记并更新存储 */
@@ -493,8 +762,13 @@ export const useNoteStore = defineStore('note', () => {
     }
   }
 
-  /** 创建文件夹并持久化 */
-  function createFolder(name: string, parentId?: string) {
+  /** 创建文件夹并持久化；超过最大嵌套层级时返回 null */
+  function createFolder(name: string, parentId?: string): Folder | null {
+    // 修复（Code Review #4）：接入深度校验，限制最大嵌套层级
+    if (!validateFolderDepth(folderList.value, parentId, 20)) {
+      showNotification('已达最大嵌套层级（20 级），无法创建子文件夹')
+      return null
+    }
     const folder: Folder = {
       id: generateId(),
       name,
@@ -511,6 +785,13 @@ export const useNoteStore = defineStore('note', () => {
     if (wouldCreateFolderCycle(folderList.value, id, newParentId)) return false
     const folder = folderList.value.find((f) => f.id === id)
     if (!folder) return false
+    if (folder.parentId !== newParentId) {
+      // 修复（Code Review #4）：移动可能绕过创建时的深度限制，需一并校验
+      if (!validateFolderDepth(folderList.value, newParentId, 20)) {
+        showNotification('已达最大嵌套层级（20 级），无法移动到该位置')
+        return false
+      }
+    }
     if (folder.parentId === newParentId) {
       folder.order = nextSiblingOrder(folderList.value, newParentId, id)
       storage.saveFolderList(folderList.value)
@@ -522,30 +803,9 @@ export const useNoteStore = defineStore('note', () => {
     return true
   }
 
-  /** 删除文件夹：子文件夹一并删除，笔记移入父文件夹（无父级则根目录） */
+  /** 删除文件夹：标记为软删除（移入回收站） */
   function deleteFolder(id: string) {
-    const target = folderList.value.find((f) => f.id === id)
-    const moveTo = target?.parentId
-    const idsToDelete = collectDescendantFolderIds(id, folderList.value)
-
-    for (const item of noteList.value) {
-      if (!item.folderId || !idsToDelete.has(item.folderId)) continue
-      const note = storage.getNote(item.id)
-      if (!note) continue
-      note.folderId = moveTo
-      note.updatedAt = Date.now()
-      storage.saveNote(note)
-      item.folderId = moveTo
-      item.updatedAt = note.updatedAt
-    }
-    if (currentNote.value?.folderId && idsToDelete.has(currentNote.value.folderId)) {
-      currentNote.value.folderId = moveTo
-    }
-    folderList.value = folderList.value.filter((f) => !idsToDelete.has(f.id))
-    storage.saveFolderList(folderList.value)
-    if (activeFolderId.value && idsToDelete.has(activeFolderId.value)) {
-      activeFolderId.value = null
-    }
+    softDeleteFolder(id)
   }
 
   /** 删除前影响统计 */
@@ -657,10 +917,87 @@ export const useNoteStore = defineStore('note', () => {
     }
   }
 
+  // ===== 文件夹操作方法 =====
+
+  /** 切换文件夹置顶状态（仅支持顶层文件夹） */
+  function toggleFolderPinned(id: string) {
+    const folder = folderList.value.find(f => f.id === id)
+    if (!folder) return
+    // 修复（R5）：子文件夹置顶不会出现在「常用文件夹」区，明确能力边界并提示用户
+    if (!folder.pinned && folder.parentId) {
+      showNotification('仅支持顶层文件夹置顶，请先移动到根目录')
+      return
+    }
+    folder.pinned = !folder.pinned
+    storage.saveFolderList(folderList.value)
+  }
+
+  /** 按指定顺序重排同级文件夹 */
+  function reorderFolders(parentId: string | undefined, orderedIds: string[]): void {
+    folderList.value = reorderSiblingFolders(folderList.value, parentId, orderedIds)
+    storage.saveFolderList(folderList.value)
+  }
+
+  /** 克隆笔记：深拷贝内容，新 ID，标题含 _副本_ */
+  function cloneNote(id: string): Note | null {
+    const note = storage.getNote(id)
+    if (!note) return null
+    const now = Date.now()
+    const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '') + new Date().toTimeString().slice(0, 8).replace(/:/g, '')
+    // 修复（Code Review #9）：深拷贝时剥离外部文件绑定与资产归属字段，避免副本与原笔记争抢同一绑定关系
+    const {
+      workingFilePath: _workingFilePath,
+      sourceFilePath: _sourceFilePath,
+      importSourcePath: _importSourcePath,
+      titleLockedFromSource: _titleLockedFromSource,
+      ...base
+    } = JSON.parse(JSON.stringify(note)) as Note
+    const cloned: Note = {
+      ...base,
+      id: generateId(),
+      title: note.title + `_副本_${timestamp}`,
+      createdAt: now,
+      updatedAt: now,
+    }
+    storage.saveNote(cloned)
+    noteList.value = storage.getNoteList()
+    rebuildSearchIndex()
+    return cloned
+  }
+
+  /** 批量移动笔记到指定文件夹（使用 saveNoteBatch 批量写入） */
+  function batchMoveNotes(ids: string[], folderId: string | undefined): void {
+    const notes: Note[] = []
+    let maxOrder = 0
+    for (const id of ids) {
+      const note = storage.getNote(id)
+      if (!note) continue
+      note.folderId = folderId
+      note.sortOrder = maxOrder++
+      note.updatedAt = Date.now()
+      notes.push(note)
+    }
+    if (notes.length > 0) {
+      storage.saveNoteBatch(notes)
+      noteList.value = storage.getNoteList()
+      rebuildSearchIndex()
+    }
+  }
+
+  /** 返回笔记所属文件夹的祖先 ID 链（从根到父级，不含自身） */
+  function locateNoteFolder(noteId: string): string[] {
+    const note = noteList.value.find(n => n.id === noteId)
+    if (!note || !note.folderId) return []
+    return collectAncestorFolderIds(note.folderId, folderList.value)
+  }
+
   /** 清空全部笔记、文件夹与图片资源（保留应用设置） */
   async function clearAllLibraryData() {
     const assetStorage = getAssetStorage()
     storage.clearAllNotesAndFolders()
+    // 修复（Code Review #5）：清空书库/备份恢复替换模式时同步清空回收站，避免孤儿条目残留
+    storage.clearTrash()
+    storage.clearTrashFolders()
     useAppSettings().save({ recentNoteAccess: [] })
     await assetStorage.clearAllAssets()
     noteList.value = []
@@ -759,7 +1096,7 @@ export const useNoteStore = defineStore('note', () => {
 
   return {
     noteList, currentNote, liveContent, folderList, searchQuery, activeFolderId,
-    searchedNoteList, filteredNoteList, sidebarStateRevision,
+    searchedNoteList, filteredNoteList, sidebarStateRevision, trashVersion,
     tocVisible, tocJumpTarget, editorContentPush, pendingLargeFileSwitch,
     contentSearchIndex,
     loadNoteList, openNote, createNote, createNoteWithContent, setLiveContent, setActiveNote, setTocVisible,
@@ -769,7 +1106,16 @@ export const useNoteStore = defineStore('note', () => {
     createFolder, deleteFolder, renameFolder, moveFolder, getDeleteFolderImpact,
     toggleNotePinned, reorderNotes, getNoteContentById,
     exportLibraryBackup, downloadLibraryBackup, restoreLibraryBackup, notifySidebarStateChanged,
-    batchImportFromFolder, clearAllLibraryData
-    , bindNoteToWorkingFile
+    batchImportFromFolder, clearAllLibraryData,
+    bindNoteToWorkingFile,
+    
+    // 回收站相关
+    softDeleteNote, restoreNote, permanentDeleteNote, clearTrash, getTrashNotes,
+    purgeOldTrash, canAddToTrash,
+    // 文件夹回收站相关
+    softDeleteFolder, restoreFolder, permanentDeleteFolder, clearTrashFolders,
+    getTrashFolders, purgeOldTrashFolders,
+    // 文件夹操作
+    toggleFolderPinned, reorderFolders, cloneNote, batchMoveNotes, locateNoteFolder
   }
 })

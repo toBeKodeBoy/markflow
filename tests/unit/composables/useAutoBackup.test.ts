@@ -37,6 +37,13 @@ describe('useAutoBackup', () => {
       saveAssetIndex: vi.fn(),
       saveAsset: vi.fn(),
       removeAsset: vi.fn(),
+      
+      // 回收站相关
+      getTrashNotes: () => [],
+      saveTrashNotes: vi.fn(),
+      // 文件夹回收站相关（useStorage 桥接包装要求方法存在）
+      getTrashFolders: () => [],
+      saveTrashFolders: vi.fn()
     })
   })
 

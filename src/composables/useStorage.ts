@@ -1,4 +1,4 @@
-import type { Note, NoteListItem, Folder, AppSettings } from '../types'
+import type { Note, NoteListItem, Folder, AppSettings, TrashNote, TrashFolderEntry } from '../types'
 import { showAppNotification } from '../utils/notify'
 
 type LegacyNote = Note & { tags?: unknown }
@@ -67,6 +67,30 @@ const localFallback = {
       handleStorageError('设置保存', err)
       throw err
     }
+  },
+  // ===== 回收站相关方法 =====
+  getTrashNotes: (): TrashNote[] => {
+    try { return JSON.parse(localStorage.getItem('markflow_trash_notes') || '[]') } catch { return [] }
+  },
+  saveTrashNotes: (notes: TrashNote[]) => {
+    try {
+      localStorage.setItem('markflow_trash_notes', JSON.stringify(notes))
+    } catch (err) {
+      handleStorageError('回收站保存', err)
+      throw err
+    }
+  },
+  // ===== 文件夹回收站相关方法 =====
+  getTrashFolders(): TrashFolderEntry[] {
+    try { return JSON.parse(localStorage.getItem('markflow_trash_folders') || '[]') } catch { return [] }
+  },
+  saveTrashFolders(entries: TrashFolderEntry[]) {
+    try {
+      localStorage.setItem('markflow_trash_folders', JSON.stringify(entries))
+    } catch (err) {
+      handleStorageError('文件夹回收站保存', err)
+      throw err
+    }
   }
 }
 
@@ -132,6 +156,9 @@ export function useStorage() {
         saveNote: wrapBridgeSave(raw.saveNote.bind(raw), '保存'),
         saveFolderList: wrapBridgeSave(raw.saveFolderList.bind(raw), '文件夹保存'),
         saveSettings: wrapBridgeSave(raw.saveSettings.bind(raw), '设置保存'),
+        saveTrashNotes: wrapBridgeSave(raw.saveTrashNotes.bind(raw), '回收站保存'),
+        // 修复（Code Review #11）：文件夹回收站写入同样需要统一异常包装
+        saveTrashFolders: wrapBridgeSave(raw.saveTrashFolders.bind(raw), '文件夹回收站保存'),
       }
     : localFallback
 
@@ -228,6 +255,119 @@ export function useStorage() {
     bridge.saveSettings(settings)
   }
 
+  // ===== 回收站相关方法 =====
+
+  /** 获取所有回收站笔记 */
+  function getTrashNotes(): TrashNote[] {
+    return bridge.getTrashNotes()
+  }
+
+  /** 保存回收站笔记到存储 */
+  function saveTrashNote(note: TrashNote) {
+    const trashList = getTrashNotes()
+    // 避免重复添加
+    const idx = trashList.findIndex(n => n.id === note.id)
+    if (idx >= 0) {
+      trashList[idx] = note
+    } else {
+      trashList.push(note)
+    }
+    bridge.saveTrashNotes(trashList)
+  }
+
+  /** 从回收站移除指定笔记 */
+  function removeTrashNote(id: string) {
+    const trashList = getTrashNotes().filter(n => n.id !== id)
+    bridge.saveTrashNotes(trashList)
+  }
+
+  /** 恢复回收站笔记到主列表 */
+  function restoreTrashNote(id: string): Note | null {
+    const trashNote = getTrashNotes().find(n => n.id === id)
+    if (!trashNote) return null
+    
+    // 重建 Note 对象（彻底清除回收站元数据）
+    const { deletedBy: _deletedBy, restoredAt: _restoredAt, deletedAt: _deletedAt, ...rest } = trashNote
+    const restored: Note = { ...rest }
+    
+    // 修复（Code Review #3）：folderId 指向的文件夹可能已被删除，悬空则回落到根目录，避免笔记"隐形"
+    if (restored.folderId) {
+      const folders = getFolderList()
+      if (!folders.some(f => f.id === restored.folderId)) {
+        restored.folderId = undefined
+      }
+    }
+    
+    // 写入主列表
+    saveNote(restored)
+    
+    // 从回收站移除
+    removeTrashNote(id)
+    
+    return restored
+  }
+
+  /** 永久删除笔记（从回收站彻底清除） */
+  function permanentlyDeleteNote(id: string) {
+    // 修复（Code Review #2）：仅从回收站移除，不再对主列表做 removeNote 兜底，
+    // 避免用户已单独恢复的笔记在文件夹永久删除时被误删
+    removeTrashNote(id)
+  }
+
+  /** 清空整个回收站 */
+  function clearTrash() {
+    bridge.saveTrashNotes([])
+  }
+
+  // ===== 文件夹回收站相关方法 =====
+
+  /** 获取所有文件夹回收站条目 */
+  function getTrashFolders(): TrashFolderEntry[] {
+    return bridge.getTrashFolders?.() ?? []
+  }
+
+  /** 保存文件夹回收站条目列表 */
+  function saveTrashFolders(entries: TrashFolderEntry[]) {
+    // 修复（Code Review #11）：MarkFlowBridge 接口已声明该方法为必选，去掉可选链
+    bridge.saveTrashFolders(entries)
+  }
+
+  /** 保存单个文件夹回收站条目（同 ID 覆盖） */
+  function saveTrashFolderEntry(entry: TrashFolderEntry) {
+    const list = getTrashFolders()
+    const idx = list.findIndex(e => e.folder.id === entry.folder.id)
+    if (idx >= 0) {
+      list[idx] = entry
+    } else {
+      list.push(entry)
+    }
+    saveTrashFolders(list)
+  }
+
+  /** 从文件夹回收站移除指定 ID 的条目 */
+  function removeTrashFolder(id: string) {
+    const list = getTrashFolders().filter(e => e.folder.id !== id)
+    saveTrashFolders(list)
+  }
+
+  /** 恢复文件夹回收站条目，返回被恢复的 entry 并从列表移除 */
+  function restoreTrashFolder(id: string): TrashFolderEntry | null {
+    const entry = getTrashFolders().find(e => e.folder.id === id)
+    if (!entry) return null
+    removeTrashFolder(id)
+    return entry
+  }
+
+  /** 永久删除文件夹回收站条目 */
+  function permanentlyDeleteFolder(id: string) {
+    removeTrashFolder(id)
+  }
+
+  /** 清空文件夹回收站 */
+  function clearTrashFolders() {
+    saveTrashFolders([])
+  }
+
   return {
     getNoteList,
     saveNoteList,
@@ -240,5 +380,22 @@ export function useStorage() {
     saveFolderList,
     getSettings,
     saveSettings,
+    
+    // 回收站相关
+    getTrashNotes,
+    saveTrashNote,
+    removeTrashNote,
+    restoreTrashNote,
+    permanentlyDeleteNote,
+    clearTrash,
+
+    // 文件夹回收站相关
+    getTrashFolders,
+    saveTrashFolders,
+    saveTrashFolderEntry,
+    removeTrashFolder,
+    restoreTrashFolder,
+    permanentlyDeleteFolder,
+    clearTrashFolders,
   }
 }

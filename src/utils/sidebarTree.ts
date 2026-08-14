@@ -1,5 +1,6 @@
 import type { Folder, NoteListItem } from '../types'
 import { buildTreeIndex, type TreeIndex } from './treeIndex'
+import { MY_FOLDER_ID, MY_FOLDER_NAME } from '../constants/myFolder'
 
 export interface SidebarTreeRow {
   kind: 'folder' | 'note'
@@ -11,8 +12,14 @@ export interface SidebarTreeRow {
   noteCount?: number
   /** 「最新」虚拟系统文件夹 */
   isSystemFolder?: boolean
+  /** 「我的文件夹」虚拟容器行（与 isSystemFolder 同时为 true） */
+  isMyFolder?: boolean
   /** 「最新」下的笔记行 */
   isRecentView?: boolean
+  /** 置顶区标记：该行属于置顶文件夹区 */
+  isPinnedSection?: boolean
+  /** 置顶区分隔线行 */
+  isPinnedSeparator?: boolean
 }
 
 /** Folder has child folders or notes */
@@ -39,6 +46,8 @@ export interface FlattenSidebarTreeOptions {
   /** When searching: omit folders with no matching notes in subtree */
   hideEmptyFolders?: boolean
   index?: TreeIndex
+  /** 置顶文件夹 ID 集合；提供时将顶层置顶文件夹分到置顶区 */
+  pinnedFolderIds?: Set<string>
 }
 
 /** Flatten folders + notes into one expandable tree */
@@ -48,14 +57,18 @@ export function flattenSidebarTree(
   expandedIds: Set<string>,
   options: FlattenSidebarTreeOptions = {}
 ): SidebarTreeRow[] {
-  const { hideEmptyFolders = false } = options
+  const { hideEmptyFolders = false, pinnedFolderIds } = options
   const index = options.index ?? buildTreeIndex(folders, notes)
   const rows: SidebarTreeRow[] = []
 
-  function walkFolders(parentId: string | undefined, depth: number) {
+  function walkFolders(parentId: string | undefined, depth: number, inPinnedSection = false) {
     const children = index.childrenMap.get(parentId) ?? []
     for (const folder of children) {
       if (hideEmptyFolders && !folderHasMatchingNotesInSubtree(folder.id, index)) {
+        continue
+      }
+      // 顶层置顶文件夹跳过普通遍历，由置顶区单独处理
+      if (pinnedFolderIds && parentId === undefined && pinnedFolderIds.has(folder.id)) {
         continue
       }
       const hasChildren = folderHasTreeChildren(folder.id, index)
@@ -65,11 +78,50 @@ export function flattenSidebarTree(
         folder,
         hasChildren,
         noteCount: countSubtreeNotes(index, folder.id),
+        ...(inPinnedSection ? { isPinnedSection: true } : {}),
       })
       if (expandedIds.has(folder.id)) {
-        walkFolders(folder.id, depth + 1)
+        walkFolders(folder.id, depth + 1, inPinnedSection)
         for (const note of index.notesByFolder.get(folder.id) ?? []) {
-          rows.push({ kind: 'note', depth: depth + 1, note, hasChildren: false })
+          rows.push({ kind: 'note', depth: depth + 1, note, hasChildren: false, ...(inPinnedSection ? { isPinnedSection: true } : {}) })
+        }
+      }
+    }
+  }
+
+  // 置顶区：仅在提供了 pinnedFolderIds 且存在置顶顶层文件夹时渲染
+  if (pinnedFolderIds && pinnedFolderIds.size > 0) {
+    const topLevelFolders = index.childrenMap.get(undefined) ?? []
+    const pinnedTopLevel = topLevelFolders.filter((f) => pinnedFolderIds.has(f.id))
+
+    if (pinnedTopLevel.length > 0) {
+      // 置顶分隔线（PRD 要求分区标题为「常用文件夹」）
+      rows.push({
+        kind: 'folder',
+        depth: 0,
+        folder: { id: '__pinned_sep__', name: '常用文件夹', order: -2 },
+        hasChildren: false,
+        isPinnedSeparator: true,
+      })
+
+      for (const folder of pinnedTopLevel) {
+        if (hideEmptyFolders && !folderHasMatchingNotesInSubtree(folder.id, index)) {
+          continue
+        }
+        const hasChildren = folderHasTreeChildren(folder.id, index)
+        rows.push({
+          kind: 'folder',
+          depth: 0,
+          folder,
+          hasChildren,
+          noteCount: countSubtreeNotes(index, folder.id),
+          isPinnedSection: true,
+        })
+        if (expandedIds.has(folder.id)) {
+          walkFolders(folder.id, 1, true)
+          for (const note of index.notesByFolder.get(folder.id) ?? []) {
+            rows.push({ kind: 'note', depth: 1, note, hasChildren: false, isPinnedSection: true })
+          }
         }
       }
     }
@@ -120,4 +172,28 @@ export function collectExpandIdsForSearch(
     }
   }
   return ids
+}
+
+/**
+ * 将真实文件夹/笔记行包进「我的文件夹」虚拟容器：
+ * - 首行插入容器行（系统文件夹，不可重命名/删除/拖拽）
+ * - 展开时子行深度整体 +1；折叠时仅保留容器行
+ * - noteCount 传入总笔记数（容器折叠时子行不含未展开笔记，不能用行数统计）
+ */
+export function wrapWithMyFolder(
+  rows: SidebarTreeRow[],
+  expanded: boolean,
+  totalNoteCount: number
+): SidebarTreeRow[] {
+  const myFolderRow: SidebarTreeRow = {
+    kind: 'folder',
+    depth: 0,
+    folder: { id: MY_FOLDER_ID, name: MY_FOLDER_NAME, order: -1 },
+    hasChildren: rows.length > 0,
+    noteCount: totalNoteCount,
+    isSystemFolder: true,
+    isMyFolder: true,
+  }
+  if (!expanded) return [myFolderRow]
+  return [myFolderRow, ...rows.map((row) => ({ ...row, depth: row.depth + 1 }))]
 }

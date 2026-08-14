@@ -2,6 +2,30 @@
 // preload.js - uTools API 桥接层（CommonJS，不压缩）
 // 挂载到 window.markflow，供 Vue 应用调用
 
+function isSafeChildPath(candidatePath, rootPath, path, fs) {
+  try {
+    var root = path.resolve(rootPath);
+    var candidate = path.resolve(candidatePath);
+    var relative = path.relative(root, candidate);
+    if (relative === '' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) return false;
+    if (fs.existsSync(candidate)) {
+      var realRoot = fs.realpathSync.native ? fs.realpathSync.native(root) : fs.realpathSync(root);
+      var realCandidate = fs.realpathSync.native ? fs.realpathSync.native(candidate) : fs.realpathSync(candidate);
+      var realRelative = path.relative(realRoot, realCandidate);
+      if (realRelative.startsWith('..' + path.sep) || path.isAbsolute(realRelative)) return false;
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function isSafeBackupFilename(filename, path) {
+  return typeof filename === 'string' && filename.length > 0 &&
+    filename === path.basename(filename) &&
+    /^markflow-backup-\\d{8}T\\d{6}\\.json$/.test(filename);
+}
+
 function appendPdfExportLog(message, extra) {
   try {
     var fs = require('fs');
@@ -117,7 +141,7 @@ window.markflow = {
         content: content,
         path: selectedPath,
         name: path.basename(selectedPath),
-        images: collectImages(content, selectedPath, fs, path)
+        images: collectImages(content, selectedPath, fs, path, path.dirname(selectedPath))
       };
     }
     return null;
@@ -541,14 +565,17 @@ window.markflow = {
     try {
       var fs = require('fs');
       var path = require('path');
-      if (!dirPath || !path.isAbsolute(dirPath)) {
+      if (!dirPath || !path.isAbsolute(dirPath) || !isSafeBackupFilename(filename, path)) {
         return { ok: false, reason: 'error' };
       }
       if (!fs.existsSync(dirPath)) {
         fs.mkdirSync(dirPath, { recursive: true });
       }
       var fullPath = path.join(dirPath, filename);
-      fs.writeFileSync(fullPath, content, 'utf-8');
+      if (!isSafeChildPath(fullPath, dirPath, path, fs)) {
+        return { ok: false, reason: 'error' };
+      }
+      fs.writeFileSync(fullPath, content, { encoding: 'utf-8', flag: 'w' });
       return { ok: true, path: fullPath };
     } catch (e) {
       return { ok: false, reason: 'error' };
@@ -615,6 +642,24 @@ window.markflow = {
     } catch (e) {
       return false;
     }
+  },
+
+  // ---- 回收站存储 ----
+  getTrashNotes: function () {
+    return utools.dbStorage.getItem('markflow_trash_notes') || [];
+  },
+
+  saveTrashNotes: function (notes) {
+    utools.dbStorage.setItem('markflow_trash_notes', notes);
+  },
+
+  // ---- 文件夹回收站存储 ----
+  getTrashFolders: function () {
+    return utools.dbStorage.getItem('markflow_trash_folders') || [];
+  },
+
+  saveTrashFolders: function (entries) {
+    utools.dbStorage.setItem('markflow_trash_folders', entries);
   }
 };
 
@@ -646,6 +691,10 @@ var IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i;
 var REL_IMAGE_MD_RE = /!\[[^\]]*\]\((?!https?:|markflow-asset:|data:)([^)\s]+)(?:\s+"[^"]*")?\)/g;
 var SCAN_MAX_DEPTH = 20;
 var SCAN_DIRS_PER_TICK = 12;
+var SCAN_MAX_FILES = 5000;
+var SCAN_MAX_FILE_BYTES = 10 * 1024 * 1024;
+var SCAN_MAX_TOTAL_BYTES = 100 * 1024 * 1024;
+var SCAN_MAX_IMAGE_BYTES = 50 * 1024 * 1024;
 
 function getFileExtension(name) {
   var dot = name.lastIndexOf('.');
@@ -685,15 +734,17 @@ function shouldSkipImportDir(name) {
   return name.charAt(0) === '.';
 }
 
-function collectImages(content, mdFullPath, fs, path) {
+function collectImages(content, mdFullPath, fs, path, importRoot) {
   var images = [];
+  var rootPath = path.resolve(importRoot || path.dirname(mdFullPath));
   var m;
   REL_IMAGE_MD_RE.lastIndex = 0;
   while ((m = REL_IMAGE_MD_RE.exec(content)) !== null) {
     var relImg = m[1].trim().replace(/^<|>$/g, '');
+    if (/^(?:[A-Za-z]:[\\/]|\\\\|file:)/.test(relImg)) continue;
     var imgPath = path.resolve(path.dirname(mdFullPath), relImg);
     try {
-      if (!fs.existsSync(imgPath) || !IMAGE_EXT_RE.test(imgPath)) continue;
+      if (!isSafeChildPath(imgPath, rootPath, path, fs) || !fs.existsSync(imgPath) || !IMAGE_EXT_RE.test(imgPath)) continue;
       var buf = fs.readFileSync(imgPath);
       var ext = path.extname(imgPath).slice(1).toLowerCase();
       var mime = ext === 'jpg' ? 'image/jpeg' : 'image/' + ext;
@@ -709,6 +760,8 @@ function scanMarkdownFolderAsync(rootPath) {
   var fs = require('fs');
   var path = require('path');
   var files = [];
+  var totalBytes = 0;
+  var imageBytes = 0;
   var queue = [{ dir: rootPath, relBase: '', depth: 0 }];
   var visited = Object.create(null);
 
@@ -755,7 +808,23 @@ function scanMarkdownFolderAsync(rootPath) {
             var fullPath = path.join(absDir, entry.name);
             relPath = relPath.replace(/\\/g, '/');
 
+            if (files.length >= SCAN_MAX_FILES) {
+              resolve({ rootPath: rootPath, files: files, truncated: true, reason: 'limit' });
+              return;
+            }
+            var stats;
+            try { stats = fs.statSync(fullPath); } catch (e) { continue; }
+            if (stats.size > SCAN_MAX_FILE_BYTES || totalBytes + stats.size > SCAN_MAX_TOTAL_BYTES) {
+              resolve({ rootPath: rootPath, files: files, truncated: true, reason: 'limit' });
+              return;
+            }
+            totalBytes += stats.size;
             if (isImportableImageFilename(entry.name)) {
+              if (imageBytes + stats.size > SCAN_MAX_IMAGE_BYTES) {
+                resolve({ rootPath: rootPath, files: files, truncated: true, reason: 'limit' });
+                return;
+              }
+              imageBytes += stats.size;
               try {
                 var imgBuf = fs.readFileSync(fullPath);
                 files.push({
@@ -777,7 +846,7 @@ function scanMarkdownFolderAsync(rootPath) {
                 files.push({
                   relativePath: relPath,
                   content: content,
-                  images: collectImages(content, fullPath, fs, path)
+                  images: collectImages(content, fullPath, fs, path, rootPath)
                 });
               } catch (e) {
                 /* skip unreadable text */

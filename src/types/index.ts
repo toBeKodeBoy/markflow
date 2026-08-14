@@ -39,6 +39,8 @@ export interface Note {
   managedAssetIds?: string[]
   /** 导入来源标题锁定；存在时编辑正文不自动改标题 */
   titleLockedFromSource?: boolean
+  /** 删除时间戳（软删除标记） */
+  deletedAt?: number
   createdAt: number
   updatedAt: number
 }
@@ -55,6 +57,14 @@ export interface Folder {
   name: string
   order: number
   parentId?: string
+  /** 是否置顶 */
+  pinned?: boolean
+  /** 移入回收站时间戳 */
+  trashAt?: number
+  /** 创建时间 */
+  createdAt?: number
+  /** 更新时间 */
+  updatedAt?: number
 }
 
 export interface NoteListItem {
@@ -64,6 +74,22 @@ export interface NoteListItem {
   updatedAt: number
   pinned?: boolean
   sortOrder?: number
+}
+
+/** 回收站中的笔记（继承 Note，扩展删除元数据） */
+export interface TrashNote extends Note {
+  deletedBy: 'user' | 'auto'  // 删除来源：手动 / 自动清理
+  restoredAt?: number          // 恢复时间戳（可选）
+}
+
+/** 回收站中的文件夹条目（含子树快照） */
+export interface TrashFolderEntry {
+  folder: Folder              // 被删除的根文件夹
+  descendantFolders: Folder[] // 被删除的子文件夹列表
+  noteIds: string[]           // 被删除文件夹内的笔记 ID 列表
+  deletedAt: number           // 删除时间戳
+  deletedBy: 'user' | 'auto'  // 删除来源
+  originalParentId?: string   // 原父级 ID（恢复时用）
 }
 
 export interface TocJumpTarget {
@@ -162,6 +188,8 @@ export interface AppSettings {
   sidebarWidth?: number
   /** 侧栏展开的文件夹 id */
   sidebarExpandedFolderIds?: string[]
+  /** 「我的文件夹」容器一次性展开迁移标记（老用户升级兼容） */
+  myFolderIntroMigrated?: boolean
   /** 侧栏选中的文件夹（新建笔记目标） */
   sidebarActiveFolderId?: string | null
   /** PDF 导出选项（可选，缺省用默认值） */
@@ -173,6 +201,8 @@ export interface AppSettings {
   /** 最近访问的笔记（LRU，最多 30 条） */
   recentNoteAccess?: RecentNoteAccess[]
   imageExport?: ImageExportSettings
+  /** 回收站保留天数（默认 30） */
+  trashRetentionDays?: number
 }
 
 // uTools preload bridge type
@@ -249,6 +279,11 @@ export interface MarkFlowBridge {
   getAsset: (id: string) => AssetRecord | null
   saveAsset: (id: string, record: AssetRecord) => void
   removeAsset: (id: string) => void
+  
+  // 回收站相关
+  getTrashNotes: () => TrashNote[]
+  saveTrashNotes: (notes: TrashNote[]) => void
+  
   ensureDirectory?: (dirPath: string) => { ok: true } | { ok: false; reason: 'error' }
   writeAssetFile?: (
     filePath: string,
@@ -259,6 +294,10 @@ export interface MarkFlowBridge {
     toPath: string
   ) => { ok: true } | { ok: false; reason: 'error' }
   pathExists?: (targetPath: string) => boolean
+
+  /** 文件夹回收站 */
+  getTrashFolders: () => TrashFolderEntry[]
+  saveTrashFolders: (entries: TrashFolderEntry[]) => void
 }
 
 declare global {

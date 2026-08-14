@@ -102,6 +102,24 @@ if (typeof window !== 'undefined') {
     writeAssetFile: vi.fn((filePath: string) => ({ ok: true as const, path: filePath })),
     movePath: vi.fn(() => ({ ok: true as const })),
     pathExists: vi.fn(() => false),
+      
+    // 回收站相关
+    getTrashNotes: vi.fn(() => {
+      const raw = mockStorage.getItem('markflow_trash_notes')
+      return raw ? JSON.parse(raw) : []
+    }),
+    saveTrashNotes: vi.fn((notes) => {
+      mockStorage.setItem('markflow_trash_notes', JSON.stringify(notes))
+    }),
+
+    // 文件夹回收站相关
+    getTrashFolders: vi.fn(() => {
+      const raw = mockStorage.getItem('markflow_trash_folders')
+      return raw ? JSON.parse(raw) : []
+    }),
+    saveTrashFolders: vi.fn((entries) => {
+      mockStorage.setItem('markflow_trash_folders', JSON.stringify(entries))
+    })
   }
 }
 

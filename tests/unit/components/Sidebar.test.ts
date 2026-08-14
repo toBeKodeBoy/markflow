@@ -6,6 +6,8 @@ import { resolve } from 'node:path'
 import Sidebar from '../../../src/components/Sidebar.vue'
 import { useNoteStore } from '../../../src/stores/note'
 import { useEditorTabsStore } from '../../../src/stores/editorTabs'
+import { RECENT_FOLDER_ID } from '../../../src/constants/recentFolder'
+import { useAppSettings } from '../../../src/composables/useAppSettings'
 
 let pinia: Pinia
 let styleEl: HTMLStyleElement | null = null
@@ -26,7 +28,13 @@ function mountSidebar() {
         SidebarTreeRowView: {
           props: ['row'],
           template: `
-            <div class="sidebar-row-stub" :data-kind="row.kind" :data-recent="row.isRecentView ? '1' : '0'">
+            <div
+              class="sidebar-row-stub"
+              :data-kind="row.kind"
+              :data-depth="row.depth"
+              :data-my="row.isMyFolder ? '1' : '0'"
+              :data-recent="row.isRecentView ? '1' : '0'"
+            >
               {{ row.kind === 'folder' ? row.folder.name : row.note.title }}
               <button
                 v-if="row.kind === 'folder'"
@@ -43,6 +51,20 @@ function mountSidebar() {
                 folder-menu
               </button>
               <button
+                v-if="row.kind === 'folder' && !row.isSystemFolder"
+                class="folder-drag-trigger"
+                @click="$emit('drag-start', { kind: 'folder', id: row.folder.id })"
+              >
+                folder-drag
+              </button>
+              <button
+                v-if="row.kind === 'folder'"
+                class="folder-drop-trigger"
+                @click="$emit('drop-on-folder', row.folder.id, 'inside')"
+              >
+                folder-drop
+              </button>
+              <button
                 v-else
                 class="note-context-trigger"
                 @click="$emit('note-context', { clientX: 56, clientY: 78 }, row.note.id)"
@@ -57,10 +79,19 @@ function mountSidebar() {
   })
 }
 
+/** 按文件夹名定位 stub 行 */
+function findFolderRow(wrapper: ReturnType<typeof mountSidebar>, name: string) {
+  return wrapper
+    .findAll('.sidebar-row-stub')
+    .find((row) => row.attributes('data-kind') === 'folder' && row.text().includes(name))
+}
+
 describe('Sidebar', () => {
   beforeEach(() => {
     localStorage.clear()
     document.body.innerHTML = ''
+    // settingsRef 为模块级缓存，清空存储后需重载，避免跨用例泄漏
+    useAppSettings().load()
     pinia = createPinia()
     setActivePinia(pinia)
     styleEl = document.createElement('style')
@@ -84,7 +115,7 @@ describe('Sidebar', () => {
     await flushPromises()
 
     expect(wrapper.text()).not.toContain('全部笔记')
-    expect(wrapper.text()).not.toContain('文件夹')
+    expect(wrapper.text()).toContain('我的文件夹')
     expect(wrapper.text()).not.toContain('在此新建')
     expect(wrapper.text()).toContain('项目文档')
     expect(wrapper.text()).toContain('根笔记')
@@ -131,11 +162,33 @@ describe('Sidebar', () => {
     expect(wrapper.text()).toContain('置顶')
     expect(wrapper.text()).toContain('删除')
 
-    const folderTriggers = wrapper.findAll('.folder-context-trigger')
-    await folderTriggers[1].trigger('click')
+    await findFolderRow(wrapper, '工作区')!.find('.folder-context-trigger').trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('新建子文件夹')
     expect(wrapper.text()).toContain('新建笔记')
+  })
+
+  it('renders new context menu items for notes and folders', async () => {
+    const store = useNoteStore()
+    const folder = store.createFolder('工作区')
+    store.createNoteWithContent('# 周报\n')
+    store.createNoteWithContent('# 文件夹笔记\n', { folderId: folder.id })
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    // 笔记右键菜单新增「复制」和「定位文件夹」
+    await wrapper.get('.note-context-trigger').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('复制')
+    expect(wrapper.text()).toContain('定位文件夹')
+
+    // 文件夹右键菜单新增「置顶」，删除改为「移入回收站」
+    await findFolderRow(wrapper, '工作区')!.find('.folder-context-trigger').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('置顶')
+    expect(wrapper.text()).toContain('移入回收站')
+    expect(wrapper.text()).not.toContain('删除')
   })
 
   it('renders note context menu without fixed right anchoring', async () => {
@@ -223,6 +276,74 @@ describe('Sidebar', () => {
     expect(recentRows[0].text()).toContain('Beta')
   })
 
+  it('expand button cycles through collapse / level 1 / level 2 / all', async () => {
+    const store = useNoteStore()
+    const a = store.createFolder('一级文件夹')
+    const b = store.createFolder('二级文件夹', a.id)
+    const c = store.createFolder('三级文件夹', b.id)
+    store.createNoteWithContent('# 深层笔记\n', { folderId: c.id })
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    const folderRows = () =>
+      wrapper
+        .findAll('.sidebar-row-stub')
+        .filter((row) => row.attributes('data-kind') === 'folder')
+        .map((row) => row.text())
+    const noteVisible = () => wrapper.text().includes('深层笔记')
+
+    // 先点「折叠」全部收起
+    await wrapper.findAll('.sidebar-toolbar-btn')[0].trigger('click')
+    await flushPromises()
+    expect(folderRows().some((t) => t.includes('二级文件夹'))).toBe(false)
+
+    const expandBtn = wrapper.findAll('.sidebar-toolbar-btn')[1]
+    expect(expandBtn.text()).toContain('展开1级')
+
+    // 第 1 次：展开 1 级
+    await expandBtn.trigger('click')
+    await flushPromises()
+    expect(folderRows().some((t) => t.includes('二级文件夹'))).toBe(true)
+    expect(folderRows().some((t) => t.includes('三级文件夹'))).toBe(false)
+    expect(expandBtn.text()).toContain('展开2级')
+
+    // 第 2 次：展开 2 级
+    await expandBtn.trigger('click')
+    await flushPromises()
+    expect(folderRows().some((t) => t.includes('三级文件夹'))).toBe(true)
+    expect(noteVisible()).toBe(false)
+    expect(expandBtn.text()).toContain('展开全部')
+
+    // 第 3 次：展开全部（含叶子内的笔记）
+    await expandBtn.trigger('click')
+    await flushPromises()
+    expect(noteVisible()).toBe(true)
+    expect(expandBtn.text()).toContain('折叠全部')
+
+    // 第 4 次：回到折叠全部
+    await expandBtn.trigger('click')
+    await flushPromises()
+    expect(noteVisible()).toBe(false)
+    expect(folderRows().some((t) => t.includes('二级文件夹'))).toBe(false)
+    expect(expandBtn.text()).toContain('展开1级')
+  })
+
+  it('trash badge counts both trashed notes and folders', async () => {
+    const store = useNoteStore()
+    const note = store.createNoteWithContent('# 待删笔记\n')
+    const folder = store.createFolder('待删文件夹')
+    store.softDeleteNote(note.id)
+    store.softDeleteFolder(folder.id)
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    const badge = wrapper.find('.trash-badge')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toBe('2')
+  })
+
   it('collapsing the recent folder should persist after remount', async () => {
     const store = useNoteStore()
     const tabsStore = useEditorTabsStore()
@@ -258,5 +379,119 @@ describe('Sidebar', () => {
       .filter((row) => row.attributes('data-recent') === '1')
     // If collapse persisted, recent notes should not render.
     expect(recentNoteRowsAfterRemount).toHaveLength(0)
+  })
+
+  // ===== 「我的文件夹」虚拟容器 =====
+  it('renders my-folder container after recent and wraps real content with depth +1', async () => {
+    const store = useNoteStore()
+    const folder = store.createFolder('工作区')
+    store.createNoteWithContent('# 根笔记\n')
+    store.createNoteWithContent('# 文件夹笔记\n', { folderId: folder.id })
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    const rows = wrapper.findAll('.sidebar-row-stub')
+    expect(rows[0].text()).toContain('最新')
+    expect(rows[1].text()).toContain('我的文件夹')
+    expect(rows[1].attributes('data-my')).toBe('1')
+
+    // 真实文件夹与根笔记都成为容器子行，深度 +1
+    const folderRow = rows.find((r) => r.text().includes('工作区'))!
+    expect(folderRow.attributes('data-depth')).toBe('1')
+    const rootNoteRow = rows.find((r) => r.text().includes('根笔记'))!
+    expect(rootNoteRow.attributes('data-depth')).toBe('1')
+  })
+
+  it('clicking my-folder container does not change activeFolderId', async () => {
+    const store = useNoteStore()
+    const folder = store.createFolder('工作区')
+    store.activeFolderId = folder.id
+    store.createNoteWithContent('# 笔记\n')
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    await findFolderRow(wrapper, '我的文件夹')!.find('.folder-click-trigger').trigger('click')
+    await flushPromises()
+
+    expect(store.activeFolderId).toBe(folder.id)
+  })
+
+  it('right-clicking my-folder container does not open context menu', async () => {
+    const store = useNoteStore()
+    store.createFolder('工作区')
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    await findFolderRow(wrapper, '我的文件夹')!.find('.folder-context-trigger').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('.context-menu')).toHaveLength(0)
+  })
+
+  it('collapsing my-folder hides real folders and persists after remount', async () => {
+    const store = useNoteStore()
+    const folder = store.createFolder('工作区')
+    // 不打开标签页，避免笔记进入「最新」视图干扰折叠断言
+    store.createNoteWithContent('# 根笔记\n')
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    await findFolderRow(wrapper, '我的文件夹')!.find('.folder-click-trigger').trigger('click')
+    await flushPromises()
+
+    // 折叠后真实文件夹与根笔记隐藏，「最新」区不受影响
+    expect(wrapper.text()).not.toContain('工作区')
+    expect(wrapper.text()).not.toContain('根笔记')
+    expect(wrapper.text()).toContain('最新')
+
+    await wrapper.unmount()
+
+    const wrapper2 = mountSidebar()
+    await flushPromises()
+    expect(wrapper2.text()).not.toContain('工作区')
+  })
+
+  it('expands my-folder once for legacy users whose saved state lacks the container id', async () => {
+    const store = useNoteStore()
+    store.createFolder('工作区')
+    // 模拟老用户：已持久化展开状态但不含新容器 ID，也无迁移标记
+    window.markflow.saveSettings({ sidebarExpandedFolderIds: [RECENT_FOLDER_ID] })
+    useAppSettings().load()
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    // 一次性迁移：容器被展开，资料库可见
+    expect(wrapper.text()).toContain('工作区')
+    expect((window.markflow.getSettings() as { myFolderIntroMigrated?: boolean }).myFolderIntroMigrated).toBe(true)
+
+    // 迁移后用户手动折叠的意图应被保留
+    await findFolderRow(wrapper, '我的文件夹')!.find('.folder-click-trigger').trigger('click')
+    await flushPromises()
+    await wrapper.unmount()
+
+    const wrapper2 = mountSidebar()
+    await flushPromises()
+    expect(wrapper2.text()).not.toContain('工作区')
+  })
+
+  it('dropping a folder onto my-folder container moves it to root', async () => {
+    const store = useNoteStore()
+    const parent = store.createFolder('工作区')
+    const child = store.createFolder('子文件夹', parent.id)
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    // 首次启动默认展开含子项的一级文件夹，「子文件夹」行可见
+    await findFolderRow(wrapper, '子文件夹')!.find('.folder-drag-trigger').trigger('click')
+    await findFolderRow(wrapper, '我的文件夹')!.find('.folder-drop-trigger').trigger('click')
+    await flushPromises()
+
+    expect(store.folderList.find((f) => f.id === child.id)?.parentId).toBeUndefined()
   })
 })

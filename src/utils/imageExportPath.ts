@@ -59,7 +59,16 @@ function joinWindowsPath(base: string, ...parts: string[]): string {
 }
 
 function isAbsolutePath(path: string): boolean {
-  return /^[A-Za-z]:[\\/]/.test(path)
+  return /^[A-Za-z]:[\\/]/.test(path) || /^\\\\/.test(path)
+}
+
+function validateRelativeTemplate(template: string): void {
+  if (/\p{Cc}/u.test(template)) throw new Error('图片导出模板包含非法控制字符')
+  if (isAbsolutePath(template)) throw new Error('图片导出模板必须是相对路径')
+  const parts = toWindowsPath(template).split('\\').filter(Boolean)
+  if (parts.some((part) => part === '..')) {
+    throw new Error('图片导出模板不能包含路径穿越')
+  }
 }
 
 function buildTemplateVars(markdownFilePath: string, noteTitle: string) {
@@ -89,8 +98,8 @@ export function resolveImageExportTarget(
   }
 
   if (ctx.mode === 'typora-cache-absolute') {
-    if (!ctx.typoraRootDir?.trim()) {
-      throw new Error('未配置 Typora 图片目录')
+    if (!ctx.typoraRootDir?.trim() || !isAbsolutePath(ctx.typoraRootDir)) {
+      throw new Error('未配置有效的 Typora 图片目录')
     }
     return {
       assetDirAbsPath: joinWindowsPath(ctx.typoraRootDir, 'typora-user-images'),
@@ -99,9 +108,11 @@ export function resolveImageExportTarget(
   }
 
   const template = (ctx.customTemplate || './assets/${filename}').trim()
+  validateRelativeTemplate(template)
   const rendered = renderPathTemplate(template, buildTemplateVars(ctx.markdownFilePath, ctx.noteTitle))
+  validateRelativeTemplate(rendered)
   return {
-    assetDirAbsPath: isAbsolutePath(rendered) ? toWindowsPath(rendered) : joinWindowsPath(markdownDir, rendered),
-    markdownPathStyle: isAbsolutePath(rendered) ? 'absolute' : 'relative',
+    assetDirAbsPath: joinWindowsPath(markdownDir, rendered),
+    markdownPathStyle: 'relative',
   }
 }
