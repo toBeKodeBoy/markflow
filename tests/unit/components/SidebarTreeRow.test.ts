@@ -224,4 +224,128 @@ describe('SidebarTreeRow', () => {
     expect(pin.attributes('data-name')).toBe('pin')
     expect(wrapper.text()).not.toContain('📌')
   })
+
+  it('置顶文件夹应渲染 pin 图标', () => {
+    const wrapper = mount(SidebarTreeRow, {
+      props: {
+        row: {
+          kind: 'folder',
+          depth: 0,
+          folder: { id: 'f1', name: '置顶文件夹', order: 0, pinned: true },
+          hasChildren: false,
+        },
+        expanded: false,
+        activeFolderId: null,
+        renamingFolderId: null,
+        renamingFolderName: '',
+        renamingNoteId: null,
+        renamingNoteName: '',
+        dragOverFolderId: null,
+      },
+      global: {
+        stubs: {
+          AppIcon: {
+            props: ['name', 'size'],
+            template: '<span class="stub-app-icon" :data-name="name" />',
+          },
+        },
+      },
+    })
+
+    const pin = wrapper.find('.folder-pin-icon .stub-app-icon')
+    expect(pin.exists()).toBe(true)
+    expect(pin.attributes('data-name')).toBe('pin')
+    expect(wrapper.find('.folder-item').classes()).toContain('pinned-folder')
+  })
+
+  it('置顶分隔线应渲染分隔线元素', () => {
+    const wrapper = mount(SidebarTreeRow, {
+      props: {
+        row: {
+          kind: 'folder',
+          depth: 0,
+          folder: { id: '__pinned_sep__', name: '常用文件夹', order: -2 },
+          hasChildren: false,
+          isPinnedSeparator: true,
+        },
+        expanded: false,
+        activeFolderId: null,
+        renamingFolderId: null,
+        renamingFolderName: '',
+        renamingNoteId: null,
+        renamingNoteName: '',
+        dragOverFolderId: null,
+      },
+      global: { stubs: { AppIcon: true } },
+    })
+
+    expect(wrapper.find('.pinned-separator').exists()).toBe(true)
+    expect(wrapper.text()).toContain('常用文件夹')
+  })
+
+  it('「我的文件夹」容器行应渲染 folder 图标而非 clock', () => {
+    const wrapper = mount(SidebarTreeRow, {
+      props: {
+        row: {
+          kind: 'folder',
+          depth: 0,
+          folder: { id: '__markflow_my__', name: '我的文件夹', order: -1 },
+          hasChildren: true,
+          noteCount: 3,
+          isSystemFolder: true,
+          isMyFolder: true,
+        },
+        expanded: true,
+        activeFolderId: null,
+        renamingFolderId: null,
+        renamingFolderName: '',
+        renamingNoteId: null,
+        renamingNoteName: '',
+        dragOverFolderId: null,
+      },
+      global: {
+        stubs: {
+          AppIcon: {
+            props: ['name', 'size'],
+            template: '<span class="stub-app-icon" :data-name="name" />',
+          },
+        },
+      },
+    })
+
+    const folderItem = wrapper.get('.folder-item')
+    expect(folderItem.classes()).toContain('system-folder')
+    expect(folderItem.attributes('draggable')).toBe('false')
+    const icon = folderItem.find('.system-folder-icon')
+    expect(icon.attributes('data-name')).toBe('folder')
+  })
+
+  it('选中笔记应添加 selected class', () => {
+    const wrapper = mount(SidebarTreeRow, {
+      props: {
+        row: {
+          kind: 'note',
+          depth: 0,
+          note: {
+            id: 'note-1',
+            title: '选中笔记',
+            updatedAt: Date.now(),
+            pinned: false,
+          },
+          hasChildren: false,
+        },
+        expanded: false,
+        activeFolderId: null,
+        renamingFolderId: null,
+        renamingFolderName: '',
+        renamingNoteId: null,
+        renamingNoteName: '',
+        dragOverFolderId: null,
+        selectedNoteIds: new Set(['note-1']),
+      },
+      global: { stubs: { AppIcon: true } },
+    })
+
+    expect(wrapper.find('.tree-note-item').classes()).toContain('selected')
+  })
 })

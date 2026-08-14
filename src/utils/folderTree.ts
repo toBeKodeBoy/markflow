@@ -180,3 +180,81 @@ export function migrateLegacyPathFolders(folders: Folder[]): { folders: Folder[]
 
   return { folders: result, changed: true }
 }
+
+/**
+ * 计算文件夹在树中的深度（根目录为 0）。
+ * 复用 collectAncestorFolderIds：深度 = 祖先链长度。
+ * 不存在的 ID 返回 -1。
+ */
+export function getFolderDepth(folders: Folder[], folderId: string): number {
+  const target = folders.find((f) => f.id === folderId)
+  if (!target) return -1
+  return collectAncestorFolderIds(folderId, folders).length
+}
+
+/**
+ * 校验将新文件夹挂到 parentId 下是否会超过最大深度。
+ * parentId 为 undefined（根目录）始终返回 true。
+ * parentId 不存在返回 false。
+ */
+export function validateFolderDepth(
+  folders: Folder[],
+  parentId: string | undefined,
+  maxDepth: number = 20
+): boolean {
+  if (parentId === undefined) return true
+  const depth = getFolderDepth(folders, parentId)
+  if (depth === -1) return false
+  return depth + 1 <= maxDepth
+}
+
+/**
+ * 按指定顺序重算同级文件夹的 order 字段（0, 1, 2, ...）。
+ * 非同级或不在 orderedIds 中的文件夹 order 不变。
+ * 返回新的 Folder 数组，不修改原数组。
+ */
+export function reorderSiblingFolders(
+  folders: Folder[],
+  parentId: string | undefined,
+  orderedIds: string[]
+): Folder[] {
+  const orderMap = new Map<string, number>()
+  orderedIds.forEach((id, index) => orderMap.set(id, index))
+
+  return folders.map((folder) => {
+    if (folder.parentId === parentId && orderMap.has(folder.id)) {
+      return { ...folder, order: orderMap.get(folder.id)! }
+    }
+    return { ...folder }
+  })
+}
+
+/**
+ * 过滤出未在回收站中的文件夹（trashAt === undefined）。
+ */
+export function filterActiveFolders(folders: Folder[]): Folder[] {
+  return folders.filter((f) => f.trashAt === undefined)
+}
+
+/**
+ * 返回置顶文件夹（pinned === true）。
+ */
+export function getPinnedFolders(folders: Folder[]): Folder[] {
+  return folders.filter((f) => f.pinned === true)
+}
+
+/**
+ * 为缺少时间戳与 pinned 字段的文件夹补默认值。
+ * - createdAt / updatedAt 缺失补 Date.now()
+ * - pinned 缺失补 false
+ * 已有值不修改，返回新数组。
+ */
+export function migrateFolderTimestamps(folders: Folder[]): Folder[] {
+  const now = Date.now()
+  return folders.map((folder) => ({
+    ...folder,
+    createdAt: folder.createdAt ?? now,
+    updatedAt: folder.updatedAt ?? now,
+    pinned: folder.pinned ?? false,
+  }))
+}

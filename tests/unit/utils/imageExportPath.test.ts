@@ -49,4 +49,16 @@ describe('resolveImageExportTarget', () => {
     expect(target.assetDirAbsPath).toBe('D:\\docs\\assets\\note')
     expect(target.markdownPathStyle).toBe('relative')
   })
+
+  it.each(['../outside', 'C:\\\\outside', '\\\\\\\\server\\share'])(
+    'rejects unsafe custom template: %s',
+    (customTemplate) => {
+      expect(() => resolveImageExportTarget({
+        markdownFilePath: 'D:\\docs\\note.md',
+        noteTitle: 'note',
+        mode: 'custom-template',
+        customTemplate,
+      })).toThrow()
+    },
+  )
 })

@@ -42,3 +42,4 @@ docs/plans/*
 !docs/plans/ui-phase-a-implementation-report.md
 !docs/plans/暗色模式滚动条适配技术方案.md
 AGENTS.md
+*.png
