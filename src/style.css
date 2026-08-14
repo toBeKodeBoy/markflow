@@ -36,6 +36,16 @@
   --scrollbar-size: 6px;
   --scrollbar-thumb: color-mix(in srgb, var(--border) 88%, var(--text-muted));
   --scrollbar-thumb-hover: var(--text-muted);
+  
+  /* Surface Elevation Tokens (Light Mode) */
+  --surface-elevated-1: color-mix(in srgb, var(--bg-editor) 96%, var(--bg-toolbar));
+  --surface-elevated-2: color-mix(in srgb, var(--bg-editor) 92%, var(--bg-toolbar));
+  --surface-elevated-3: color-mix(in srgb, var(--bg-editor) 88%, var(--bg-toolbar));
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-focus: 0 14px 36px rgba(15, 23, 42, 0.08);
+  
   color-scheme: light;
 }
 
@@ -61,10 +71,20 @@
   --code-bg: #11111b;
   --shadow: 0 1px 3px rgba(0,0,0,0.3);
   --canvas-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+  --canvas-radius: 14px;
+  
+  /* Surface Elevation Tokens (Dark Mode) */
+  --surface-elevated-1: color-mix(in srgb, var(--bg-editor) 96%, var(--bg-toolbar));
+  --surface-elevated-2: color-mix(in srgb, var(--bg-editor) 92%, var(--bg-toolbar));
+  --surface-elevated-3: color-mix(in srgb, var(--bg-editor) 88%, var(--bg-toolbar));
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.3);
+  --shadow-focus: 0 14px 36px rgba(0, 0, 0, 0.25);
+  
   color-scheme: dark;
 }
 
-/* ===== Reset ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #app { height: 100%; }
 body { font-family: var(--font-ui); background: var(--bg-app); color: var(--text); overflow: hidden; }
@@ -192,6 +212,25 @@ input:focus { border-color: var(--primary); }
 .mode-source .editor-stage {
   padding-left: 0;
   padding-right: 0;
+}
+
+/* ===== Canvas Layer Enhancements by Mode ===== */
+
+/* Live 模式：增强画布边界感 */
+.mode-live .editor-canvas {
+  border-color: var(--border-subtle);
+}
+
+/* Focus 模式:更沉浸但仍保留画布识别 */
+.mode-focus .editor-canvas {
+  border-color: color-mix(in srgb, var(--border) 60%, transparent);
+  box-shadow: var(--shadow-focus);
+  transition: none;
+}
+
+/* Split 模式：统一编辑区与预览区画布语言 */
+.mode-split .editor-canvas {
+  border-color: var(--border-subtle);
 }
 
 .workspace-chrome-bar {
@@ -866,11 +905,12 @@ input:focus { border-color: var(--primary); }
 
 .modal {
   background: var(--bg-editor);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
   padding: 20px;
   min-width: 280px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  box-shadow: var(--shadow-lg);
+  transition: box-shadow 0.2s ease;
 }
 
 .modal-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
@@ -887,7 +927,8 @@ input:focus { border-color: var(--primary); }
   width: min(520px, calc(100vw - 32px));
   padding: 22px;
   border-radius: 18px;
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-lg);
+  background: var(--surface-elevated-1);
 }
 
 .create-entry-header {
@@ -1603,6 +1644,7 @@ input:focus { border-color: var(--primary); }
   border: 1px solid var(--border-subtle);
   border-radius: var(--canvas-radius);
   box-shadow: var(--canvas-shadow);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 /* 分屏/源码模式：移除装饰性样式，紧贴排列 */
@@ -1745,9 +1787,10 @@ input:focus { border-color: var(--primary); }
   align-items: center;
   gap: 4px;
   padding: 4px 6px;
-  background: color-mix(in srgb, var(--bg-editor) 78%, var(--bg-toolbar));
+  background: var(--surface-elevated-2);
   border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
   border-radius: 10px;
+  box-shadow: var(--shadow-sm);
 }
 
 .toolbar-group-label {
@@ -3449,9 +3492,9 @@ img.ProseMirror-separator {
 .search-modal {
   width: min(520px, calc(100vw - 40px));
   background: var(--bg-editor);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
   border-radius: 12px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--shadow-lg);
   overflow: hidden;
 }
 
@@ -3547,4 +3590,18 @@ img.ProseMirror-separator {
   text-align: center;
   font-size: 13px;
   color: var(--text-muted);
+}
+
+.search-modal-recent-section {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.search-modal-recent-header {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+  letter-spacing: 0.05em;
 }
