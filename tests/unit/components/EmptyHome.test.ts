@@ -40,6 +40,7 @@ describe('EmptyHome', () => {
     expect(wrapper.text()).toContain(EMPTY_HOME_TITLE)
     expect(wrapper.text()).toContain(EMPTY_HOME_SUBTITLE)
     expect(wrapper.text()).toContain(EMPTY_HOME_STORAGE_HINT)
+    expect(wrapper.text()).not.toContain('侧边栏可管理所有文件夹与笔记')
     expect(wrapper.find('[data-testid="empty-home-create"]').text()).toBe(EMPTY_HOME_CREATE_LABEL)
     expect(wrapper.find('[data-testid="empty-home-create-folder"]').text()).toBe(
       EMPTY_HOME_CREATE_FOLDER_LABEL,

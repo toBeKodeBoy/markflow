@@ -53,7 +53,11 @@ const emit = defineEmits<{
 
 <style scoped>
 .sidebar-spaces {
-  padding: 8px 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sidebar-space-gap);
+  padding: var(--sidebar-section-y) 8px;
+  border-top: 1px solid var(--border, var(--border-color));
   border-bottom: 1px solid var(--border, var(--border-color));
 }
 
@@ -61,8 +65,9 @@ const emit = defineEmits<{
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 12px;
+  padding: 4px var(--sidebar-pad-x) 2px;
   font-size: 12px;
+  letter-spacing: 0.04em;
   color: var(--text-muted, var(--text-secondary));
 }
 
@@ -83,9 +88,9 @@ const emit = defineEmits<{
 .sidebar-space-item {
   display: block;
   width: 100%;
-  padding: 8px 12px;
+  padding: var(--sidebar-item-py) var(--sidebar-pad-x);
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--sidebar-item-radius);
   background: transparent;
   color: var(--text-secondary, var(--text));
   text-align: left;

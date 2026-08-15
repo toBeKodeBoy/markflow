@@ -28,7 +28,6 @@
         </button>
       </div>
       <p class="empty-home-storage-hint">{{ EMPTY_HOME_STORAGE_HINT }}</p>
-      <p class="empty-tabs-text">{{ EMPTY_HOME_SIDEBAR_HINT }}</p>
     </div>
 
     <section data-testid="empty-home-templates" class="empty-home-templates">
@@ -101,7 +100,6 @@ import {
   EMPTY_HOME_HINT_FOLDER_COUNT,
   EMPTY_HOME_HINT_THEME,
   EMPTY_HOME_IMPORT_LABEL,
-  EMPTY_HOME_SIDEBAR_HINT,
   EMPTY_HOME_STORAGE_HINT,
   EMPTY_HOME_SUBTITLE,
   EMPTY_HOME_TEMPLATES_TITLE,

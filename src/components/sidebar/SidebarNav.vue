@@ -7,7 +7,8 @@
       :class="{ active: active === 'home' }"
       @click="emit('select', 'home')"
     >
-      {{ SIDEBAR_NAV_HOME }}
+      <AppIcon name="home" :size="16" />
+      <span>{{ SIDEBAR_NAV_HOME }}</span>
     </button>
     <button
       type="button"
@@ -16,7 +17,8 @@
       :class="{ active: active === 'docs' }"
       @click="emit('select', 'docs')"
     >
-      {{ SIDEBAR_NAV_DOCS }}
+      <AppIcon name="file" :size="16" />
+      <span>{{ SIDEBAR_NAV_DOCS }}</span>
     </button>
     <button
       type="button"
@@ -25,6 +27,7 @@
       :class="{ active: active === 'trash' }"
       @click="emit('select', 'trash')"
     >
+      <AppIcon name="trash" :size="16" />
       <span>{{ SIDEBAR_NAV_TRASH }}</span>
       <span v-if="trashCount > 0" class="trash-badge">{{ trashCount }}</span>
     </button>
@@ -32,6 +35,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../AppIcon.vue'
 import {
   SIDEBAR_NAV_DOCS,
   SIDEBAR_NAV_HOME,
@@ -53,18 +57,18 @@ const emit = defineEmits<{
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 8px 8px 12px;
+  gap: var(--sidebar-item-gap);
+  padding: 2px 8px 8px;
 }
 
 .sidebar-nav-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   width: 100%;
-  padding: 9px 12px;
+  padding: var(--sidebar-item-py) var(--sidebar-pad-x);
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--sidebar-item-radius);
   background: transparent;
   color: var(--text-secondary, var(--text));
   text-align: left;
@@ -78,10 +82,10 @@ const emit = defineEmits<{
 .sidebar-nav-item.active {
   background: var(--bg-active, var(--bg-hover));
   color: var(--primary);
-  box-shadow: inset 2px 0 0 var(--primary);
 }
 
 .trash-badge {
+  margin-left: auto;
   background: var(--color-danger, #e5484d);
   color: white;
   font-size: 11px;

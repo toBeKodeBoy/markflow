@@ -26,6 +26,13 @@
   --content-max: 1040px;
   --content-max-focus: 960px;
   --sidebar-width: 260px;
+  --sidebar-pad-x: 12px;
+  --sidebar-section-y: 8px;
+  --sidebar-item-gap: 4px;
+  --sidebar-item-py: 7px;
+  --sidebar-item-radius: 8px;
+  --sidebar-create-h: 36px;
+  --sidebar-space-gap: 2px;
   --content-pad-x: 24px;
   --content-pad-y: 24px;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
@@ -442,7 +449,7 @@ input:focus { border-color: var(--primary); }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   max-width: 560px;
 }
 
@@ -469,9 +476,9 @@ input:focus { border-color: var(--primary); }
 
 .empty-tabs-actions .btn-primary,
 .empty-tabs-actions button:not(.btn-primary) {
-  min-height: 36px;
+  min-height: 40px;
   padding: 0 16px;
-  border-radius: 10px;
+  border-radius: 999px;
 }
 
 .empty-tabs-actions button:not(.btn-primary) {
@@ -509,7 +516,7 @@ input:focus { border-color: var(--primary); }
 }
 
 .empty-home-templates-title {
-  margin: 0 0 12px;
+  margin: 0 0 16px;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-muted);
@@ -518,7 +525,7 @@ input:focus { border-color: var(--primary); }
 .empty-home-template-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
+  gap: 20px;
 }
 
 .empty-home-template-card {
@@ -527,8 +534,8 @@ input:focus { border-color: var(--primary); }
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  min-height: 148px;
-  padding: 16px 16px 18px;
+  min-height: 160px;
+  padding: 20px;
   text-align: left;
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -805,7 +812,7 @@ input:focus { border-color: var(--primary); }
 
 /* ===== Sidebar ===== */
 .sidebar {
-  width: 240px;
+  width: 260px;
   flex-shrink: 0;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border);
@@ -915,7 +922,7 @@ input:focus { border-color: var(--primary); }
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
+  padding: 8px 12px;
   cursor: pointer;
   font-size: 13px;
   margin: 0 4px;

@@ -8,8 +8,6 @@ export const EMPTY_HOME_SUBTITLE =
 export const EMPTY_HOME_STORAGE_HINT =
   '存储位置：uTools 本地数据库（设置 → 数据管理 可备份）'
 
-export const EMPTY_HOME_SIDEBAR_HINT = '侧边栏可管理所有文件夹与笔记'
-
 export const EMPTY_HOME_CREATE_LABEL = '新建文档'
 
 export const EMPTY_HOME_CREATE_FOLDER_LABEL = '新建文件夹'
