@@ -59,7 +59,7 @@ describe('editor tab empty state', () => {
     const noteCountBefore = store.noteList.length
     await flushPromises()
 
-    await wrapper.find('[data-testid="empty-tabs-state"] .btn-primary').trigger('click')
+    await wrapper.find('[data-testid="empty-home-create"]').trigger('click')
     await flushPromises()
 
     expect(store.noteList.length).toBe(noteCountBefore)
@@ -85,7 +85,7 @@ describe('editor tab empty state', () => {
     tabsStore.closeAllTabs({ save: false })
     await flushPromises()
 
-    await wrapper.find('[data-testid="empty-tabs-state"] .btn-primary').trigger('click')
+    await wrapper.find('[data-testid="empty-home-create"]').trigger('click')
     await flushPromises()
     await wrapper.findAll('.create-entry-kind-card')[1].trigger('click')
     await wrapper.find('.create-entry-input').setValue('子目录')
@@ -106,5 +106,49 @@ describe('editor tab empty state', () => {
     expect(settings.sidebarExpandedFolderIds).toEqual(
       expect.arrayContaining([parentFolder.id, createdFolder!.id])
     )
+  })
+
+  it('空首页侧栏按钮在关闭时可展开并写入设置', async () => {
+    localStorage.setItem('markflow_settings', JSON.stringify({
+      theme: 'light',
+      fontSize: 14,
+      editorFontFamily: 'monospace',
+      sidebarVisible: false,
+    }))
+
+    const wrapper = mount(App, { global: { stubs } })
+    const tabsStore = useEditorTabsStore()
+    tabsStore.closeAllTabs({ save: false })
+    await flushPromises()
+
+    expect(wrapper.find('.stub-sidebar').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="empty-home-open-sidebar"]').text()).toBe('从侧边栏打开')
+
+    await wrapper.find('[data-testid="empty-home-open-sidebar"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.stub-sidebar').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="empty-home-open-sidebar"]').text()).toBe('收起侧边栏')
+    expect(JSON.parse(localStorage.getItem('markflow_settings') ?? '{}').sidebarVisible).toBe(true)
+  })
+
+  it('空首页侧栏按钮在展开时可收起，连点两次回到原状态', async () => {
+    const wrapper = mount(App, { global: { stubs } })
+    const tabsStore = useEditorTabsStore()
+    tabsStore.closeAllTabs({ save: false })
+    await flushPromises()
+
+    expect(wrapper.find('.stub-sidebar').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="empty-home-open-sidebar"]').text()).toBe('收起侧边栏')
+
+    await wrapper.find('[data-testid="empty-home-open-sidebar"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.stub-sidebar').exists()).toBe(false)
+    expect(JSON.parse(localStorage.getItem('markflow_settings') ?? '{}').sidebarVisible).toBe(false)
+
+    await wrapper.find('[data-testid="empty-home-open-sidebar"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.stub-sidebar').exists()).toBe(true)
+    expect(JSON.parse(localStorage.getItem('markflow_settings') ?? '{}').sidebarVisible).toBe(true)
   })
 })

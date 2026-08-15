@@ -31,14 +31,16 @@
 
         <div class="workspace-editor-row">
           <div class="editor-stage">
-            <div v-if="!hasOpenTabs" data-testid="empty-tabs-state" class="empty-tabs-state">
-              <h2 class="empty-tabs-title">当前没有打开的笔记</h2>
-              <p class="empty-tabs-text">你可以新建一篇笔记，或者从侧边栏重新打开已有内容。</p>
-              <div class="empty-tabs-actions">
-                <button class="btn-primary" @click="createModalVisible = true">新建笔记</button>
-                <button @click="sidebarVisible = true">从侧边栏打开</button>
-              </div>
-            </div>
+            <EmptyHome
+              v-if="!hasOpenTabs"
+              :empty-library="store.noteList.length === 0"
+              :sidebar-visible="sidebarVisible"
+              @create="createModalVisible = true"
+              @import="onEmptyHomeImport"
+              @toggle-sidebar="sidebarVisible = !sidebarVisible"
+              @use-template="onUseTemplate"
+              @import-example="onImportExample"
+            />
 
             <template v-else-if="viewMode === 'live' || viewMode === 'focus'">
               <WysiwygEditor
@@ -74,8 +76,8 @@
     </div>
 
     <footer v-if="viewMode !== 'focus'" class="status-bar">
-      <span class="status-bar-left">{{ saveStatusText }}</span>
-      <span class="status-bar-right">{{ charCount }} 字</span>
+      <span class="status-bar-left">{{ hasOpenTabs ? saveStatusText : '就绪' }}</span>
+      <span v-if="hasOpenTabs" class="status-bar-right">{{ charCount }} 字</span>
     </footer>
 
     <ImageLightbox />
@@ -95,6 +97,15 @@
       @close="searchModalVisible = false"
       @select="onSearchSelect"
     />
+
+    <OnboardingCoach
+      :visible="onboardingVisible"
+      :step="onboardingStep"
+      :total="3"
+      @skip="dismissOnboarding"
+      @dismiss="dismissOnboarding"
+      @next="nextOnboarding"
+    />
   </div>
 </template>
 
@@ -111,6 +122,13 @@ import CreateEntryModal from './components/CreateEntryModal.vue'
 import SearchModal from './components/SearchModal.vue'
 import AppIcon from './components/AppIcon.vue'
 import EditorTabBar from './components/EditorTabBar.vue'
+import EmptyHome from './components/EmptyHome.vue'
+import OnboardingCoach from './components/OnboardingCoach.vue'
+import { useImportMarkdown } from './composables/useImportMarkdown'
+import { useOnboarding } from './composables/useOnboarding'
+import type { NoteTemplateId } from './constants/noteTemplates'
+import { importExampleLibrary } from './utils/exampleLibrary'
+import { createNoteFromTemplate } from './utils/createFromTemplate'
 import { useNoteStore } from './stores/note'
 import { useEditorTabsStore } from './stores/editorTabs'
 import { useTheme } from './composables/useTheme'
@@ -153,9 +171,15 @@ const sidebarVisible = ref(appSettings.get().sidebarVisible ?? true)
 const tocVisible = ref(false)
 const createModalVisible = ref(false)
 const searchModalVisible = ref(false)
+const { importMarkdownToActiveFolder } = useImportMarkdown()
 
 const showSidebar = computed(() => viewMode.value !== 'focus' && sidebarVisible.value)
 const hasOpenTabs = computed(() => tabsStore.tabs.length > 0)
+const emptyLibrary = computed(() => store.noteList.length === 0)
+const { visible: onboardingVisible, step: onboardingStep, dismiss: dismissOnboarding, next: nextOnboarding } = useOnboarding({
+  emptyLibrary,
+  hasOpenTabs,
+})
 const charCount = computed(() => store.liveContent.length || store.currentNote?.content.length || 0)
 
 const saveStatusText = computed(() => {
@@ -196,31 +220,42 @@ function toggleToc() {
   store.setTocVisible(tocVisible.value)
 }
 
-function handleCreated(payload: { kind: 'note' | 'folder'; id: string; parentId?: string }) {
-  createModalVisible.value = false
-  const activeFolderId = payload.kind === 'note' ? (payload.parentId ?? null) : payload.id
-  const expandTargetId = payload.kind === 'note' ? payload.parentId : payload.id
+function revealNoteInSidebar(noteId: string, folderId?: string) {
+  const activeFolderId = folderId ?? null
   const settings = appSettings.get()
   const nextExpandedFolderIds = new Set(settings.sidebarExpandedFolderIds ?? [])
 
-  if (expandTargetId) {
-    for (const id of collectAncestorFolderIds(expandTargetId, store.folderList)) nextExpandedFolderIds.add(id)
-    nextExpandedFolderIds.add(expandTargetId)
+  if (folderId) {
+    for (const id of collectAncestorFolderIds(folderId, store.folderList)) nextExpandedFolderIds.add(id)
+    nextExpandedFolderIds.add(folderId)
   }
 
   appSettings.save({
     sidebarActiveFolderId: activeFolderId,
     sidebarExpandedFolderIds: [...nextExpandedFolderIds],
   })
+  store.activeFolderId = activeFolderId
+  tabsStore.openTabForNewNote(noteId)
+}
+
+function handleCreated(payload: { kind: 'note' | 'folder'; id: string; parentId?: string }) {
+  createModalVisible.value = false
 
   if (payload.kind === 'note') {
-    store.activeFolderId = activeFolderId
-    tabsStore.openTabForNewNote(payload.id)
+    revealNoteInSidebar(payload.id, payload.parentId)
     return
   }
 
+  const settings = appSettings.get()
+  const nextExpandedFolderIds = new Set(settings.sidebarExpandedFolderIds ?? [])
+  for (const id of collectAncestorFolderIds(payload.id, store.folderList)) nextExpandedFolderIds.add(id)
+  nextExpandedFolderIds.add(payload.id)
+  appSettings.save({
+    sidebarActiveFolderId: payload.id,
+    sidebarExpandedFolderIds: [...nextExpandedFolderIds],
+  })
   sidebarVisible.value = true
-  store.activeFolderId = activeFolderId
+  store.activeFolderId = payload.id
 }
 
 watch(sidebarVisible, (visible) => {
@@ -275,6 +310,24 @@ function onSearchSelect(noteId: string) {
 
 function toggleSearchModal() {
   searchModalVisible.value = !searchModalVisible.value
+}
+
+async function onEmptyHomeImport() {
+  const imported = await importMarkdownToActiveFolder()
+  if (!imported) return
+  const note = store.currentNote
+  if (!note) return
+  revealNoteInSidebar(note.id, note.folderId)
+}
+
+function onUseTemplate(id: NoteTemplateId) {
+  const note = createNoteFromTemplate(id, store.activeFolderId ?? undefined)
+  if (!note) return
+  revealNoteInSidebar(note.id, note.folderId)
+}
+
+function onImportExample() {
+  importExampleLibrary()
 }
 
 function onKeydown(e: KeyboardEvent) {

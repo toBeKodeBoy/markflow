@@ -1,4 +1,5 @@
-export const WELCOME_NOTE_CONTENT = `# 欢迎使用 MarkFlow 👋
+export const WELCOME_NOTE_CONTENT = `<!-- markflow:tutorial -->
+# 欢迎使用 MarkFlow 👋
 
 > **MarkFlow** 是一款基于 uTools 的本地 Markdown 编辑器，随叫随到，专注写作。
 

@@ -1,5 +1,5 @@
 /**
- * UI 布局复刻架构约束（docs/plans/markflow-ui-layout-redesign-plan.md）
+ * UI 布局复刻架构约束（docs/plans/UI布局复刻方案.md）
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'

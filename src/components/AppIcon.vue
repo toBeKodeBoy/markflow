@@ -133,6 +133,26 @@
       <path d="M20 15v4h-4" />
       <path d="M9 12h6" />
     </template>
+    <template v-else-if="name === 'template-doc'">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6M8 13h8M8 17h8M8 9h2" />
+    </template>
+    <template v-else-if="name === 'template-book'">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    </template>
+    <template v-else-if="name === 'template-calendar'">
+      <path d="M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </template>
+    <template v-else-if="name === 'template-sparkle'">
+      <path d="M12 3l1.6 5.2L19 10l-5.4 1.8L12 17l-1.6-5.2L5 10l5.4-1.8L12 3z" />
+      <path d="M19 14l.7 2.1L22 17l-2.3.9L19 20l-.7-2.1L16 17l2.3-.9L19 14z" />
+    </template>
+    <template v-else-if="name === 'info'">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v6M12 8h.01" />
+    </template>
   </svg>
 </template>
 
@@ -173,6 +193,11 @@ export type AppIconName =
   | 'view-split'
   | 'view-source'
   | 'view-focus'
+  | 'template-doc'
+  | 'template-book'
+  | 'template-calendar'
+  | 'template-sparkle'
+  | 'info'
 
 withDefaults(
   defineProps<{
