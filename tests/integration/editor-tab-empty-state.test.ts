@@ -64,7 +64,7 @@ describe('editor tab empty state', () => {
 
     expect(store.noteList.length).toBe(noteCountBefore)
     expect(wrapper.text()).toContain('新建内容')
-    expect(wrapper.text()).toContain('新建文件')
+    expect(wrapper.find('.create-entry-kind-card.active').text()).toContain('新建文件')
   })
 
   it('persists sidebar selection and expansion when creating from empty state with sidebar closed', async () => {
@@ -108,7 +108,44 @@ describe('editor tab empty state', () => {
     )
   })
 
-  it('空首页侧栏按钮在关闭时可展开并写入设置', async () => {
+  it('opens the unified create modal as folder from empty state instead of creating immediately', async () => {
+    const wrapper = mount(App, { global: { stubs } })
+    const tabsStore = useEditorTabsStore()
+    const store = useNoteStore()
+
+    tabsStore.closeAllTabs({ save: false })
+    const noteCountBefore = store.noteList.length
+    const folderCountBefore = store.folderList.length
+    await flushPromises()
+
+    await wrapper.find('[data-testid="empty-home-create-folder"]').trigger('click')
+    await flushPromises()
+
+    expect(store.noteList.length).toBe(noteCountBefore)
+    expect(store.folderList.length).toBe(folderCountBefore)
+    expect(wrapper.text()).toContain('新建内容')
+    expect(wrapper.find('.create-entry-kind-card.active').text()).toContain('新建文件夹')
+  })
+
+  it('取消新建文件夹后再点新建文档，弹窗 kind 回到 note', async () => {
+    const wrapper = mount(App, { global: { stubs } })
+    const tabsStore = useEditorTabsStore()
+    tabsStore.closeAllTabs({ save: false })
+    await flushPromises()
+
+    await wrapper.find('[data-testid="empty-home-create-folder"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.create-entry-kind-card.active').text()).toContain('新建文件夹')
+
+    await wrapper.find('.create-entry-overlay').trigger('click')
+    await flushPromises()
+
+    await wrapper.find('[data-testid="empty-home-create"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.create-entry-kind-card.active').text()).toContain('新建文件')
+  })
+
+  it('顶栏汉堡在空首页关闭时可展开并写入设置', async () => {
     localStorage.setItem('markflow_settings', JSON.stringify({
       theme: 'light',
       fontSize: 14,
@@ -122,31 +159,30 @@ describe('editor tab empty state', () => {
     await flushPromises()
 
     expect(wrapper.find('.stub-sidebar').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="empty-home-open-sidebar"]').text()).toBe('从侧边栏打开')
+    expect(wrapper.find('[data-testid="empty-home-open-sidebar"]').exists()).toBe(false)
 
-    await wrapper.find('[data-testid="empty-home-open-sidebar"]').trigger('click')
+    await wrapper.find('[aria-label="切换侧边栏"]').trigger('click')
     await flushPromises()
 
     expect(wrapper.find('.stub-sidebar').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="empty-home-open-sidebar"]').text()).toBe('收起侧边栏')
     expect(JSON.parse(localStorage.getItem('markflow_settings') ?? '{}').sidebarVisible).toBe(true)
   })
 
-  it('空首页侧栏按钮在展开时可收起，连点两次回到原状态', async () => {
+  it('顶栏汉堡在空首页可收起，连点两次回到原状态', async () => {
     const wrapper = mount(App, { global: { stubs } })
     const tabsStore = useEditorTabsStore()
     tabsStore.closeAllTabs({ save: false })
     await flushPromises()
 
     expect(wrapper.find('.stub-sidebar').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="empty-home-open-sidebar"]').text()).toBe('收起侧边栏')
+    expect(wrapper.find('[data-testid="empty-home-open-sidebar"]').exists()).toBe(false)
 
-    await wrapper.find('[data-testid="empty-home-open-sidebar"]').trigger('click')
+    await wrapper.find('[aria-label="切换侧边栏"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('.stub-sidebar').exists()).toBe(false)
     expect(JSON.parse(localStorage.getItem('markflow_settings') ?? '{}').sidebarVisible).toBe(false)
 
-    await wrapper.find('[data-testid="empty-home-open-sidebar"]').trigger('click')
+    await wrapper.find('[aria-label="切换侧边栏"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('.stub-sidebar').exists()).toBe(true)
     expect(JSON.parse(localStorage.getItem('markflow_settings') ?? '{}').sidebarVisible).toBe(true)

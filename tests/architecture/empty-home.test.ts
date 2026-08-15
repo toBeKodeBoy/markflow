@@ -31,24 +31,36 @@ describe('空白首页架构约束', () => {
 
   it('侧栏应展示 uTools 本地数据库说明而非伪造路径', () => {
     const sidebar = readSrc('src/components/Sidebar.vue')
-    expect(sidebar).toMatch(/sidebar-storage-caption/)
+    const footer = readSrc('src/components/sidebar/SidebarFooter.vue')
+    expect(sidebar + footer).toMatch(/sidebar-storage-caption/)
     expect(sidebar).toMatch(/SIDEBAR_STORAGE_CAPTION/)
   })
 
   it('App.vue 应挂载 EmptyHome，且无打开 Tab 时不渲染字数', () => {
     const app = readSrc('src/App.vue')
     expect(app).toMatch(/EmptyHome/)
-    expect(app).toMatch(/v-if="hasOpenTabs"[\s\S]*status-bar-right|status-bar-right[\s\S]*v-if="hasOpenTabs"/)
+    expect(app).toMatch(/v-if="isEditorView"[\s\S]*status-bar-right|status-bar-right[\s\S]*v-if="isEditorView"/)
   })
 
-  it('空首页侧栏按钮应与汉堡共用 toggle，不得单向打开', () => {
-    const app = readSrc('src/App.vue')
+  it('首页与空态常量不得出现产品名词「知识库」，且无侧栏开关', () => {
+    const copy = readSrc('src/constants/emptyHomeCopy.ts')
     const emptyHome = readSrc('src/components/EmptyHome.vue')
-    expect(app).toMatch(/:sidebar-visible="sidebarVisible"/)
-    expect(app).toMatch(/@toggle-sidebar="sidebarVisible = !sidebarVisible"/)
-    expect(app).not.toMatch(/@open-sidebar="sidebarVisible = true"/)
-    expect(emptyHome).toMatch(/toggleSidebar/)
-    expect(emptyHome).not.toMatch(/openSidebar/)
+    expect(copy).not.toMatch(/知识库/)
+    expect(emptyHome).not.toMatch(/知识库/)
+    expect(emptyHome).not.toMatch(/toggleSidebar|empty-home-open-sidebar|openSidebar/)
+    expect(emptyHome).toMatch(/empty-home-create-folder/)
+    expect(emptyHome).toMatch(/createFolder/)
+    expect(copy).toMatch(/EMPTY_HOME_CREATE_FOLDER_LABEL/)
+  })
+
+  it('侧栏显隐仅由顶栏汉堡负责，首页不再绑定开关', () => {
+    const app = readSrc('src/App.vue')
+    const toolbar = readSrc('src/components/Toolbar.vue')
+    expect(toolbar).toMatch(/toggleSidebar/)
+    expect(app).toMatch(/@toggleSidebar="sidebarVisible = !sidebarVisible"/)
+    expect(app).not.toMatch(/:sidebar-visible="sidebarVisible"/)
+    expect(app).not.toMatch(/@toggle-sidebar="sidebarVisible = !sidebarVisible"/)
+    expect(app).toMatch(/@create-folder=/)
   })
 
   it('src/constants 与 src/components 不得出现伪造 Documents 路径', () => {

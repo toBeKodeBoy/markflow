@@ -17,7 +17,7 @@ describe('A1 顶栏搜索入口与 App 同源', () => {
   const appSrc = readSrc('src/App.vue')
 
   it('Toolbar 应提供可见搜索按钮并声明 openSearch 事件', () => {
-    expect(toolbarSrc).toMatch(/data-testid=["']toolbar-search-btn["']/)
+    expect(toolbarSrc).toMatch(/data-testid=["']toolbar-search-bar["']/)
     expect(toolbarSrc).toMatch(/openSearch/)
     expect(toolbarSrc).toMatch(/aria-label=["']搜索笔记["']/)
   })

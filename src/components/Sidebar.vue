@@ -1,5 +1,17 @@
 <template>
   <aside class="sidebar" :style="{ width: sidebarWidth + 'px' }">
+    <SidebarBrand
+      @create-note="openCreateModal('note', activeSpaceId ?? undefined)"
+      @navigate-home="workspace.showHome()"
+    />
+    <SidebarNav :active="activeNav" :trash-count="trashCount" @select="onNavSelect" />
+    <SidebarSpaces
+      :spaces="spaceFolders"
+      :active-space-id="activeSpaceId"
+      @select="selectSpace"
+      @create-space="openCreateModal('folder', undefined, true)"
+    />
+
     <!-- 侧栏工具栏：折叠/展开 -->
     <div class="sidebar-toolbar">
       <button class="sidebar-toolbar-btn" @click="collapseAllFolders" title="全部折叠">折叠</button>
@@ -11,18 +23,6 @@
       <span class="batch-count">已选 {{ selectedNoteIds.size }} 篇</span>
       <button class="batch-btn" @click="startBatchMove">移动到</button>
       <button class="batch-btn" @click="clearSelection">取消选择</button>
-    </div>
-
-    <div v-if="store.activeFolderId" class="sidebar-scope-bar">
-      <button
-        type="button"
-        class="sidebar-scope-reset"
-        data-testid="sidebar-clear-folder-filter"
-        @click="clearActiveFolder"
-      >
-        返回全部
-      </button>
-      <span class="sidebar-scope-label">{{ activeFolderLabel }}</span>
     </div>
 
     <div class="sidebar-section folders-section">
@@ -278,27 +278,24 @@
       @created="handleCreateEntry"
     />
 
-    <!-- 回收站入口按钮 -->
-    <div class="sidebar-bottom-bar">
-      <button 
-        @click="showTrashPanel = !showTrashPanel" 
-        class="sidebar-bottom-btn trash-btn"
-        :class="{ 'has-items': trashCount > 0 }"
-        title="回收站"
-      >
-        <AppIcon name="trash" class="sidebar-bottom-icon" />
-        <span v-if="trashCount > 0" class="trash-badge">{{ trashCount }}</span>
-        <span class="trash-label">回收站</span>
-      </button>
-      <p data-testid="sidebar-storage-caption" class="sidebar-storage-caption">{{ SIDEBAR_STORAGE_CAPTION }}</p>
-    </div>
+    <SidebarFooter :caption="SIDEBAR_STORAGE_CAPTION" @open-settings="settingsModalVisible = true" />
 
-    <!-- 回收站面板 -->
-    <TrashPanel 
-      v-if="showTrashPanel" 
-      :visible="true" 
-      @close="showTrashPanel = false"
+    <SettingsModal
+      :visible="settingsModalVisible"
+      @confirm="onSidebarSettingsConfirm"
+      @cancel="settingsModalVisible = false"
+      @import-folder="onSidebarSettingsImportFolder"
+      @backup-restored="settingsModalVisible = false"
+      @library-cleared="settingsModalVisible = false"
     />
+
+    <ImportFolderModal
+      :visible="importFolderVisible"
+      :scan="importFolderScan"
+      @cancel="closeImportFolder"
+      @done="closeImportFolder"
+    />
+
   </aside>
 </template>
 
@@ -306,6 +303,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useNoteStore } from '../stores/note'
 import { useEditorTabsStore } from '../stores/editorTabs'
+import { useWorkspaceStore } from '../stores/workspace'
 import { showAppNotification } from '../utils/notify'
 import {
   flattenFolderTree,
@@ -324,8 +322,16 @@ import {
 import { buildTreeIndex } from '../utils/treeIndex'
 import CreateEntryModal from './CreateEntryModal.vue'
 import SidebarTreeRowView from './SidebarTreeRow.vue'
-import TrashPanel from './TRashPanel.vue'
-import AppIcon from './AppIcon.vue'
+import SettingsModal from './SettingsModal.vue'
+import ImportFolderModal from './ImportFolderModal.vue'
+import { pickFolderScan } from '../utils/importFolderDevScan'
+import type { AppSettings, ImportFolderScanResult } from '../types'
+import SidebarBrand from './sidebar/SidebarBrand.vue'
+import SidebarNav from './sidebar/SidebarNav.vue'
+import SidebarSpaces from './sidebar/SidebarSpaces.vue'
+import SidebarFooter from './sidebar/SidebarFooter.vue'
+import type { SidebarNavId } from './sidebar/types'
+import { useTheme } from '../composables/useTheme'
 import { useAppSettings, clampSidebarWidth } from '../composables/useAppSettings'
 import { useNoteSort } from '../composables/useNoteSort'
 import { sortNotes } from '../utils/noteSort'
@@ -341,8 +347,24 @@ const VIRTUAL_BUFFER = 8
 // 模板中使用：根目录对外统一展示为「我的文件夹」
 const myFolderName = MY_FOLDER_NAME
 
+const emit = defineEmits<{
+  navigateHome: []
+}>()
+
 const store = useNoteStore()
 const tabsStore = useEditorTabsStore()
+const workspace = useWorkspaceStore()
+const theme = useTheme()
+const activeNav = computed<SidebarNavId>(() => {
+  if (workspace.view === 'home') return 'home'
+  if (workspace.view === 'trash') return 'trash'
+  return 'docs'
+})
+const activeSpaceId = ref<string | null>(null)
+const settingsModalVisible = ref(false)
+const importFolderVisible = ref(false)
+const importFolderScan = ref<ImportFolderScanResult | null>(null)
+const spaceFolders = computed(() => store.folderList.filter((folder) => !folder.parentId))
 
 function openNoteTab(noteId: string) {
   // 普通点击：清空多选并打开笔记
@@ -359,10 +381,8 @@ const scrollTop = ref(0)
 const createModalVisible = ref(false)
 const createModalKind = ref<'note' | 'folder'>('folder')
 const createModalDefaultParentId = ref<string | undefined>(undefined)
-const createModalLockedParentId = ref<string | undefined>(undefined)
+const createModalLockedParentId = ref<string | null | undefined>(undefined)
 
-// 回收站相关
-const showTrashPanel = ref(false)
 // 修复（R6 遗留）：角标同时统计回收站中的笔记与文件夹数量
 // 依赖 trashVersion：存储层数据非响应式，需通过版本号触发重新计算
 const trashCount = computed(() => {
@@ -428,19 +448,22 @@ const baseSidebarRows = computed(() =>
   flattenSidebarTree(store.folderList, store.searchedNoteList, expandedFolderIds.value, {
     hideEmptyFolders: isSearching.value,
     index: treeIndex.value,
-    pinnedFolderIds: pinnedFolderIds.value,
+    pinnedFolderIds: activeSpaceId.value ? undefined : pinnedFolderIds.value,
+    rootFolderId: activeSpaceId.value ?? undefined,
   })
 )
 
 const sidebarRows = computed(() => {
   const base = baseSidebarRows.value
   const recent = recentNotes.value
-  // 「我的文件夹」虚拟容器：包裹所有真实文件夹/笔记，与「最新」同级
-  const myFolderRows = wrapWithMyFolder(
-    base,
-    expandedFolderIds.value.has(MY_FOLDER_ID),
-    store.searchedNoteList.length
-  )
+  // 「我的文件夹」虚拟容器：仅「我的空间」包裹全部真实文件夹/笔记
+  const myFolderRows = activeSpaceId.value
+    ? base
+    : wrapWithMyFolder(
+        base,
+        expandedFolderIds.value.has(MY_FOLDER_ID),
+        store.searchedNoteList.length
+      )
 
   if (isSearching.value && recent.length === 0) {
     return myFolderRows
@@ -494,12 +517,7 @@ const showTreeEmpty = computed(() => {
 
 const emptyTip = computed(() => {
   if (isSearching.value) return '无匹配笔记'
-  return '暂无笔记，点击顶栏「新建」'
-})
-
-const activeFolderLabel = computed(() => {
-  if (!store.activeFolderId) return ''
-  return getFolderPathLabel(store.folderList, store.activeFolderId) || '未知文件夹'
+  return '暂无笔记，点击「新建文档」'
 })
 
 const moveFolderRows = computed(() =>
@@ -526,9 +544,52 @@ function persistSidebarState() {
   })
 }
 
-function clearActiveFolder() {
-  store.activeFolderId = null
+function selectSpace(id: string | null) {
+  activeSpaceId.value = id
+  store.activeFolderId = id
+  if (id) {
+    const next = new Set(expandedFolderIds.value)
+    next.add(id)
+    expandedFolderIds.value = next
+  }
+  if (workspace.view === 'trash') workspace.showDocs(tabsStore.tabs.length > 0)
   persistSidebarState()
+}
+
+function onNavSelect(id: SidebarNavId) {
+  if (id === 'trash') {
+    workspace.showTrash()
+    return
+  }
+  if (id === 'home') {
+    workspace.showHome()
+    emit('navigateHome')
+    return
+  }
+  workspace.showDocs(tabsStore.tabs.length > 0)
+}
+
+function onSidebarSettingsConfirm(settings: AppSettings) {
+  settingsModalVisible.value = false
+  theme.setTheme(settings.theme)
+  appSettings.save({
+    fontSize: settings.fontSize,
+    editorFontFamily: settings.editorFontFamily,
+    imageExport: settings.imageExport,
+  })
+}
+
+async function onSidebarSettingsImportFolder() {
+  settingsModalVisible.value = false
+  const scan = await pickFolderScan()
+  if (!scan) return
+  importFolderScan.value = scan
+  importFolderVisible.value = true
+}
+
+function closeImportFolder() {
+  importFolderVisible.value = false
+  importFolderScan.value = null
 }
 
 function onTreeScroll(e: Event) {
@@ -539,7 +600,7 @@ function openCreateModal(kind: 'note' | 'folder', parentId?: string, locked = fa
   folderContextMenu.value = null
   createModalKind.value = kind
   createModalDefaultParentId.value = parentId ?? store.activeFolderId ?? undefined
-  createModalLockedParentId.value = locked ? parentId : undefined
+  createModalLockedParentId.value = locked ? parentId ?? null : undefined
   createModalVisible.value = true
 }
 
@@ -559,6 +620,8 @@ function handleCreateEntry(payload: { kind: 'note' | 'folder'; id: string; paren
   }
 
   store.activeFolderId = payload.id
+  const created = store.folderList.find((folder) => folder.id === payload.id)
+  if (created && !created.parentId) activeSpaceId.value = created.id
   const next = new Set(expandedFolderIds.value)
   for (const id of collectAncestorFolderIds(payload.id, store.folderList)) next.add(id)
   next.add(payload.id)
@@ -609,8 +672,6 @@ function commitRenameFolder() {
 
 function openFolderContextMenu(e: MouseEvent, folderId: string) {
   if (isVirtualFolder(folderId)) return
-  // 修复：打开右键菜单时关闭回收站面板，避免遮罩层拦截菜单点击
-  showTrashPanel.value = false
   noteContextMenu.value = null
   folderContextMenu.value = { folderId, x: e.clientX, y: e.clientY }
 }
@@ -666,8 +727,6 @@ function closeMoveFolderModal() {
 }
 
 function openNoteContextMenu(e: MouseEvent, noteId: string) {
-  // 修复：打开右键菜单时关闭回收站面板，避免遮罩层拦截菜单点击
-  showTrashPanel.value = false
   folderContextMenu.value = null
   noteContextMenu.value = { noteId, x: e.clientX, y: e.clientY }
 }

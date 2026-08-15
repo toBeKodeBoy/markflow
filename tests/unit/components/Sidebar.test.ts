@@ -6,6 +6,7 @@ import { resolve } from 'node:path'
 import Sidebar from '../../../src/components/Sidebar.vue'
 import { useNoteStore } from '../../../src/stores/note'
 import { useEditorTabsStore } from '../../../src/stores/editorTabs'
+import { useWorkspaceStore } from '../../../src/stores/workspace'
 import { RECENT_FOLDER_ID } from '../../../src/constants/recentFolder'
 import { useAppSettings } from '../../../src/composables/useAppSettings'
 
@@ -121,23 +122,145 @@ describe('Sidebar', () => {
     expect(wrapper.text()).toContain('根笔记')
   })
 
-  it('provides a lightweight way to clear the active folder filter', async () => {
+  it('renders shell chrome: logo, create CTA, nav and spaces', async () => {
     const store = useNoteStore()
-    const folder = store.createFolder('项目文档')
-    store.createNoteWithContent('# 根笔记\n')
-    store.activeFolderId = folder.id
-    store.createNoteWithContent('# 文件夹笔记\n', { folderId: folder.id })
+    store.createFolder('项目文档')
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="sidebar-brand"]').text()).toContain('MarkFlow')
+    expect(wrapper.find('[data-testid="sidebar-create-note"]').text()).toContain('新建文档')
+    const nav = wrapper.get('[data-testid="sidebar-nav"]')
+    expect(nav.text()).toContain('首页')
+    expect(nav.text()).toContain('文档')
+    expect(nav.text()).toContain('回收站')
+    expect(nav.text()).not.toContain('知识库')
+    expect(nav.text()).not.toContain('标签')
+    expect(wrapper.get('[data-testid="sidebar-spaces"]').text()).toContain('空间')
+    expect(wrapper.get('[data-testid="sidebar-space-my"]').text()).toContain('我的空间')
+    expect(wrapper.get('[data-testid="sidebar-spaces"]').text()).toContain('项目文档')
+    expect(wrapper.find('.sidebar-bottom-bar .trash-btn').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sidebar-settings"]').exists()).toBe(true)
+  })
+
+  it('selecting a space filters the tree to that subtree', async () => {
+    const store = useNoteStore()
+    const spaceA = store.createFolder('空间A')
+    const spaceB = store.createFolder('空间B')
+    store.createNoteWithContent('# A笔记\n', { folderId: spaceA.id })
+    store.createNoteWithContent('# B笔记\n', { folderId: spaceB.id })
 
     const wrapper = mountSidebar()
     await flushPromises()
 
-    const clearButton = wrapper.get('[data-testid="sidebar-clear-folder-filter"]')
-    await clearButton.trigger('click')
+    const spaceButtons = wrapper.findAll('[data-testid="sidebar-space-item"]')
+    const spaceABtn = spaceButtons.find((btn) => btn.text().includes('空间A'))
+    expect(spaceABtn).toBeTruthy()
+    await spaceABtn!.trigger('click')
+    await flushPromises()
+
+    expect(store.activeFolderId).toBe(spaceA.id)
+    expect(wrapper.text()).toContain('A笔记')
+    expect(wrapper.text()).not.toContain('B笔记')
+  })
+
+  it('selecting 我的空间 clears the space filter and shows all notes', async () => {
+    const store = useNoteStore()
+    const spaceA = store.createFolder('空间A')
+    store.createNoteWithContent('# 根笔记\n')
+    store.createNoteWithContent('# A笔记\n', { folderId: spaceA.id })
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    const spaceABtn = wrapper
+      .findAll('[data-testid="sidebar-space-item"]')
+      .find((btn) => btn.text().includes('空间A'))
+    await spaceABtn!.trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('根笔记')
+
+    await wrapper.get('[data-testid="sidebar-space-my"]').trigger('click')
     await flushPromises()
 
     expect(store.activeFolderId).toBe(null)
     expect(wrapper.text()).toContain('根笔记')
-    expect(wrapper.find('[data-testid="sidebar-clear-folder-filter"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('A笔记')
+  })
+
+  it('creating a top-level folder from spaces + selects that space', async () => {
+    const store = useNoteStore()
+    const other = store.createFolder('其他空间')
+    store.createNoteWithContent('# 其他笔记\n', { folderId: other.id })
+
+    const wrapper = mount(Sidebar, {
+      global: {
+        plugins: [pinia],
+        stubs: {
+          Teleport: true,
+          AppIcon: true,
+          SettingsModal: true,
+          ImportFolderModal: true,
+          SidebarTreeRowView: {
+            props: ['row'],
+            template: `
+              <div class="sidebar-row-stub" :data-kind="row.kind">
+                {{ row.kind === 'folder' ? row.folder.name : row.note.title }}
+              </div>
+            `,
+          },
+        },
+      },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="sidebar-space-add"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('.create-entry-input').setValue('新空间')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    const created = store.folderList.find((folder) => folder.name === '新空间')
+    expect(created).toBeTruthy()
+    expect(created?.parentId).toBeUndefined()
+    expect(store.activeFolderId).toBe(created!.id)
+    expect(
+      wrapper.findAll('[data-testid="sidebar-space-item"]').find((btn) => btn.text().includes('新空间'))?.classes(),
+    ).toContain('active')
+    expect(wrapper.findAll('.sidebar-row-stub').some((row) => row.text().includes('其他笔记'))).toBe(false)
+  })
+
+  it('spaces + opens the create modal without writing a folder', async () => {
+    const store = useNoteStore()
+    const folderCountBefore = store.folderList.length
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="sidebar-space-add"]').trigger('click')
+    await flushPromises()
+
+    expect(store.folderList.length).toBe(folderCountBefore)
+    expect(wrapper.text()).toContain('新建内容')
+  })
+
+  it('trash nav opens the existing trash panel and keeps the badge', async () => {
+    const store = useNoteStore()
+    const note = store.createNoteWithContent('# 待删笔记\n')
+    const folder = store.createFolder('待删文件夹')
+    store.softDeleteNote(note.id)
+    store.softDeleteFolder(folder.id)
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    const badge = wrapper.find('.trash-badge')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toBe('2')
+
+    await wrapper.get('[data-testid="sidebar-nav-trash"]').trigger('click')
+    await flushPromises()
+    expect(useWorkspaceStore().view).toBe('trash')
+    expect(wrapper.find('.trash-panel-modal, .trash-overlay').exists()).toBe(false)
   })
 
   it('keeps empty state guidance pointing to the topbar create action', async () => {
@@ -443,16 +566,18 @@ describe('Sidebar', () => {
     await findFolderRow(wrapper, '我的文件夹')!.find('.folder-click-trigger').trigger('click')
     await flushPromises()
 
-    // 折叠后真实文件夹与根笔记隐藏，「最新」区不受影响
-    expect(wrapper.text()).not.toContain('工作区')
-    expect(wrapper.text()).not.toContain('根笔记')
-    expect(wrapper.text()).toContain('最新')
+    // 折叠后真实文件夹与根笔记从树中隐藏；空间列表仍可显示顶层名
+    const treeText = wrapper.findAll('.sidebar-row-stub').map((row) => row.text()).join('\n')
+    expect(treeText).not.toContain('工作区')
+    expect(treeText).not.toContain('根笔记')
+    expect(treeText).toContain('最新')
 
     await wrapper.unmount()
 
     const wrapper2 = mountSidebar()
     await flushPromises()
-    expect(wrapper2.text()).not.toContain('工作区')
+    const remountTreeText = wrapper2.findAll('.sidebar-row-stub').map((row) => row.text()).join('\n')
+    expect(remountTreeText).not.toContain('工作区')
   })
 
   it('expands my-folder once for legacy users whose saved state lacks the container id', async () => {
@@ -476,7 +601,8 @@ describe('Sidebar', () => {
 
     const wrapper2 = mountSidebar()
     await flushPromises()
-    expect(wrapper2.text()).not.toContain('工作区')
+    const remountTreeText = wrapper2.findAll('.sidebar-row-stub').map((row) => row.text()).join('\n')
+    expect(remountTreeText).not.toContain('工作区')
   })
 
   it('dropping a folder onto my-folder container moves it to root', async () => {

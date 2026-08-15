@@ -89,6 +89,7 @@ describe('empty home templates and tutorial', () => {
     const wrapper = mount(App, { global: { stubs } })
     const store = useNoteStore()
 
+    await wrapper.find('[data-testid="toolbar-overflow-btn"]').trigger('click')
     await wrapper.find('[data-testid="toolbar-tutorial-btn"]').trigger('click')
     await flushPromises()
     expect(store.noteList).toHaveLength(1)
@@ -96,6 +97,7 @@ describe('empty home templates and tutorial', () => {
 
     useEditorTabsStore().closeAllTabs({ save: false })
     await flushPromises()
+    await wrapper.find('[data-testid="toolbar-overflow-btn"]').trigger('click')
     await wrapper.find('[data-testid="toolbar-tutorial-btn"]').trigger('click')
     await flushPromises()
 

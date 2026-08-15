@@ -20,13 +20,29 @@
 
       </button>
 
-      <div class="app-logo">
+      <button
+        type="button"
+        class="btn-icon"
+        data-testid="toolbar-history-back"
+        title="后退"
+        aria-label="后退"
+        :disabled="!canGoBack"
+        @click="goBack()"
+      >
+        <AppIcon name="chevron-left" :size="16" />
+      </button>
 
-        <span class="logo-icon">M↓</span>
-
-        <span class="logo-name">MarkFlow</span>
-
-      </div>
+      <button
+        type="button"
+        class="btn-icon"
+        data-testid="toolbar-history-forward"
+        title="前进"
+        aria-label="前进"
+        :disabled="!canGoForward"
+        @click="goForward()"
+      >
+        <AppIcon name="chevron-right" :size="16" />
+      </button>
 
       <div v-if="store.currentNote && folderPath" class="note-context">
         <div class="note-context-path">{{ folderPath }}</div>
@@ -34,72 +50,70 @@
 
     </div>
 
-
+    <div class="topbar-center">
+      <button
+        type="button"
+        class="toolbar-search-bar"
+        data-testid="toolbar-search-bar"
+        data-onboarding="search"
+        title="搜索笔记（Ctrl/Cmd+K）"
+        aria-label="搜索笔记"
+        @click="$emit('openSearch')"
+      >
+        <AppIcon name="search" :size="16" />
+        <span>搜索笔记</span>
+      </button>
+    </div>
 
     <div class="topbar-right">
-
-      <button class="btn-primary btn-action" data-onboarding="create" @click="openCreateModal('note')" title="新建笔记" aria-label="新建笔记">
-
-        <AppIcon name="plus" :size="14" />
-
-        <span class="btn-action-label">新建</span>
-
-      </button>
-
-
 
       <button
 
         class="btn-icon btn-icon-text"
 
-        data-testid="toolbar-search-btn"
-        data-onboarding="search"
+        :class="{ active: tocVisible }"
 
-        title="搜索笔记（Ctrl/Cmd+K）"
+        @click="$emit('toggleToc')"
 
-        aria-label="搜索笔记"
+        title="目录"
 
-        @click="$emit('openSearch')"
+        aria-label="目录"
 
       >
 
-        <AppIcon name="search" :size="16" />
+        <AppIcon name="toc" :size="16" />
 
-        <span class="btn-icon-label">搜索</span>
+        <span class="btn-icon-label">目录</span>
 
       </button>
 
-
-
-      <div class="import-menu-wrap" ref="fileMenuRef">
+      <div class="import-menu-wrap" ref="overflowMenuRef">
 
         <button
 
-          class="btn-icon btn-icon-text"
+          class="btn-icon"
 
-          data-testid="toolbar-file-btn"
+          data-testid="toolbar-overflow-btn"
 
-          :class="{ active: fileMenuOpen }"
+          :class="{ active: overflowOpen }"
 
-          @click="toggleFileMenu"
+          @click="toggleOverflowMenu"
 
-          title="文件操作"
+          title="更多"
 
-          aria-label="文件操作"
+          aria-label="更多"
 
           aria-haspopup="menu"
 
-          :aria-expanded="fileMenuOpen"
+          :aria-expanded="overflowOpen"
 
         >
 
-          <AppIcon name="file-menu" :size="16" />
-
-          <span class="btn-icon-label">文件</span>
+          <AppIcon name="more" :size="16" />
 
         </button>
 
-        <div v-if="fileMenuOpen" class="import-dropdown file-dropdown" role="menu">
+        <div v-if="overflowOpen" class="import-dropdown file-dropdown" role="menu">
 
           <button type="button" role="menuitem" :disabled="!store.currentNote" @click="exportNote">
 
@@ -129,47 +143,20 @@
 
           <button type="button" role="menuitem" @click="openImportFolder">导入文件夹</button>
 
+          <div class="dropdown-divider" role="separator" />
+
+          <button
+            type="button"
+            role="menuitem"
+            data-testid="toolbar-tutorial-btn"
+            @click="openTutorial"
+          >
+            新手教程
+          </button>
+
         </div>
 
       </div>
-
-
-
-      <button
-
-        class="btn-icon btn-icon-text"
-
-        :class="{ active: tocVisible }"
-
-        @click="$emit('toggleToc')"
-
-        title="目录"
-
-        aria-label="目录"
-
-      >
-
-        <AppIcon name="toc" :size="16" />
-
-        <span class="btn-icon-label">目录</span>
-
-      </button>
-
-      <button
-        class="btn-icon btn-icon-text"
-        data-testid="toolbar-tutorial-btn"
-        title="新手教程"
-        aria-label="新手教程"
-        @click="openTutorial"
-      >
-        <span class="btn-icon-label">新手教程</span>
-      </button>
-
-      <button class="btn-icon" @click="openSettings" title="设置" aria-label="设置">
-
-        <AppIcon name="settings" :size="16" />
-
-      </button>
 
     </div>
 
@@ -191,24 +178,6 @@
 
 
 
-  <SettingsModal
-
-    :visible="settingsModalVisible"
-
-    @confirm="onSettingsConfirm"
-
-    @cancel="settingsModalVisible = false"
-
-    @import-folder="onSettingsImportFolder"
-
-    @backup-restored="onBackupRestored"
-
-    @library-cleared="onLibraryCleared"
-
-  />
-
-
-
   <ImportFolderModal
 
     :visible="importFolderVisible"
@@ -219,16 +188,6 @@
 
     @done="closeImportFolder"
 
-  />
-
-  <CreateEntryModal
-    :visible="createModalVisible"
-    :default-kind="createModalKind"
-    :default-parent-id="store.activeFolderId ?? undefined"
-    :folders="store.folderList"
-    :active-folder-id="store.activeFolderId"
-    @cancel="createModalVisible = false"
-    @created="handleCreated"
   />
 
 </template>
@@ -242,28 +201,22 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useNoteStore } from '../stores/note'
 import { useEditorTabsStore } from '../stores/editorTabs'
 
-import { useTheme } from '../composables/useTheme'
-
 import { exportPdf, pdfExporting, sanitizeFilename } from '../utils/exportPdf'
 import { DEFAULT_IMAGE_EXPORT_SETTINGS, exportMarkdownAssets } from '../utils/exportMarkdownAssets'
 import { resolveImageExportTarget } from '../utils/imageExportPath'
 
-import { showAppNotification } from '../utils/notify'
-
 import { pickFolderScan } from '../utils/importFolderDevScan'
 
-import { collectAncestorFolderIds, getFolderPathLabel } from '../utils/folderTree'
+import { getFolderPathLabel } from '../utils/folderTree'
 
 import PdfExportModal from './PdfExportModal.vue'
 
-import SettingsModal from './SettingsModal.vue'
-
 import ImportFolderModal from './ImportFolderModal.vue'
-import CreateEntryModal from './CreateEntryModal.vue'
 
 import AppIcon from './AppIcon.vue'
 
-import type { AppSettings, ImportFolderScanResult, PdfExportOptions } from '../types'
+import type { ImportFolderScanResult, PdfExportOptions } from '../types'
+import { useNoteHistory } from '../composables/useNoteHistory'
 
 import { useAppSettings } from '../composables/useAppSettings'
 import { useImportMarkdown } from '../composables/useImportMarkdown'
@@ -279,24 +232,19 @@ defineEmits<{ toggleSidebar: []; toggleToc: []; openSearch: [] }>()
 const store = useNoteStore()
 const tabsStore = useEditorTabsStore()
 const { importMarkdownToActiveFolder } = useImportMarkdown()
-
-const theme = useTheme()
+const { canGoBack, canGoForward, goBack, goForward } = useNoteHistory()
 
 const appSettings = useAppSettings()
 
 const pdfModalVisible = ref(false)
 
-const settingsModalVisible = ref(false)
-
-const fileMenuOpen = ref(false)
+const overflowOpen = ref(false)
 
 const importFolderVisible = ref(false)
-const createModalVisible = ref(false)
-const createModalKind = ref<'note' | 'folder'>('note')
 
 const importFolderScan = ref<ImportFolderScanResult | null>(null)
 
-const fileMenuRef = ref<HTMLElement | null>(null)
+const overflowMenuRef = ref<HTMLElement | null>(null)
 
 
 
@@ -324,7 +272,7 @@ function openPdfModal() {
 
 function openPdfFromMenu() {
 
-  closeFileMenu()
+  closeOverflowMenu()
 
   openPdfModal()
 
@@ -342,47 +290,17 @@ async function onPdfConfirm(options: PdfExportOptions) {
 
 
 
-function openSettings() {
+function toggleOverflowMenu() {
 
-  settingsModalVisible.value = true
-
-}
-
-
-
-function onSettingsConfirm(settings: AppSettings) {
-
-  settingsModalVisible.value = false
-
-  theme.setTheme(settings.theme)
-
-  appSettings.save({
-
-    fontSize: settings.fontSize,
-
-    editorFontFamily: settings.editorFontFamily,
-
-    imageExport: settings.imageExport,
-
-  })
-
-  showAppNotification('设置已保存')
+  overflowOpen.value = !overflowOpen.value
 
 }
 
 
 
-function toggleFileMenu() {
+function closeOverflowMenu() {
 
-  fileMenuOpen.value = !fileMenuOpen.value
-
-}
-
-
-
-function closeFileMenu() {
-
-  fileMenuOpen.value = false
+  overflowOpen.value = false
 
 }
 
@@ -407,11 +325,11 @@ function buildExportWarningMessage(warnings: string[]): string {
 
 function onDocumentClick(e: MouseEvent) {
 
-  if (!fileMenuOpen.value) return
+  if (!overflowOpen.value) return
 
-  const el = fileMenuRef.value
+  const el = overflowMenuRef.value
 
-  if (el && !el.contains(e.target as Node)) closeFileMenu()
+  if (el && !el.contains(e.target as Node)) closeOverflowMenu()
 
 }
 
@@ -423,32 +341,9 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
 
 
 
-function openCreateModal(kind: 'note' | 'folder') {
-  createModalKind.value = kind
-  createModalVisible.value = true
-}
-
 function openTutorial() {
+  closeOverflowMenu()
   tabsStore.openTutorialNote()
-}
-
-function handleCreated(payload: { kind: 'note' | 'folder'; id: string; parentId?: string }) {
-  createModalVisible.value = false
-  if (payload.kind === 'note') {
-    store.activeFolderId = payload.parentId ?? null
-    tabsStore.openTabForNewNote(payload.id)
-    return
-  }
-
-  store.activeFolderId = payload.id
-  const settings = appSettings.get()
-  const nextExpandedFolderIds = new Set(settings.sidebarExpandedFolderIds ?? [])
-  for (const id of collectAncestorFolderIds(payload.id, store.folderList)) nextExpandedFolderIds.add(id)
-  nextExpandedFolderIds.add(payload.id)
-  appSettings.save({
-    sidebarExpandedFolderIds: [...nextExpandedFolderIds],
-    sidebarActiveFolderId: payload.id,
-  })
 }
 
 
@@ -457,7 +352,7 @@ function handleCreated(payload: { kind: 'note' | 'folder'; id: string; parentId?
 
 async function exportNote() {
 
-  closeFileMenu()
+  closeOverflowMenu()
 
   if (!store.currentNote) return
 
@@ -558,7 +453,7 @@ async function exportNote() {
 /** 导入 .md 文件为笔记（uTools 环境或文件选择器） */
 
 async function importNote() {
-  closeFileMenu()
+  closeOverflowMenu()
   await importMarkdownToActiveFolder()
 }
 
@@ -566,7 +461,7 @@ async function importNote() {
 
 async function openImportFolder() {
 
-  closeFileMenu()
+  closeOverflowMenu()
 
   const scan = await pickFolderScan()
 
@@ -576,24 +471,6 @@ async function openImportFolder() {
 
   importFolderVisible.value = true
 
-}
-
-
-
-function onSettingsImportFolder() {
-
-  settingsModalVisible.value = false
-
-  void openImportFolder()
-
-}
-
-function onBackupRestored() {
-  settingsModalVisible.value = false
-}
-
-function onLibraryCleared() {
-  settingsModalVisible.value = false
 }
 
 

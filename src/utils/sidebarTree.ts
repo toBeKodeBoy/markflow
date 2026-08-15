@@ -48,6 +48,8 @@ export interface FlattenSidebarTreeOptions {
   index?: TreeIndex
   /** 置顶文件夹 ID 集合；提供时将顶层置顶文件夹分到置顶区 */
   pinnedFolderIds?: Set<string>
+  /** 只展开该空间子树；不传则从根遍历 */
+  rootFolderId?: string
 }
 
 /** Flatten folders + notes into one expandable tree */
@@ -57,7 +59,7 @@ export function flattenSidebarTree(
   expandedIds: Set<string>,
   options: FlattenSidebarTreeOptions = {}
 ): SidebarTreeRow[] {
-  const { hideEmptyFolders = false, pinnedFolderIds } = options
+  const { hideEmptyFolders = false, pinnedFolderIds, rootFolderId } = options
   const index = options.index ?? buildTreeIndex(folders, notes)
   const rows: SidebarTreeRow[] = []
 
@@ -87,6 +89,26 @@ export function flattenSidebarTree(
         }
       }
     }
+  }
+
+  if (rootFolderId) {
+    const root = index.folderById.get(rootFolderId)
+    if (!root) return rows
+    if (hideEmptyFolders && !folderHasMatchingNotesInSubtree(root.id, index)) return rows
+    rows.push({
+      kind: 'folder',
+      depth: 0,
+      folder: root,
+      hasChildren: folderHasTreeChildren(root.id, index),
+      noteCount: countSubtreeNotes(index, root.id),
+    })
+    if (expandedIds.has(root.id)) {
+      walkFolders(root.id, 1)
+      for (const note of index.notesByFolder.get(root.id) ?? []) {
+        rows.push({ kind: 'note', depth: 1, note, hasChildren: false })
+      }
+    }
+    return rows
   }
 
   // 置顶区：仅在提供了 pinnedFolderIds 且存在置顶顶层文件夹时渲染
