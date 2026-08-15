@@ -12,12 +12,6 @@
       @create-space="openCreateModal('folder', undefined, true)"
     />
 
-    <!-- 侧栏工具栏：折叠/展开 -->
-    <div class="sidebar-toolbar">
-      <button class="sidebar-toolbar-btn" @click="collapseAllFolders" title="全部折叠">折叠</button>
-      <button class="sidebar-toolbar-btn" @click="cycleExpandLevel" :title="expandButtonLabel">{{ expandButtonLabel }}</button>
-    </div>
-
     <!-- 批量操作工具栏 -->
     <div v-if="selectedNoteIds.size > 0" class="sidebar-batch-bar">
       <span class="batch-count">已选 {{ selectedNoteIds.size }} 篇</span>
@@ -816,79 +810,6 @@ function closeBatchMoveModal() {
   batchMoveVisible.value = false
 }
 
-// ===== Task 14: 折叠/展开 =====
-// 修复（R6）：展开按钮多档循环：折叠全部 → 展开1级 → 展开2级 → 展开全部
-const expandLevelCycle = ref(0)
-const expandButtonLabel = computed(() => {
-  // 文案表示「下一次点击将执行的动作」
-  return ['展开1级', '展开2级', '展开全部', '折叠全部'][expandLevelCycle.value]
-})
-
-function collapseAllFolders() {
-  // 折叠全部：仅保留「最新」展开，「我的文件夹」一并折叠
-  expandedFolderIds.value = new Set([RECENT_FOLDER_ID])
-  // 手动折叠后重置循环档位，避免展开按钮状态与实际不一致
-  expandLevelCycle.value = 0
-  persistSidebarState()
-}
-
-/** 展开全部：所有有子项的文件夹都展开 */
-function expandAllFolders() {
-  const next = new Set(expandedFolderIds.value)
-  next.add(RECENT_FOLDER_ID)
-  next.add(MY_FOLDER_ID)
-  for (const folder of store.folderList) {
-    const hasChildren =
-      store.folderList.some((f) => f.parentId === folder.id) ||
-      store.noteList.some((n) => n.folderId === folder.id)
-    if (hasChildren) next.add(folder.id)
-  }
-  expandedFolderIds.value = next
-  persistSidebarState()
-}
-
-/** 点击展开按钮：在 4 个档位间循环切换 */
-function cycleExpandLevel() {
-  expandLevelCycle.value = (expandLevelCycle.value + 1) % 4
-  if (expandLevelCycle.value === 0) {
-    collapseAllFolders()
-  } else if (expandLevelCycle.value === 3) {
-    expandAllFolders()
-  } else {
-    // depth 为 0-based：展开 N 级对应 expandToLevel(N - 1)
-    expandToLevel(expandLevelCycle.value - 1)
-  }
-}
-
-function expandToLevel(level: number) {
-  const next = new Set(expandedFolderIds.value)
-  next.add(RECENT_FOLDER_ID)
-  next.add(MY_FOLDER_ID)
-  // 计算每个文件夹的深度
-  const folderDepth = new Map<string, number>()
-  function computeDepth(parentId: string | undefined, depth: number) {
-    const children = store.folderList.filter((f) => f.parentId === parentId)
-    for (const child of children) {
-      folderDepth.set(child.id, depth)
-      computeDepth(child.id, depth + 1)
-    }
-  }
-  computeDepth(undefined, 0)
-  for (const folder of store.folderList) {
-    const depth = folderDepth.get(folder.id) ?? 0
-    if (depth <= level) {
-      const hasChildren =
-        store.folderList.some((f) => f.parentId === folder.id) ||
-        store.noteList.some((n) => n.folderId === folder.id)
-      if (hasChildren) {
-        next.add(folder.id)
-      }
-    }
-  }
-  expandedFolderIds.value = next
-  persistSidebarState()
-}
-
 function startRenameNote(id: string) {
   const note = store.noteList.find((n) => n.id === id)
   if (note) {
@@ -1251,31 +1172,6 @@ onUnmounted(() => document.removeEventListener('click', onGlobalClick))
 .trash-label {
   flex: 1;
   text-align: left;
-}
-
-/* 侧栏工具栏 */
-.sidebar-toolbar {
-  display: flex;
-  gap: 4px;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border-color);
-  background: var(--bg-secondary);
-}
-
-.sidebar-toolbar-btn {
-  padding: 4px 10px;
-  font-size: 12px;
-  background: transparent;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  cursor: pointer;
-  color: var(--text-secondary);
-  transition: all 0.2s;
-}
-
-.sidebar-toolbar-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
 }
 
 /* 批量操作工具栏 */

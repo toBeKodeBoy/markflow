@@ -36,8 +36,8 @@ const emit = defineEmits<{
 .sidebar-brand {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px 12px 12px;
+  gap: 10px;
+  padding: 14px var(--sidebar-pad-x) 10px;
 }
 
 .sidebar-logo {
@@ -54,7 +54,7 @@ const emit = defineEmits<{
 .sidebar-create-note {
   width: 100%;
   justify-content: center;
-  border-radius: 10px;
-  height: 40px;
+  border-radius: var(--sidebar-item-radius);
+  height: var(--sidebar-create-h);
 }
 </style>

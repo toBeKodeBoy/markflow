@@ -12,6 +12,10 @@
     aria-hidden="true"
   >
     <path v-if="name === 'menu'" d="M4 6h16M4 12h16M4 18h16" />
+    <template v-else-if="name === 'home'">
+      <path d="M4 10.5L12 4l8 6.5V20H4z" />
+      <path d="M10 20v-6h4v6" />
+    </template>
     <template v-else-if="name === 'folder'">
       <path d="M4 20h16a1 1 0 0 0 1-1V7H9l-2-2H4a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1z" />
     </template>
@@ -167,6 +171,7 @@
 <script setup lang="ts">
 export type AppIconName =
   | 'menu'
+  | 'home'
   | 'folder'
   | 'file'
   | 'settings'

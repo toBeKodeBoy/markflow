@@ -399,57 +399,12 @@ describe('Sidebar', () => {
     expect(recentRows[0].text()).toContain('Beta')
   })
 
-  it('expand button cycles through collapse / level 1 / level 2 / all', async () => {
-    const store = useNoteStore()
-    const a = store.createFolder('一级文件夹')
-    const b = store.createFolder('二级文件夹', a.id)
-    const c = store.createFolder('三级文件夹', b.id)
-    store.createNoteWithContent('# 深层笔记\n', { folderId: c.id })
-
+  it('does not render batch collapse or expand toolbar', async () => {
     const wrapper = mountSidebar()
     await flushPromises()
-
-    const folderRows = () =>
-      wrapper
-        .findAll('.sidebar-row-stub')
-        .filter((row) => row.attributes('data-kind') === 'folder')
-        .map((row) => row.text())
-    const noteVisible = () => wrapper.text().includes('深层笔记')
-
-    // 先点「折叠」全部收起
-    await wrapper.findAll('.sidebar-toolbar-btn')[0].trigger('click')
-    await flushPromises()
-    expect(folderRows().some((t) => t.includes('二级文件夹'))).toBe(false)
-
-    const expandBtn = wrapper.findAll('.sidebar-toolbar-btn')[1]
-    expect(expandBtn.text()).toContain('展开1级')
-
-    // 第 1 次：展开 1 级
-    await expandBtn.trigger('click')
-    await flushPromises()
-    expect(folderRows().some((t) => t.includes('二级文件夹'))).toBe(true)
-    expect(folderRows().some((t) => t.includes('三级文件夹'))).toBe(false)
-    expect(expandBtn.text()).toContain('展开2级')
-
-    // 第 2 次：展开 2 级
-    await expandBtn.trigger('click')
-    await flushPromises()
-    expect(folderRows().some((t) => t.includes('三级文件夹'))).toBe(true)
-    expect(noteVisible()).toBe(false)
-    expect(expandBtn.text()).toContain('展开全部')
-
-    // 第 3 次：展开全部（含叶子内的笔记）
-    await expandBtn.trigger('click')
-    await flushPromises()
-    expect(noteVisible()).toBe(true)
-    expect(expandBtn.text()).toContain('折叠全部')
-
-    // 第 4 次：回到折叠全部
-    await expandBtn.trigger('click')
-    await flushPromises()
-    expect(noteVisible()).toBe(false)
-    expect(folderRows().some((t) => t.includes('二级文件夹'))).toBe(false)
-    expect(expandBtn.text()).toContain('展开1级')
+    expect(wrapper.find('.sidebar-toolbar').exists()).toBe(false)
+    expect(wrapper.findAll('.sidebar-toolbar-btn')).toHaveLength(0)
+    expect(wrapper.text()).not.toMatch(/展开1级|展开2级|展开全部|折叠全部/)
   })
 
   it('trash badge counts both trashed notes and folders', async () => {
