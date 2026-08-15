@@ -26,7 +26,7 @@ describe('顶栏搜索与 Ctrl+K 同源', () => {
     const wrapper = mount(App, { global: { stubs }, attachTo: document.body })
     expect(wrapper.find('.search-modal').exists()).toBe(false)
 
-    await wrapper.find('[data-testid="toolbar-search-btn"]').trigger('click')
+    await wrapper.find('[data-testid="toolbar-search-bar"]').trigger('click')
     await flushPromises()
 
     expect(wrapper.find('.search-modal').exists()).toBe(true)
@@ -42,11 +42,11 @@ describe('顶栏搜索与 Ctrl+K 同源', () => {
     await flushPromises()
     expect(wrapper.find('.search-modal').exists()).toBe(true)
 
-    await wrapper.find('[data-testid="toolbar-search-btn"]').trigger('click')
+    await wrapper.find('[data-testid="toolbar-search-bar"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('.search-modal').exists()).toBe(false)
 
-    await wrapper.find('[data-testid="toolbar-search-btn"]').trigger('click')
+    await wrapper.find('[data-testid="toolbar-search-bar"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('.search-modal').exists()).toBe(true)
 

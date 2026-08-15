@@ -15,6 +15,7 @@ import {
 } from './tabContentCache'
 import { registerEditorTabsBridge } from './editorTabsBridge'
 import { touchRecentNote } from '../utils/recentNotes'
+import { useWorkspaceStore } from './workspace'
 import type { EditorTab, ViewMode } from '../types'
 
 type SaveBehavior = { save: boolean }
@@ -37,8 +38,70 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
   const storage = useStorage()
   const tabs = ref<EditorTab[]>([])
   const activeTabId = ref<string | null>(null)
+  const historyStack = ref<string[]>([])
+  const historyPointer = ref(-1)
+  const historyNavigating = ref(false)
 
   const activeTab = computed(() => tabs.value.find((t) => t.noteId === activeTabId.value) ?? null)
+  const canGoBack = computed(() => historyPointer.value > 0)
+  const canGoForward = computed(() => (
+    historyPointer.value >= 0 && historyPointer.value < historyStack.value.length - 1
+  ))
+
+  function leaveToHomeIfEditing(): void {
+    const workspace = useWorkspaceStore()
+    if (workspace.view === 'editor') workspace.showHome()
+  }
+
+  function recordHistoryVisit(noteId: string): void {
+    if (historyNavigating.value) return
+    if (historyStack.value[historyPointer.value] === noteId) return
+    const next = historyStack.value.slice(0, historyPointer.value + 1)
+    next.push(noteId)
+    historyStack.value = next
+    historyPointer.value = next.length - 1
+  }
+
+  function removeHistoryNote(noteId: string): void {
+    const current = historyStack.value[historyPointer.value]
+    const next = historyStack.value.filter((id) => id !== noteId)
+    if (next.length === historyStack.value.length) return
+    historyStack.value = next
+    if (current && current !== noteId) {
+      const idx = next.lastIndexOf(current)
+      historyPointer.value = idx >= 0 ? idx : next.length - 1
+      return
+    }
+    historyPointer.value = next.length - 1
+  }
+
+  function goHistory(delta: -1 | 1): void {
+    const canMove = delta < 0 ? canGoBack.value : canGoForward.value
+    if (!canMove) return
+    historyNavigating.value = true
+    try {
+      let next = historyPointer.value + delta
+      while (next >= 0 && next < historyStack.value.length) {
+        const id = historyStack.value[next]
+        if (id && storage.getNote(id)) {
+          historyPointer.value = next
+          openTab(id, { recordRecent: false })
+          return
+        }
+        next += delta
+      }
+    } finally {
+      historyNavigating.value = false
+    }
+  }
+
+  function goHistoryBack(): void {
+    goHistory(-1)
+  }
+
+  function goHistoryForward(): void {
+    goHistory(1)
+  }
 
   function findTab(noteId: string): EditorTab | undefined {
     return tabs.value.find((t) => t.noteId === noteId)
@@ -97,7 +160,7 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     persistTabs()
   }
 
-  function activateTab(noteId: string): void {
+  function activateTab(noteId: string, opts: { recordRecent?: boolean } = {}): void {
     const noteStore = useNoteStore()
     if (activeTabId.value === noteId) return
 
@@ -112,15 +175,17 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
       noteStore.setActiveNote(note, tab.liveContent)
       noteStore.applyLargeFilePolicy(tab.liveContent)
     }
-    touchRecentNote(noteId)
+    if (opts.recordRecent !== false) touchRecentNote(noteId)
+    recordHistoryVisit(noteId)
+    useWorkspaceStore().showEditor()
     persistTabs()
   }
 
-  function openTab(noteId: string, opts: { activate?: boolean } = {}): void {
+  function openTab(noteId: string, opts: { activate?: boolean; recordRecent?: boolean } = {}): void {
     const activate = opts.activate !== false
     const existing = findTab(noteId)
     if (existing) {
-      if (activate) activateTab(noteId)
+      if (activate) activateTab(noteId, { recordRecent: opts.recordRecent })
       return
     }
 
@@ -135,7 +200,7 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     const settings = useAppSettings().get()
     const savedMode = settings.editorTabs?.viewModesByNoteId?.[noteId]
     addTabFromNote(noteId, note.content, normalizeViewMode(savedMode))
-    if (activate) activateTab(noteId)
+    if (activate) activateTab(noteId, { recordRecent: opts.recordRecent })
     else persistTabs()
   }
 
@@ -230,6 +295,7 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
 
     if (tabs.value.length === 0) {
       clearActiveEditorState()
+      leaveToHomeIfEditing()
       persistTabs()
       return
     }
@@ -248,6 +314,7 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
       if (nextId) activateTab(nextId)
       else {
         clearActiveEditorState()
+        leaveToHomeIfEditing()
         persistTabs()
       }
       return
@@ -325,6 +392,7 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     const noteStore = useNoteStore()
     activeTabId.value = null
     noteStore.setActiveNote(null, '')
+    leaveToHomeIfEditing()
     persistTabs()
   }
 
@@ -403,6 +471,7 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     tabs.value = []
     clearTabContentCache()
     clearActiveEditorState()
+    leaveToHomeIfEditing()
     persistTabs()
   }
 
@@ -439,11 +508,20 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     clearAllTabs,
     setTabViewMode,
     findTab,
+    canGoBack,
+    canGoForward,
+    goHistoryBack,
+    goHistoryForward,
+    removeHistoryNote,
   }
 })
 
 registerEditorTabsBridge({
-  onNoteDeleted: (noteId) => useEditorTabsStore().removeTabSilently(noteId),
+  onNoteDeleted: (noteId) => {
+    const tabs = useEditorTabsStore()
+    tabs.removeTabSilently(noteId)
+    tabs.removeHistoryNote(noteId)
+  },
   onLibraryReset: (firstNoteId) => {
     const tabs = useEditorTabsStore()
     if (firstNoteId) tabs.resetAndOpenTab(firstNoteId)

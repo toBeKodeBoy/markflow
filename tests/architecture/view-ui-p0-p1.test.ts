@@ -71,7 +71,7 @@ describe('P1 垂直密度', () => {
     expect(app).toMatch(/workspace-chrome-bar|data-testid="workspace-chrome-bar"/)
     const chromeBlock =
       app.match(
-        /<div\s+v-if="hasOpenTabs && viewMode !== 'focus'"[\s\S]*?data-testid="workspace-chrome-bar"[\s\S]*?<\/div>/,
+        /<div\s+v-if="isEditorView && viewMode !== 'focus'"[\s\S]*?data-testid="workspace-chrome-bar"[\s\S]*?<\/div>/,
       )?.[0] ?? ''
     expect(chromeBlock).toMatch(/EditorTabBar/)
     expect(chromeBlock).not.toMatch(/ViewMode/)
@@ -80,7 +80,7 @@ describe('P1 垂直密度', () => {
 
   it('无打开笔记时不应展示 chrome 行', () => {
     expect(app).toMatch(
-      /v-if="hasOpenTabs\s*&&\s*viewMode\s*!==\s*'focus'"[\s\S]*?workspace-chrome-bar/,
+      /v-if="isEditorView\s*&&\s*viewMode\s*!==\s*'focus'"[\s\S]*?workspace-chrome-bar/,
     )
   })
 

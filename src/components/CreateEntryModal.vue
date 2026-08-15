@@ -143,7 +143,7 @@ const props = defineProps<{
   visible: boolean
   defaultKind: CreateEntryKind
   defaultParentId?: string
-  lockedParentId?: string
+  lockedParentId?: string | null
   folders: Folder[]
   activeFolderId?: string | null
 }>()
@@ -169,7 +169,7 @@ const folderOptions = computed(() =>
 )
 
 const resolvedParentId = computed(() => {
-  if (props.lockedParentId !== undefined) return props.lockedParentId
+  if (props.lockedParentId !== undefined) return props.lockedParentId ?? undefined
   if (parentValue.value === ROOT_VALUE) return undefined
   return parentValue.value
 })
@@ -193,7 +193,9 @@ function resetState() {
   kind.value = props.defaultKind
   name.value = ''
   templateId.value = null
-  const nextParentId = props.lockedParentId ?? props.defaultParentId ?? props.activeFolderId ?? undefined
+  const nextParentId = props.lockedParentId !== undefined
+    ? props.lockedParentId ?? undefined
+    : props.defaultParentId ?? props.activeFolderId ?? undefined
   parentValue.value = nextParentId ?? ROOT_VALUE
 }
 

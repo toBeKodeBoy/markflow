@@ -64,6 +64,28 @@ describe('sidebarTree', () => {
     expect(rows[rows.length - 1].note?.title).toBe('Root')
   })
 
+  it('rootFolderId 只展开该空间子树，不含其他顶层文件夹与根笔记', () => {
+    const extraFolders: Folder[] = [
+      ...folders,
+      { id: 'f3', name: 'other', order: 2 },
+    ]
+    const extraNotes: NoteListItem[] = [
+      ...notes,
+      { id: 'n4', title: 'OtherNote', updatedAt: 4, folderId: 'f3' },
+    ]
+    const rows = flattenSidebarTree(extraFolders, extraNotes, new Set(['f1']), {
+      rootFolderId: 'f1',
+    })
+    const labels = rows.map((r) => (r.kind === 'note' ? r.note!.title : r.folder!.name))
+    expect(labels).toContain('docs')
+    expect(labels).toContain('api')
+    expect(labels).toContain('Intro')
+    expect(labels).not.toContain('other')
+    expect(labels).not.toContain('OtherNote')
+    expect(labels).not.toContain('Root')
+  })
+
+
   it('根级置顶笔记应排在非置顶根笔记之前', () => {
     const mixedNotes: NoteListItem[] = [
       { id: 'n-readme', title: 'README', updatedAt: 100 },

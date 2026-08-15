@@ -39,6 +39,14 @@
     <template v-else-if="name === 'chevron-right'">
       <path d="M9 6l6 6-6 6" />
     </template>
+    <template v-else-if="name === 'chevron-left'">
+      <path d="M15 6l-6 6 6 6" />
+    </template>
+    <template v-else-if="name === 'more'">
+      <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    </template>
     <template v-else-if="name === 'trash'">
       <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
     </template>
@@ -167,6 +175,8 @@ export type AppIconName =
   | 'file-menu'
   | 'chevron-down'
   | 'chevron-right'
+  | 'chevron-left'
+  | 'more'
   | 'trash'
   | 'close'
   | 'clock'

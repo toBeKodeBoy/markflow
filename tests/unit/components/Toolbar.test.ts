@@ -47,7 +47,7 @@ function mountToolbar() {
 }
 
 async function openFileMenu(wrapper: ReturnType<typeof mountToolbar>) {
-  await wrapper.find('[data-testid="toolbar-file-btn"]').trigger('click')
+  await wrapper.find('[data-testid="toolbar-overflow-btn"]').trigger('click')
 }
 
 describe('Toolbar', () => {
@@ -188,14 +188,18 @@ describe('Toolbar', () => {
     expect(noteStore.currentNote?.title).toBe('meeting-notes')
   })
 
-  it('点击顶部新建按钮应打开统一创建弹层', async () => {
+  it('顶栏命令条有搜索条与历史按钮，无 Logo 和新建主按钮', () => {
     const wrapper = mountToolbar()
 
-    await wrapper.find('.btn-action').trigger('click')
-
-    expect(wrapper.text()).toContain('新建内容')
-    expect(wrapper.text()).toContain('新建文件')
-    expect(wrapper.text()).toContain('新建文件夹')
+    expect(wrapper.find('[data-testid="toolbar-search-bar"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="toolbar-search-bar"]').text()).toContain('搜索笔记')
+    expect(wrapper.find('[data-testid="toolbar-history-back"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="toolbar-history-forward"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="toolbar-history-back"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-testid="toolbar-history-forward"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('.app-logo').exists()).toBe(false)
+    expect(wrapper.find('[aria-label="新建笔记"]').exists()).toBe(false)
+    expect(wrapper.find('[aria-label="设置"]').exists()).toBe(false)
   })
 
   it('顶栏不应再展示主题快捷切换按钮', () => {
@@ -205,92 +209,6 @@ describe('Toolbar', () => {
     expect(wrapper.find('[aria-label="切换主题"]').exists()).toBe(false)
   })
 
-  it('设置确认后应应用主题到 document', async () => {
-    const wrapper = mount(Toolbar, {
-      props: { tocVisible: false },
-      global: {
-        plugins: [pinia],
-        stubs: {
-          PdfExportModal: true,
-          SettingsModal: {
-            name: 'SettingsModal',
-            emits: ['confirm', 'cancel', 'import-folder', 'backup-restored', 'library-cleared'],
-            template:
-              '<button data-testid="settings-confirm" @click="$emit(\'confirm\', payload)" />',
-            setup() {
-              return {
-                payload: {
-                  theme: 'dark' as const,
-                  fontSize: 16,
-                  editorFontFamily: 'monospace',
-                  previewVisible: true,
-                  sidebarVisible: true,
-                  imageExport: {
-                    mode: 'note-assets-folder' as const,
-                    customTemplate: './${filename}.assets',
-                    fileNameTemplate: '${filename}-${index}',
-                    overwriteStrategy: 'rename' as const,
-                    bindNoteOnExport: true,
-                    downloadRemoteImages: true,
-                    syncUnusedAssets: true,
-                    unusedAssetsFolderName: '_unused',
-                  },
-                },
-              }
-            },
-          },
-          ImportFolderModal: true,
-          AppIcon: true,
-        },
-      },
-    })
-
-    await wrapper.find('[data-testid="settings-confirm"]').trigger('click')
-    await flushPromises()
-
-    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
-  })
-
-  it('顶部新建切换目标目录后应同步更新当前目录', async () => {
-    const wrapper = mountToolbar()
-    const noteStore = useNoteStore()
-    const targetFolder = noteStore.createFolder('目标目录')
-
-    await wrapper.find('.btn-action').trigger('click')
-    await flushPromises()
-    await wrapper.find('.create-entry-select').setValue(targetFolder.id)
-    await wrapper.find('form').trigger('submit.prevent')
-
-    expect(noteStore.currentNote?.folderId).toBe(targetFolder.id)
-    expect(noteStore.activeFolderId).toBe(targetFolder.id)
-  })
-
-  it('顶栏新建文件夹后应选中新文件夹并持久化侧边栏状态', async () => {
-    const wrapper = mountToolbar()
-    const noteStore = useNoteStore()
-    const parentFolder = noteStore.createFolder('父目录')
-    noteStore.activeFolderId = parentFolder.id
-
-    await wrapper.find('.btn-action').trigger('click')
-    await flushPromises()
-    await wrapper.findAll('.create-entry-kind-card')[1].trigger('click')
-    await wrapper.find('.create-entry-input').setValue('子目录')
-    await wrapper.find('form').trigger('submit.prevent')
-    await flushPromises()
-
-    const createdFolder = noteStore.folderList.find(
-      (folder) => folder.name === '子目录' && folder.parentId === parentFolder.id
-    )
-
-    expect(createdFolder).toBeTruthy()
-    expect(noteStore.activeFolderId).toBe(createdFolder?.id)
-
-    const settings = JSON.parse(localStorage.getItem('markflow_settings') ?? '{}')
-    expect(settings.sidebarActiveFolderId).toBe(createdFolder?.id)
-    expect(settings.sidebarExpandedFolderIds).toEqual(
-      expect.arrayContaining([parentFolder.id, createdFolder!.id])
-    )
-  })
   it('uTools 导出 Markdown 时应先导出图片并写入最终内容', async () => {
     vi.mocked(window.markflow.selectMarkdownSavePath).mockReturnValue({
       ok: true,
@@ -389,14 +307,33 @@ describe('Toolbar', () => {
     )
   })
 
-  it('点击搜索按钮应派发 openSearch', async () => {
+  it('点击搜索条应派发 openSearch', async () => {
     const wrapper = mountToolbar()
-    const btn = wrapper.find('[data-testid="toolbar-search-btn"]')
+    const btn = wrapper.find('[data-testid="toolbar-search-bar"]')
     expect(btn.exists()).toBe(true)
     expect(btn.attributes('aria-label')).toBe('搜索笔记')
     expect(btn.attributes('title')).toMatch(/Ctrl\+K|Cmd\+K|搜索/)
 
     await btn.trigger('click')
     expect(wrapper.emitted('openSearch')).toEqual([[]])
+  })
+
+  it('打开两篇笔记后顶栏后退可切回上一篇', async () => {
+    const wrapper = mountToolbar()
+    const noteStore = useNoteStore()
+    const tabsStore = useEditorTabsStore()
+    const a = noteStore.createNoteWithContent('# Hist A\n')
+    const b = noteStore.createNoteWithContent('# Hist B\n')
+
+    tabsStore.openTab(a.id)
+    tabsStore.openTab(b.id)
+    await flushPromises()
+
+    const back = wrapper.find('[data-testid="toolbar-history-back"]')
+    expect(back.attributes('disabled')).toBeUndefined()
+    await back.trigger('click')
+    await flushPromises()
+
+    expect(tabsStore.activeTabId).toBe(a.id)
   })
 })

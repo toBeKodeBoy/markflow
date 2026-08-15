@@ -30,6 +30,21 @@ describe('useEditorTabsStore', () => {
     expect(noteStore.liveContent).toBe('# Tab A\n')
   })
 
+  it('openTab({ recordRecent: false }) 不改写最近访问顺序', () => {
+    const noteStore = useNoteStore()
+    const tabsStore = useEditorTabsStore()
+    const a = noteStore.createNoteWithContent('# A\n')
+    const b = noteStore.createNoteWithContent('# B\n')
+
+    tabsStore.openTab(a.id)
+    tabsStore.openTab(b.id)
+    tabsStore.openTab(a.id, { recordRecent: false })
+
+    const settings = JSON.parse(localStorage.getItem('markflow_settings') ?? '{}')
+    expect(settings.recentNoteAccess?.[0]?.noteId).toBe(b.id)
+    expect(tabsStore.activeTabId).toBe(a.id)
+  })
+
   it('openTab 会记录最近访问', () => {
     const noteStore = useNoteStore()
     const tabsStore = useEditorTabsStore()

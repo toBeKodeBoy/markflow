@@ -7,31 +7,48 @@ import {
   EMPTY_HOME_STORAGE_HINT,
   EMPTY_HOME_TEMPLATES_TITLE,
   EMPTY_HOME_EXAMPLE_LIBRARY_LABEL,
-  EMPTY_HOME_OPEN_SIDEBAR_LABEL,
-  EMPTY_HOME_CLOSE_SIDEBAR_LABEL,
+  EMPTY_HOME_CREATE_LABEL,
+  EMPTY_HOME_CREATE_FOLDER_LABEL,
+  EMPTY_HOME_IMPORT_LABEL,
 } from '../../../src/constants/emptyHomeCopy'
 import { NOTE_TEMPLATES } from '../../../src/constants/noteTemplates'
 
-function mountHome(props?: { emptyLibrary?: boolean; sidebarVisible?: boolean }) {
+function mountHome(props?: { emptyLibrary?: boolean }) {
   return mount(EmptyHome, {
     props: {
       emptyLibrary: props?.emptyLibrary ?? true,
-      sidebarVisible: props?.sidebarVisible ?? false,
     },
   })
 }
 
 describe('EmptyHome', () => {
+  it('产品标题与主按钮不含知识库，且对齐壳层文案', () => {
+    expect(EMPTY_HOME_TITLE).toBe('欢迎使用 MarkFlow')
+    expect(EMPTY_HOME_TITLE).not.toContain('知识库')
+    expect(EMPTY_HOME_SUBTITLE).not.toContain('知识库')
+    expect(EMPTY_HOME_CREATE_LABEL).toBe('新建文档')
+    expect(EMPTY_HOME_CREATE_FOLDER_LABEL).toBe('新建文件夹')
+    expect(EMPTY_HOME_IMPORT_LABEL).toBe('导入 .md')
+    expect(EMPTY_HOME_EXAMPLE_LIBRARY_LABEL).toBe('导入示例笔记')
+    expect(EMPTY_HOME_EXAMPLE_LIBRARY_LABEL).not.toContain('知识库')
+  })
+
   it('空库时渲染欢迎文案、存储说明与三个主操作', () => {
-    const wrapper = mountHome({ emptyLibrary: true, sidebarVisible: false })
+    const wrapper = mountHome({ emptyLibrary: true })
 
     expect(wrapper.find('[data-testid="empty-tabs-state"]').exists()).toBe(true)
     expect(wrapper.text()).toContain(EMPTY_HOME_TITLE)
     expect(wrapper.text()).toContain(EMPTY_HOME_SUBTITLE)
     expect(wrapper.text()).toContain(EMPTY_HOME_STORAGE_HINT)
-    expect(wrapper.find('[data-testid="empty-home-create"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="empty-home-import"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="empty-home-open-sidebar"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="empty-home-create"]').text()).toBe(EMPTY_HOME_CREATE_LABEL)
+    expect(wrapper.find('[data-testid="empty-home-create-folder"]').text()).toBe(
+      EMPTY_HOME_CREATE_FOLDER_LABEL,
+    )
+    expect(wrapper.find('[data-testid="empty-home-import"]').text()).toBe(EMPTY_HOME_IMPORT_LABEL)
+    expect(wrapper.find('[data-testid="empty-home-open-sidebar"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('从侧边栏打开')
+    expect(wrapper.text()).not.toContain('收起侧边栏')
+    expect(wrapper.text()).not.toContain('知识库')
     expect(wrapper.find('[data-testid="empty-home-templates"]').exists()).toBe(true)
     expect(wrapper.text()).toContain(EMPTY_HOME_TEMPLATES_TITLE)
     expect(wrapper.findAll('[data-testid="empty-home-template-card"]')).toHaveLength(NOTE_TEMPLATES.length)
@@ -42,35 +59,17 @@ describe('EmptyHome', () => {
     )
   })
 
-  it('点击主按钮发出 create，导入发出 import', async () => {
+  it('点击主按钮发出 create，新建文件夹发出 createFolder，导入发出 import', async () => {
     const wrapper = mountHome()
 
     await wrapper.find('[data-testid="empty-home-create"]').trigger('click')
+    await wrapper.find('[data-testid="empty-home-create-folder"]').trigger('click')
     await wrapper.find('[data-testid="empty-home-import"]').trigger('click')
-    await wrapper.find('[data-testid="empty-home-open-sidebar"]').trigger('click')
 
     expect(wrapper.emitted('create')).toHaveLength(1)
+    expect(wrapper.emitted('createFolder')).toHaveLength(1)
     expect(wrapper.emitted('import')).toHaveLength(1)
-    expect(wrapper.emitted('toggleSidebar')).toHaveLength(1)
-    expect(wrapper.emitted('openSidebar')).toBeUndefined()
-  })
-
-  it('侧栏关闭时按钮为打开文案且未按下', () => {
-    const wrapper = mountHome({ sidebarVisible: false })
-    const button = wrapper.find('[data-testid="empty-home-open-sidebar"]')
-
-    expect(button.text()).toBe(EMPTY_HOME_OPEN_SIDEBAR_LABEL)
-    expect(button.attributes('aria-pressed')).toBe('false')
-    expect(button.classes()).not.toContain('active')
-  })
-
-  it('侧栏展开时按钮为收起文案且呈按下态', () => {
-    const wrapper = mountHome({ sidebarVisible: true })
-    const button = wrapper.find('[data-testid="empty-home-open-sidebar"]')
-
-    expect(button.text()).toBe(EMPTY_HOME_CLOSE_SIDEBAR_LABEL)
-    expect(button.attributes('aria-pressed')).toBe('true')
-    expect(button.classes()).toContain('active')
+    expect(wrapper.emitted('toggleSidebar')).toBeUndefined()
   })
 
   it('点击模板卡发出 useTemplate，点击示例库发出 importExample', async () => {
@@ -90,5 +89,7 @@ describe('EmptyHome', () => {
     expect(wrapper.findAll('[data-testid="empty-home-template-card"]')).toHaveLength(NOTE_TEMPLATES.length)
     expect(wrapper.find('[data-testid="empty-home-example-library"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="empty-home-hints"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="empty-home-recent"]').exists()).toBe(false)
   })
 })
+

@@ -1,7 +1,12 @@
 <template>
-  <Teleport to="body">
-    <div v-if="visible" class="trash-overlay" @click.self="$emit('close')">
-      <div class="trash-panel-modal">
+  <Teleport to="body" :disabled="embedded">
+    <div
+      v-if="visible"
+      :class="embedded ? 'trash-panel-main' : 'trash-overlay'"
+      :data-testid="embedded ? 'workspace-trash-panel' : undefined"
+      @click.self="onOverlayClick"
+    >
+      <div class="trash-panel-modal" :class="{ 'is-embedded': embedded }">
         <!-- 头部 -->
         <div class="trash-header">
           <div class="trash-header-left">
@@ -96,7 +101,10 @@ import { formatRelativeTime } from '../utils/formatRelativeTime'
 import AppIcon from './AppIcon.vue'
 
 const store = useNoteStore()
-const props = defineProps<{ visible: boolean }>()
+const props = defineProps<{
+  visible: boolean
+  embedded?: boolean
+}>()
 const emit = defineEmits<{
   close: []
   'restore-note': [id: string]
@@ -120,6 +128,10 @@ const trashFolders = computed(() => {
 })
 
 const totalCount = computed(() => trashNotes.value.length + trashFolders.value.length)
+
+function onOverlayClick() {
+  if (!props.embedded) emit('close')
+}
 
 // 恢复笔记
 function handleRestore(id: string) {
@@ -176,6 +188,11 @@ function handleClearTrash() {
   z-index: 2000;
 }
 
+.trash-panel-main {
+  height: 100%;
+  min-height: 0;
+}
+
 .trash-panel-modal {
   width: 480px;
   max-width: 90vw;
@@ -187,6 +204,15 @@ function handleClearTrash() {
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
   overflow: hidden;
+}
+
+.trash-panel-modal.is-embedded {
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  height: 100%;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .trash-header {

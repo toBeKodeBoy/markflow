@@ -51,14 +51,17 @@ describe('壳层布局 DOM', () => {
     expect(appSrc).toMatch(/class="editor-stage"/)
   })
 
-  it('顶栏应始终展示 MarkFlow Logo', () => {
-    expect(toolbarSrc).toMatch(/class="app-logo"/)
-    expect(toolbarSrc).toMatch(/logo-name[\s\S]*MarkFlow|MarkFlow[\s\S]*logo-name/)
+  it('侧栏应展示 MarkFlow Logo，顶栏不再放 Logo 与新建主按钮', () => {
+    const brandSrc = readSrc('src/components/sidebar/SidebarBrand.vue')
+    expect(brandSrc).toMatch(/MarkFlow/)
+    expect(toolbarSrc).not.toMatch(/class="app-logo"/)
+    expect(toolbarSrc).not.toMatch(/aria-label=["']新建笔记["']/)
+    expect(toolbarSrc).not.toMatch(/btn-action-label/)
   })
 
-  it('新建按钮应使用主色按钮样式', () => {
-    expect(toolbarSrc).toMatch(/btn-primary|btn-action/)
-    expect(toolbarSrc).toMatch(/新建/)
+  it('顶栏应有居中搜索条', () => {
+    expect(toolbarSrc).toMatch(/data-testid=["']toolbar-search-bar["']/)
+    expect(toolbarSrc).toMatch(/搜索笔记/)
   })
 
   it('顶栏不应再提供主题快捷切换入口（主题仅在设置面板）', () => {

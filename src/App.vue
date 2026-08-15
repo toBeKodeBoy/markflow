@@ -22,7 +22,7 @@
 
       <main class="workspace-main">
         <div
-          v-if="hasOpenTabs && viewMode !== 'focus'"
+          v-if="isEditorView && viewMode !== 'focus'"
           class="workspace-chrome-bar"
           data-testid="workspace-chrome-bar"
         >
@@ -32,15 +32,27 @@
         <div class="workspace-editor-row">
           <div class="editor-stage">
             <EmptyHome
-              v-if="!hasOpenTabs"
+              v-if="isHomeView"
               :empty-library="store.noteList.length === 0"
-              :sidebar-visible="sidebarVisible"
-              @create="createModalVisible = true"
+              @create="openCreateModal('note')"
+              @create-folder="openCreateModal('folder')"
               @import="onEmptyHomeImport"
-              @toggle-sidebar="sidebarVisible = !sidebarVisible"
               @use-template="onUseTemplate"
               @import-example="onImportExample"
             />
+
+            <div
+              v-else-if="isTrashView"
+              data-testid="workspace-trash"
+              class="workspace-trash"
+            >
+              <TrashPanel
+                :visible="true"
+                embedded
+                @close="onCloseTrash"
+                @restore-note="onRestoreFromTrash"
+              />
+            </div>
 
             <template v-else-if="viewMode === 'live' || viewMode === 'focus'">
               <WysiwygEditor
@@ -70,21 +82,21 @@
             </template>
           </div>
 
-          <Toc v-if="hasOpenTabs && tocVisible && viewMode !== 'focus'" :view-mode="viewMode" />
+          <Toc v-if="isEditorView && tocVisible && viewMode !== 'focus'" :view-mode="viewMode" />
         </div>
       </main>
     </div>
 
     <footer v-if="viewMode !== 'focus'" class="status-bar">
-      <span class="status-bar-left">{{ hasOpenTabs ? saveStatusText : '就绪' }}</span>
-      <span v-if="hasOpenTabs" class="status-bar-right">{{ charCount }} 字</span>
+      <span class="status-bar-left">{{ isEditorView ? saveStatusText : '就绪' }}</span>
+      <span v-if="isEditorView" class="status-bar-right">{{ charCount }} 字</span>
     </footer>
 
     <ImageLightbox />
 
     <CreateEntryModal
       :visible="createModalVisible"
-      default-kind="note"
+      :default-kind="createModalKind"
       :default-parent-id="store.activeFolderId ?? undefined"
       :folders="store.folderList"
       :active-folder-id="store.activeFolderId"
@@ -99,7 +111,7 @@
     />
 
     <OnboardingCoach
-      :visible="onboardingVisible"
+      :visible="onboardingVisible && workspace.view === 'home'"
       :step="onboardingStep"
       :total="3"
       @skip="dismissOnboarding"
@@ -123,6 +135,7 @@ import SearchModal from './components/SearchModal.vue'
 import AppIcon from './components/AppIcon.vue'
 import EditorTabBar from './components/EditorTabBar.vue'
 import EmptyHome from './components/EmptyHome.vue'
+import TrashPanel from './components/TRashPanel.vue'
 import OnboardingCoach from './components/OnboardingCoach.vue'
 import { useImportMarkdown } from './composables/useImportMarkdown'
 import { useOnboarding } from './composables/useOnboarding'
@@ -131,6 +144,7 @@ import { importExampleLibrary } from './utils/exampleLibrary'
 import { createNoteFromTemplate } from './utils/createFromTemplate'
 import { useNoteStore } from './stores/note'
 import { useEditorTabsStore } from './stores/editorTabs'
+import { useWorkspaceStore } from './stores/workspace'
 import { useTheme } from './composables/useTheme'
 import { useAppSettings } from './composables/useAppSettings'
 import { useImageLightbox } from './composables/useImageLightbox'
@@ -154,6 +168,7 @@ const VIEW_MODE_SHORTCUTS: Record<string, ViewMode> = {
 
 const store = useNoteStore()
 const tabsStore = useEditorTabsStore()
+const workspace = useWorkspaceStore()
 const viewModeFlash = createViewModeFlashRegistry()
 provideViewModeFlash(viewModeFlash)
 
@@ -170,11 +185,15 @@ const { isFullscreen, enter: enterFullscreen, exit: exitFullscreen } = useFullsc
 const sidebarVisible = ref(appSettings.get().sidebarVisible ?? true)
 const tocVisible = ref(false)
 const createModalVisible = ref(false)
+const createModalKind = ref<'note' | 'folder'>('note')
 const searchModalVisible = ref(false)
 const { importMarkdownToActiveFolder } = useImportMarkdown()
 
 const showSidebar = computed(() => viewMode.value !== 'focus' && sidebarVisible.value)
 const hasOpenTabs = computed(() => tabsStore.tabs.length > 0)
+const isHomeView = computed(() => workspace.view === 'home' || (workspace.view === 'editor' && !hasOpenTabs.value))
+const isTrashView = computed(() => workspace.view === 'trash')
+const isEditorView = computed(() => workspace.view === 'editor' && hasOpenTabs.value)
 const emptyLibrary = computed(() => store.noteList.length === 0)
 const { visible: onboardingVisible, step: onboardingStep, dismiss: dismissOnboarding, next: nextOnboarding } = useOnboarding({
   emptyLibrary,
@@ -308,8 +327,21 @@ function onSearchSelect(noteId: string) {
   tabsStore.openTab(noteId)
 }
 
+function onCloseTrash() {
+  workspace.showDocs(hasOpenTabs.value)
+}
+
+function onRestoreFromTrash(noteId: string) {
+  tabsStore.openTab(noteId)
+}
+
 function toggleSearchModal() {
   searchModalVisible.value = !searchModalVisible.value
+}
+
+function openCreateModal(kind: 'note' | 'folder') {
+  createModalKind.value = kind
+  createModalVisible.value = true
 }
 
 async function onEmptyHomeImport() {
@@ -361,6 +393,10 @@ function onKeydown(e: KeyboardEvent) {
   }
   if (lightboxVisible.value) {
     closeLightbox()
+    return
+  }
+  if (workspace.view === 'trash') {
+    workspace.showDocs(hasOpenTabs.value)
     return
   }
   if (viewMode.value === 'focus') exitFocus()
