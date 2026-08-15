@@ -31,7 +31,7 @@ export function importExampleLibrary(): ImportExampleLibraryResult {
   for (const folderSeed of EXAMPLE_LIBRARY) {
     let folder = findRootFolderByName(folderSeed.name)
     if (!folder) {
-      folder = store.createFolder(folderSeed.name)
+      folder = store.createFolder(folderSeed.name) ?? undefined
       created = true
     }
     if (!folder) continue
