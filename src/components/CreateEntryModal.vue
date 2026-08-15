@@ -77,8 +77,34 @@
           </select>
         </div>
 
+        <div v-if="kind === 'note'" class="create-entry-field" data-testid="create-entry-templates">
+          <span class="create-entry-label">从模板创建</span>
+          <div class="create-entry-template-grid">
+            <button
+              type="button"
+              class="create-entry-template-chip"
+              :class="{ active: templateId === null }"
+              data-testid="create-entry-template-blank"
+              @click="templateId = null"
+            >
+              空白笔记
+            </button>
+            <button
+              v-for="item in NOTE_TEMPLATES"
+              :key="item.id"
+              type="button"
+              class="create-entry-template-chip"
+              :class="{ active: templateId === item.id }"
+              data-testid="create-entry-template-option"
+              @click="templateId = item.id"
+            >
+              {{ item.title }}
+            </button>
+          </div>
+        </div>
+
         <p v-if="kind === 'note'" class="create-entry-hint">
-          将创建一份空白 Markdown 笔记，标题可在创建后直接重命名。
+          {{ noteHint }}
         </p>
 
         <div class="modal-actions">
@@ -103,6 +129,8 @@ import type { Folder } from '../types'
 import { flattenFolderTree, getFolderPathLabel } from '../utils/folderTree'
 import { useNoteStore } from '../stores/note'
 import { MY_FOLDER_NAME } from '../constants/myFolder'
+import { NOTE_TEMPLATES, type NoteTemplateId } from '../constants/noteTemplates'
+import { createNoteFromTemplate } from '../utils/createFromTemplate'
 import AppIcon from './AppIcon.vue'
 
 type CreateEntryKind = 'note' | 'folder'
@@ -128,6 +156,7 @@ const emit = defineEmits<{
 const store = useNoteStore()
 const kind = ref<CreateEntryKind>('note')
 const name = ref('')
+const templateId = ref<NoteTemplateId | null>(null)
 const parentValue = ref(ROOT_VALUE)
 const nameInputRef = ref<HTMLInputElement | null>(null)
 const submitButtonRef = ref<HTMLButtonElement | null>(null)
@@ -152,9 +181,18 @@ const currentParentLabel = computed(() => {
 
 const canSubmit = computed(() => kind.value === 'note' || name.value.trim().length > 0)
 
+const noteHint = computed(() => {
+  if (!templateId.value) return '将创建一份空白 Markdown 笔记，标题可在创建后直接重命名。'
+  const template = NOTE_TEMPLATES.find((item) => item.id === templateId.value)
+  return template
+    ? `将按「${template.title}」模板创建笔记，创建后可直接重命名。`
+    : '将创建一份空白 Markdown 笔记，标题可在创建后直接重命名。'
+})
+
 function resetState() {
   kind.value = props.defaultKind
   name.value = ''
+  templateId.value = null
   const nextParentId = props.lockedParentId ?? props.defaultParentId ?? props.activeFolderId ?? undefined
   parentValue.value = nextParentId ?? ROOT_VALUE
 }
@@ -177,7 +215,10 @@ async function handleOpen() {
 async function submit() {
   if (!canSubmit.value) return
   if (kind.value === 'note') {
-    const note = store.createNote(resolvedParentId.value)
+    const note = templateId.value
+      ? createNoteFromTemplate(templateId.value, resolvedParentId.value)
+      : store.createNote(resolvedParentId.value)
+    if (!note) return
     emit('created', { kind: 'note', id: note.id, parentId: note.folderId })
     return
   }

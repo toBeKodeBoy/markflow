@@ -288,13 +288,20 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     return true
   }
 
-  function openWelcomeTab(): void {
+  function openTutorialNote(): void {
     const noteStore = useNoteStore()
+    const existingId = useAppSettings().get().tutorialNoteId
+    if (existingId && noteStore.noteList.some((item) => item.id === existingId)) {
+      openTab(existingId)
+      return
+    }
     const note = noteStore.createNoteWithContent(WELCOME_NOTE_CONTENT)
-    tabs.value = []
-    clearTabContentCache()
-    addTabFromNote(note.id, note.content)
-    activateTab(note.id)
+    useAppSettings().save({ tutorialNoteId: note.id })
+    openTabForNewNote(note.id)
+  }
+
+  function openWelcomeTab(): void {
+    openTutorialNote()
   }
 
   function openTabForNewNote(noteId: string): void {
@@ -314,6 +321,13 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     activateTab(noteId)
   }
 
+  function leaveEmptyWorkspace(): void {
+    const noteStore = useNoteStore()
+    activeTabId.value = null
+    noteStore.setActiveNote(null, '')
+    persistTabs()
+  }
+
   function removeTabSilently(noteId: string): void {
     const noteStore = useNoteStore()
     if (!findTab(noteId)) {
@@ -322,7 +336,6 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
           noteStore.openNote(noteStore.noteList[0].id)
         } else {
           noteStore.setActiveNote(null, '')
-          openWelcomeTab()
         }
       }
       return
@@ -338,9 +351,7 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     }
 
     if (tabs.value.length === 0) {
-      activeTabId.value = null
-      noteStore.setActiveNote(null, '')
-      openWelcomeTab()
+      leaveEmptyWorkspace()
       return
     }
 
@@ -378,8 +389,6 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     const noteStore = useNoteStore()
     if (noteStore.noteList.length > 0) {
       openTab(noteStore.noteList[0].id)
-    } else {
-      openWelcomeTab()
     }
   }
 
@@ -417,6 +426,7 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     flushTab,
     flushActiveTab,
     openWelcomeTab,
+    openTutorialNote,
     openTabForNewNote,
     removeTabSilently,
     restoreFromSettings,

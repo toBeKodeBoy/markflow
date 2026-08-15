@@ -38,7 +38,7 @@
 
     <div class="topbar-right">
 
-      <button class="btn-primary btn-action" @click="openCreateModal('note')" title="新建笔记" aria-label="新建笔记">
+      <button class="btn-primary btn-action" data-onboarding="create" @click="openCreateModal('note')" title="新建笔记" aria-label="新建笔记">
 
         <AppIcon name="plus" :size="14" />
 
@@ -53,6 +53,7 @@
         class="btn-icon btn-icon-text"
 
         data-testid="toolbar-search-btn"
+        data-onboarding="search"
 
         title="搜索笔记（Ctrl/Cmd+K）"
 
@@ -154,6 +155,16 @@
 
       </button>
 
+      <button
+        class="btn-icon btn-icon-text"
+        data-testid="toolbar-tutorial-btn"
+        title="新手教程"
+        aria-label="新手教程"
+        @click="openTutorial"
+      >
+        <span class="btn-icon-label">新手教程</span>
+      </button>
+
       <button class="btn-icon" @click="openSettings" title="设置" aria-label="设置">
 
         <AppIcon name="settings" :size="16" />
@@ -240,7 +251,6 @@ import { resolveImageExportTarget } from '../utils/imageExportPath'
 import { showAppNotification } from '../utils/notify'
 
 import { pickFolderScan } from '../utils/importFolderDevScan'
-import { hasRelativeImageReferences } from '../utils/importFolderHelpers'
 
 import { collectAncestorFolderIds, getFolderPathLabel } from '../utils/folderTree'
 
@@ -256,6 +266,7 @@ import AppIcon from './AppIcon.vue'
 import type { AppSettings, ImportFolderScanResult, PdfExportOptions } from '../types'
 
 import { useAppSettings } from '../composables/useAppSettings'
+import { useImportMarkdown } from '../composables/useImportMarkdown'
 
 
 
@@ -267,6 +278,7 @@ defineEmits<{ toggleSidebar: []; toggleToc: []; openSearch: [] }>()
 
 const store = useNoteStore()
 const tabsStore = useEditorTabsStore()
+const { importMarkdownToActiveFolder } = useImportMarkdown()
 
 const theme = useTheme()
 
@@ -416,6 +428,10 @@ function openCreateModal(kind: 'note' | 'folder') {
   createModalVisible.value = true
 }
 
+function openTutorial() {
+  tabsStore.openTutorialNote()
+}
+
 function handleCreated(payload: { kind: 'note' | 'folder'; id: string; parentId?: string }) {
   createModalVisible.value = false
   if (payload.kind === 'note') {
@@ -542,77 +558,8 @@ async function exportNote() {
 /** 导入 .md 文件为笔记（uTools 环境或文件选择器） */
 
 async function importNote() {
-
   closeFileMenu()
-
-  const folderId = store.activeFolderId ?? undefined
-
-  if (typeof window.markflow !== 'undefined') {
-
-    const file = window.markflow.openMarkdownFile()
-
-    if (file !== null) {
-
-      const result = await store.importMarkdownFile(file, folderId)
-
-      tabsStore.openTabForNewNote(result.note.id)
-      const warning = result.warnings[0]
-      const importWarningMessage = `\u5bfc\u5165\u5b8c\u6210\uff0c\u4f46\u56fe\u7247\u5904\u7406\u5931\u8d25\uff1a${warning}`
-      if (warning) {
-        window.markflow.showNotification(importWarningMessage)
-        return
-        window.markflow.showNotification(`导入完成，但图片处理失败：${warning}`)
-        return
-      }
-
-      window.markflow.showNotification('导入成功')
-
-    }
-
-  } else {
-
-    const input = document.createElement('input')
-
-    input.type = 'file'
-
-    input.accept = '.md,.txt'
-
-    input.onchange = (e) => {
-
-      const file = (e.target as HTMLInputElement).files?.[0]
-
-      if (!file) return
-
-      const reader = new FileReader()
-
-      reader.onload = (ev) => {
-
-        const content = ev.target?.result as string
-
-        if (hasRelativeImageReferences(content)) {
-          window.alert('浏览器环境下，含本地图片的 Markdown 请使用“导入文件夹”')
-          return
-        }
-
-        void store.importMarkdownFile({
-          content,
-          path: file.name,
-          name: file.name,
-          images: [],
-        }, folderId).then((result) => {
-          tabsStore.openTabForNewNote(result.note.id)
-        })
-
-      }
-
-      reader.readAsText(file)
-
-    }
-
-    input.click()
-
-  }
-
+  await importMarkdownToActiveFolder()
 }
 
 

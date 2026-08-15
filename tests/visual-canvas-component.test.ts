@@ -201,9 +201,8 @@ describe('Visual Canvas Layer - Component Integration', () => {
       setActivePinia(pinia)
       const noteStore = useNoteStore(pinia)
       const tabsStore = useEditorTabsStore(pinia)
-      
-      tabsStore.activeTabId = 'tab-1'
-      noteStore.noteList.value = [{ id: 'note-1', title: 'Test', content: '', folderId: null }]
+      const note = noteStore.createNoteWithContent('# Test\n')
+      tabsStore.openTab(note.id)
 
       const wrapper = mount(App, {
         ...createMocks(),
@@ -227,10 +226,8 @@ describe('Visual Canvas Layer - Component Integration', () => {
       setActivePinia(pinia)
       const noteStore = useNoteStore(pinia)
       const tabsStore = useEditorTabsStore(pinia)
-      
-      // Create a tab to trigger editor rendering
-      tabsStore.activeTabId = 'tab-1'
-      noteStore.noteList.value = [{ id: 'note-1', title: 'Test', content: '', folderId: null }]
+      const note = noteStore.createNoteWithContent('# Test\n')
+      tabsStore.openTab(note.id)
 
       const wrapper = mount(App, {
         ...createMocks(),

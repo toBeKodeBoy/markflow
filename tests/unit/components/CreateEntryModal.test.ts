@@ -77,6 +77,28 @@ describe('CreateEntryModal', () => {
     })
   })
 
+  it('新建文件时展示模板选择，默认空白，选模板后按模板创建', async () => {
+    const store = useNoteStore()
+    const wrapper = mountModal({ folders: store.folderList })
+
+    await flushPromises()
+    expect(wrapper.find('[data-testid="create-entry-templates"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="create-entry-template-blank"]').exists()).toBe(true)
+
+    await wrapper.findAll('[data-testid="create-entry-template-option"]')[0].trigger('click')
+    await wrapper.find('form').trigger('submit.prevent')
+
+    expect(store.noteList).toHaveLength(1)
+    expect(store.noteList[0].title).toBe('技术开发文档')
+    expect(store.getNoteContentById(store.noteList[0].id).length).toBeGreaterThan(180)
+  })
+
+  it('新建文件夹时不展示模板选择', async () => {
+    const wrapper = mountModal({ defaultKind: 'folder', folders: [] })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="create-entry-templates"]').exists()).toBe(false)
+  })
+
   it('锁定目录时不展示下拉选择，只显示目标路径', async () => {
     const store = useNoteStore()
     const parent = store.createFolder('知识库')

@@ -426,6 +426,197 @@ input:focus { border-color: var(--primary); }
   background: var(--bg-hover);
 }
 
+.empty-tabs-actions button:not(.btn-primary).active {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+  background: var(--bg-active);
+  color: var(--primary);
+}
+
+.empty-home-storage-hint {
+  max-width: 520px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-placeholder);
+}
+
+.empty-home-templates {
+  width: min(720px, 100%);
+  margin-top: 8px;
+}
+
+.empty-home-templates-title {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.empty-home-template-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.empty-home-template-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-toolbar);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.empty-home-template-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.empty-home-template-icon.tone-blue {
+  color: #3b82f6;
+  background: color-mix(in srgb, #3b82f6 14%, transparent);
+}
+
+.empty-home-template-icon.tone-green {
+  color: #22c55e;
+  background: color-mix(in srgb, #22c55e 14%, transparent);
+}
+
+.empty-home-template-icon.tone-orange {
+  color: #f97316;
+  background: color-mix(in srgb, #f97316 14%, transparent);
+}
+
+.empty-home-template-icon.tone-purple {
+  color: #a855f7;
+  background: color-mix(in srgb, #a855f7 14%, transparent);
+}
+
+.empty-home-template-card:hover {
+  background: var(--bg-hover);
+}
+
+.empty-home-template-card span {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.empty-home-template-card em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--primary);
+}
+
+.empty-home-hints {
+  max-width: 520px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-placeholder);
+}
+
+.empty-home-hints li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.empty-home-hint-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+
+.empty-home-example-link {
+  margin-top: 8px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--primary);
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .empty-home-template-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.onboarding-coach {
+  position: fixed;
+  left: 50%;
+  bottom: 48px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(360px, calc(100% - 32px));
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.onboarding-bubble,
+.onboarding-controls {
+  pointer-events: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-toolbar);
+  box-shadow: var(--shadow-md);
+}
+
+.onboarding-bubble {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.onboarding-bubble p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.onboarding-step-badge {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+  line-height: 20px;
+  text-align: center;
+}
+
+.onboarding-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.onboarding-controls button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--primary);
+}
+
 .mode-focus .editor-tab-bar { display: none; }
 
 .app-logo {
@@ -1138,6 +1329,32 @@ input:focus { border-color: var(--primary); }
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.6;
+}
+
+.create-entry-template-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.create-entry-template-chip {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-editor);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.create-entry-template-chip:hover {
+  background: var(--bg-hover);
+}
+
+.create-entry-template-chip.active {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+  background: var(--bg-active);
+  color: var(--primary);
 }
 
 .pdf-export-modal { min-width: 320px; }

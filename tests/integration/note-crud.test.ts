@@ -33,10 +33,10 @@ describe('笔记 CRUD 集成', () => {
     store.renameNote(note.id, '新标题')
     expect(store.currentNote!.title).toBe('新标题')
 
-    // 4. 删除（最后一个笔记会创建 welcome 笔记）
+    // 4. 删除最后一篇后停在空态，不再自动创建欢迎笔记
     store.deleteNote(note.id)
-    expect(store.noteList).toHaveLength(1)
-    expect(store.currentNote?.content).toContain('欢迎使用 MarkFlow')
+    expect(store.noteList).toHaveLength(0)
+    expect(store.currentNote).toBeNull()
   })
 
   it('多笔记切换应保持各自内容', () => {

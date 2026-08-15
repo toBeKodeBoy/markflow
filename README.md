@@ -44,14 +44,20 @@ MarkFlow 是一个面向日常 Markdown 写作的 uTools 插件。解决本地�
 ## 功能特性
 
 **笔记管理**
-- 创建、重命名、删除笔记，自动从首个标题提取笔记名；**新建笔记/文件夹弹窗**（`CreateEntryModal`）支持一步创建
-- 文件夹创建、重命名与删除，多级文件夹树、拖拽移动、虚拟列表（>150 行）
+- 创建、重命名、复制笔记，自动从首个标题提取笔记名；**新建笔记/文件夹弹窗**（`CreateEntryModal`）支持一步创建
+- 文件夹创建、重命名、拖拽移动与层级展开/折叠；多级文件夹树、虚拟列表（>150 行）；侧栏可拖拽调宽
+- **虚拟目录**：「我的文件夹」为根容器；「最新」展示最近打开的笔记（最多 30 篇）
+- **置顶**：笔记可置顶；顶层文件夹可置顶，侧栏单独显示「常用文件夹」分区
+- **回收站**（`TrashPanel`）：删除笔记/文件夹为软删除，可恢复或彻底删除；容量上限 200 条；启动时按保留天数自动清理（默认 30 天）
+- 删除文件夹时连同子树与其中笔记一并移入回收站（不再把笔记挪到父文件夹）
+- 笔记多选（Ctrl/Cmd 点击）后批量移动；右键可定位所在文件夹
 - **多文档页签**（`EditorTabBar`）：同时打开多个笔记，页签切换、拖拽排序、关闭，上限 10 个（`MAX_EDITOR_TABS`）
 - **全文搜索**：标题 + 正文联合搜索，匹配摘要高亮（`SearchModal`，顶栏入口与 `Ctrl+K`）
-- **排序**：置顶/取消置顶，同文件夹内拖拽重排（`sortOrder`）
+- **排序**：笔记置顶优先，同文件夹内拖拽重排（`sortOrder`）
 - 导入/导出 `.md` 文件；**批量导入文件夹**（`ImportFolderModal`，可选保留目录结构与图片）
+- 导出 Markdown 时可按设置写出图片（同级目录 / `.assets` / 自定义模板 / Typora 缓存路径）
 - 导出 **PDF**（`PdfExportModal` 配置选项，uTools 环境走 Chromium `printToPDF`，浏览器环境回退系统打印）
-- **数据备份 v2**（JSON 含笔记、文件夹、设置与图片资产）；设置页可**清空全部数据**；支持**自动备份**
+- **数据备份 v2**（JSON 含笔记、文件夹、设置与图片资产）；设置页可**清空全部数据**（同时清空回收站）；支持**自动备份**
 - 生产环境使用 `utools.dbStorage`，开发环境自动回退 `localStorage`
 
 **编辑与预览**
@@ -74,8 +80,9 @@ MarkFlow 是一个面向日常 Markdown 写作的 uTools 插件。解决本地�
 - 一键复制预览内容为 HTML
 
 **界面与设置**
-- 工具栏 ⚙ **设置面板**（`SettingsModal`）：主题（浅色 / 深色 / 跟随系统或 uTools）、源码字号、等宽字体、PDF 选项、存储用量、备份与清空
-- 可独立隐藏侧边栏与目录面板（侧边栏显隐会记住）
+- 工具栏 **设置面板**（`SettingsModal`）：主题（浅色 / 深色 / 跟随系统或 uTools）、源码字号、等宽字体、自动备份、Markdown 图片导出路径、存储用量、备份与清空
+- 视图模式通过下拉菜单切换（`ViewModeDropdown`）
+- 可独立隐藏侧边栏与目录面板（侧边栏显隐、宽度会记住）；侧栏底部打开回收站
 - 专注模式隐藏工具栏与侧边栏，居中宽屏写作，按 `Esc` 退出
 - **全屏模式**（`useFullscreen`）：编辑区独立全屏，配合专注模式沉浸写作
 
@@ -134,7 +141,7 @@ npm run test:watch
 
 ## 视图模式
 
-顶部工具栏提供四种编辑视图：
+顶部工具栏 / 编辑区下拉（`ViewModeDropdown`）提供四种编辑视图：
 
 | 模式 | 说明 | 编辑区 | 渲染引擎 |
 |------|------|--------|----------|
@@ -174,18 +181,24 @@ markflow/
 │   ├── style.css            # 全局样式与 CSS 变量（明/暗主题）
 │   ├── constants.ts         # 阈值与防抖常量
 │   ├── constants/
-│   │   └── welcomeNote.ts   # 默认欢迎笔记内容
+│   │   ├── welcomeNote.ts   # 默认欢迎笔记内容
+│   │   ├── myFolder.ts      # 「我的文件夹」虚拟根目录
+│   │   └── recentFolder.ts  # 「最新」虚拟目录与最近笔记上限
 │   ├── types/
 │   │   ├── index.ts         # TypeScript 核心类型定义
 │   │   ├── asset.ts         # 图片资源类型
+│   │   ├── imageExport.ts   # Markdown 图片导出路径设置
 │   │   ├── import.ts        # 导入功能类型
 │   │   └── task.ts          # 任务列表类型
 │   ├── extensions/
 │   │   └── autoCloseBrackets.ts  # CodeMirror 括号自动闭合扩展
 │   ├── components/          # 界面组件
 │   │   ├── Toolbar.vue          # 工具栏（新建/搜索/导入导出/目录/设置）
-│   │   ├── Sidebar.vue          # 侧边栏（文件夹树/最近/笔记）
+│   │   ├── Sidebar.vue          # 侧边栏（我的文件夹 / 最新 / 文件夹树 / 回收站）
+│   │   ├── SidebarTreeRow.vue   # 侧栏树行组件
+│   │   ├── TRashPanel.vue       # 回收站面板（恢复 / 彻底删除 / 清空）
 │   │   ├── EditorTabBar.vue     # 多文档页签栏
+│   │   ├── ViewModeDropdown.vue # 视图模式切换下拉
 │   │   ├── CreateEntryModal.vue # 新建笔记/文件夹弹窗
 │   │   ├── SearchModal.vue      # 全文搜索弹窗
 │   │   ├── WysiwygEditor.vue    # Milkdown WYSIWYG 编辑器
@@ -195,21 +208,20 @@ markflow/
 │   │   ├── FocusFormatToolbar.vue # 专注模式浮动格式工具栏
 │   │   ├── TableToolbar.vue     # 表格编辑工具栏
 │   │   ├── Toc.vue              # 文档目录导航
-│   │   ├── SidebarTreeRow.vue   # 侧栏树行组件
 │   │   ├── ImageLightbox.vue    # 图片全屏预览灯箱
 │   │   ├── ImportFolderModal.vue# 批量导入文件夹弹窗
-│   │   ├── SettingsModal.vue    # 设置、备份、清空数据
+│   │   ├── SettingsModal.vue    # 设置、备份、图片导出、清空数据
 │   │   ├── PdfExportModal.vue   # PDF 导出配置弹窗
 │   │   ├── LinkDialog.vue       # 链接编辑弹窗
 │   │   ├── HighlightTextModal.vue # 高亮文本弹窗
 │   │   └── AppIcon.vue          # 应用图标 / 状态指示
 │   ├── stores/              # Pinia 状态管理
-│   │   ├── note.ts              # 笔记 CRUD 与状态
+│   │   ├── note.ts              # 笔记/文件夹 CRUD、置顶、回收站
 │   │   ├── editorTabs.ts        # 多文档页签管理
 │   │   ├── editorTabsBridge.ts  # 页签与笔记同步桥接
 │   │   └── tabContentCache.ts   # 页签内容缓存
 │   ├── composables/         # 可复用组合式逻辑（17 个）
-│   │   ├── useStorage.ts        # 存储抽象（utools / localStorage）
+│   │   ├── useStorage.ts        # 存储抽象（utools / localStorage，含回收站）
 │   │   ├── useTheme.ts          # 主题切换（明/暗/跟随系统）
 │   │   ├── useAppSettings.ts    # 应用设置读写
 │   │   ├── useScrollSync.ts     # 分屏滚动同步
@@ -224,8 +236,9 @@ markflow/
 │   │   ├── useBackup.ts         # 手动备份/恢复
 │   │   ├── useFocusToolbarVisibility.ts # 专注模式工具栏显隐
 │   │   ├── useFullscreen.ts     # 全屏状态管理
-│   │   └── useTableToolbar.ts   # 表格工具栏逻辑
-│   ├── plugins/             # Milkdown 插件（14 个）
+│   │   ├── useTableToolbar.ts   # 表格工具栏逻辑
+│   │   └── useViewModeFlash.ts  # 视图切换高亮提示
+│   ├── plugins/             # Milkdown 插件（15 个）
 │   │   ├── math.ts              # LaTeX 数学公式支持
 │   │   ├── codeBlockLabel.ts    # 代码块语言标签
 │   │   ├── headingId.ts         # 标题自动编号
@@ -239,8 +252,9 @@ markflow/
 │   │   ├── autoCloseBrackets.ts # 括号自动闭合
 │   │   ├── plainTextFallback.ts # 纯文本回退保护
 │   │   ├── tableToolbar.ts      # 表格编辑工具栏
-│   │   └── footnoteDisplay.ts   # 脚注渲染
-│   └── utils/               # 工具函数（50 个）
+│   │   ├── footnoteDisplay.ts   # 脚注渲染
+│   │   └── footnoteAutoConvert.ts # 脚注语法自动转为节点
+│   └── utils/               # 工具函数（约 60 个）
 │       ├── markedSetup.ts       # marked 解析器配置
 │       ├── mathRender.ts        # KaTeX 数学渲染
 │       ├── mermaidRender.ts     # Mermaid 图示渲染
@@ -259,17 +273,24 @@ markflow/
 │       ├── imageInsert.ts       # 图片插入
 │       ├── imageScale.ts        # 图片缩放
 │       ├── imageLightbox.ts     # 图片灯箱逻辑
+│       ├── imageExportPath.ts   # 导出 Markdown 时的图片路径
+│       ├── exportMarkdownAssets.ts # 导出时写出图片资源
+│       ├── exportAssetFilename.ts  # 导出资源文件名
 │       ├── assetUri.ts          # 资源 URI 处理
 │       ├── resolveMarkdownAssets.ts # Markdown 资源路径解析
 │       ├── backup.ts            # 备份/恢复核心逻辑
 │       ├── autoBackup.ts        # 自动备份核心
 │       ├── autoBackupBrowser.ts # 浏览器环境自动备份
+│       ├── autoPurgeTrash.ts    # 回收站到期自动清理
 │       ├── noteTitle.ts         # 笔记标题提取
 │       ├── noteSort.ts          # 笔记排序
 │       ├── migrateNoteSortOrder.ts # 排序兼容迁移
 │       ├── folderTree.ts        # 文件夹树操作
-│       ├── sidebarTree.ts       # 侧栏树构建
+│       ├── sidebarTree.ts       # 侧栏树构建（含我的文件夹 / 最新 / 置顶区）
 │       ├── treeIndex.ts         # 树形索引
+│       ├── recentNotes.ts       # 最近打开笔记
+│       ├── searchHistory.ts     # 搜索历史
+│       ├── searchSnippet.ts     # 搜索摘要高亮
 │       ├── importFolderDevScan.ts   # 开发环境文件夹扫描
 │       ├── importFolderHelpers.ts   # 导入辅助函数
 │       ├── importFolderOptions.ts   # 导入选项配置
@@ -280,10 +301,15 @@ markflow/
 │       ├── headingSlug.ts       # 标题锚点生成
 │       ├── generateTocMarkdown.ts   # 目录 Markdown 生成
 │       ├── previewFragmentNav.ts    # 预览片段导航
-│       ├── searchSnippet.ts     # 搜索摘要高亮
+│       ├── previewLinkNav.ts        # 预览链接跳转
 │       ├── storageStats.ts      # 存储用量统计
 │       ├── inlineCode.ts        # 行内代码处理
 │       ├── notify.ts            # 通知提示
+│       ├── logger.ts            # 日志
+│       ├── formatRelativeTime.ts    # 相对时间（回收站等）
+│       ├── pathTemplate.ts      # 导出路径模板
+│       ├── linkEditing.ts       # 链接编辑
+│       ├── stripInlineMarkdown.ts   # 行内 Markdown 剥离
 │       ├── wysiwygFormat.ts     # WYSIWYG 格式化
 │       ├── taskListParse.ts     # 任务列表解析
 │       ├── taskListMutations.ts # 任务列表状态变更
@@ -296,7 +322,7 @@ markflow/
 │   │   ├── stores/                 # 状态管理测试
 │   │   ├── plugins/                # 插件测试
 │   │   └── utils/                  # 工具函数测试
-│   ├── integration/            # 集成测试（WYSIWYG、备份恢复、笔记 CRUD 等）
+│   ├── integration/            # 集成测试（WYSIWYG、备份恢复、笔记 CRUD、文件夹回收站等）
 │   ├── architecture/           # 架构约束测试
 │   ├── helpers/                # 测试辅助工具
 │   ├── utils/                  # 测试工具函数
@@ -351,6 +377,14 @@ markflow/
 | `ASSET_MAX_BYTES` | 2 MB | 单张图片资源最大体积 |
 | `MAX_EDITOR_TABS` | 10 | 同时打开的最大编辑器页签数 |
 
+回收站与侧栏相关默认值（不在 `constants.ts`）：
+
+| 常量 / 设置 | 值 | 说明 |
+|-----|-----|------|
+| `TRASH_MAX_ITEMS` | 200 | 回收站容量上限（`stores/note.ts`） |
+| `trashRetentionDays` | 30 | 回收站保留天数（`AppSettings`，启动时自动清理） |
+| `RECENT_NOTE_LIMIT` | 30 | 「最新」虚拟目录最多展示篇数 |
+
 ### 数据存储 Key
 
 | Key | 内容 |
@@ -358,7 +392,9 @@ markflow/
 | `markflow_note_list` | 笔记列表（id、标题、文件夹、时间等） |
 | `markflow_note_{id}` | 单篇笔记正文 |
 | `markflow_folder_list` | 文件夹列表 |
-| `markflow_settings` | 应用设置（主题、字号、PDF 等） |
+| `markflow_settings` | 应用设置（主题、字号、PDF、图片导出、侧栏状态等） |
+| `markflow_trash_notes` | 回收站笔记 |
+| `markflow_trash_folders` | 回收站文件夹条目（含子树快照） |
 | `markflow_asset_*` | 图片等资源索引与二进制（IndexedDB / 桥接层） |
 
 ## 常见问题 FAQ
@@ -385,7 +421,11 @@ markflow/
 
 **Q6：如何清除本地笔记数据？**
 
-设置 → 数据管理 → **清空全部数据**（二次确认）；或移除 uTools 插件重装（清除 `utools.dbStorage`）。
+侧栏底部打开 **回收站**，可恢复或彻底删除单条；也可「清空回收站」。设置 → 数据管理 → **清空全部数据**（二次确认）会删除全部笔记、文件夹、图片与回收站（保留应用设置）；或移除 uTools 插件重装（清除 `utools.dbStorage`）。
+
+**Q7：删除的笔记还能找回吗？**
+
+可以。删除笔记或文件夹会进入回收站，默认保留 30 天，启动时自动清理过期条目。容量上限 200 条；满了之后需要先清空部分条目才能继续删除。
 
 ## 贡献指南
 

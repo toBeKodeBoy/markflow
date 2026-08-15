@@ -18,6 +18,7 @@
       'pinned-folder': row.folder?.pinned,
     }"
     :data-folder-id="row.folder?.id"
+    :data-onboarding="row.isMyFolder ? 'my-folder' : undefined"
     :style="rowStyle"
     :draggable="!row.isSystemFolder"
     @click="$emit('folder-click', row.folder!.id, row.hasChildren)"

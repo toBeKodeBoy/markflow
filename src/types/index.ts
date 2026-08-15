@@ -203,6 +203,12 @@ export interface AppSettings {
   imageExport?: ImageExportSettings
   /** 回收站保留天数（默认 30） */
   trashRetentionDays?: number
+  /** 空库新手引导是否已关闭（跳过或勾选不再展示） */
+  onboardingDismissed?: boolean
+  /** 按需创建的新手教程笔记 id */
+  tutorialNoteId?: string | null
+  /** 示例知识库是否已导入（幂等） */
+  exampleLibraryImported?: boolean
 }
 
 // uTools preload bridge type

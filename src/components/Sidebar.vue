@@ -290,6 +290,7 @@
         <span v-if="trashCount > 0" class="trash-badge">{{ trashCount }}</span>
         <span class="trash-label">回收站</span>
       </button>
+      <p data-testid="sidebar-storage-caption" class="sidebar-storage-caption">{{ SIDEBAR_STORAGE_CAPTION }}</p>
     </div>
 
     <!-- 回收站面板 -->
@@ -331,6 +332,7 @@ import { sortNotes } from '../utils/noteSort'
 import { buildRecentNoteList } from '../utils/recentNotes'
 import { RECENT_FOLDER_ID, RECENT_FOLDER_NAME } from '../constants/recentFolder'
 import { MY_FOLDER_ID, MY_FOLDER_NAME } from '../constants/myFolder'
+import { SIDEBAR_STORAGE_CAPTION } from '../constants/emptyHomeCopy'
 
 const SIDEBAR_ROW_HEIGHT = 42
 const VIRTUAL_THRESHOLD = 150
@@ -1158,6 +1160,13 @@ onUnmounted(() => document.removeEventListener('click', onGlobalClick))
   width: 16px;
   height: 16px;
   flex-shrink: 0;
+}
+
+.sidebar-storage-caption {
+  margin: 6px 4px 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted, var(--text-secondary));
 }
 
 .trash-btn.has-items {
