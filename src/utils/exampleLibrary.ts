@@ -26,7 +26,9 @@ export function importExampleLibrary(): ImportExampleLibraryResult {
   let created = false
   let openedNoteId: string | null = null
   const expanded = new Set(appSettings.get().sidebarExpandedFolderIds ?? [])
+  const expandedSpaces = new Set(appSettings.get().sidebarExpandedSpaceIds ?? [])
   expanded.add(MY_FOLDER_ID)
+  expandedSpaces.add(MY_FOLDER_ID)
 
   for (const folderSeed of EXAMPLE_LIBRARY) {
     let folder = findRootFolderByName(folderSeed.name)
@@ -36,6 +38,7 @@ export function importExampleLibrary(): ImportExampleLibraryResult {
     }
     if (!folder) continue
     expanded.add(folder.id)
+    expandedSpaces.add(folder.id)
     for (const noteSeed of folderSeed.notes) {
       const existed = store.noteList.find(
         (item) => item.title === noteSeed.title && item.folderId === folder.id,
@@ -57,6 +60,7 @@ export function importExampleLibrary(): ImportExampleLibraryResult {
   appSettings.save({
     exampleLibraryImported: true,
     sidebarExpandedFolderIds: [...expanded],
+    sidebarExpandedSpaceIds: [...expandedSpaces],
   })
   store.notifySidebarStateChanged()
   if (openedNoteId) tabsStore.openTabForNewNote(openedNoteId)

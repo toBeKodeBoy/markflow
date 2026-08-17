@@ -1,5 +1,6 @@
 import type { AppSettings, Folder, Note, NoteListItem } from '../types'
 import type { AssetIndexItem, AssetRecord } from '../types/asset'
+import { MY_FOLDER_ID } from '../constants/myFolder'
 
 type LegacyNote = Note & { tags?: unknown }
 
@@ -50,6 +51,28 @@ export interface BackupAssetWriter {
 }
 
 const EMPTY_ASSETS: MarkFlowBackupAssets = { index: [], records: {} }
+
+function resolveExpandedSpaceIds(settings: Partial<AppSettings>, folders: Folder[]): string[] | undefined {
+  if (settings.sidebarExpandedSpaceIds !== undefined) return settings.sidebarExpandedSpaceIds
+  if (settings.sidebarExpandedFolderIds === undefined) return undefined
+
+  const ids = new Set<string>()
+  for (const id of settings.sidebarExpandedFolderIds) {
+    if (id === MY_FOLDER_ID) {
+      ids.add(MY_FOLDER_ID)
+      continue
+    }
+
+    let current = folders.find((folder) => folder.id === id)
+    while (current?.parentId) {
+      const parentId = current.parentId
+      current = folders.find((folder) => folder.id === parentId)
+    }
+    if (current) ids.add(current.id)
+  }
+
+  return [...ids]
+}
 
 function sanitizeBackupNote(note: LegacyNote): Note {
   const { tags: _tags, ...rest } = note
@@ -153,11 +176,15 @@ export function applyBackup(
     }
   }
   const current = storage.getSettings()
+  const backupSettings = (backup.settings ?? {}) as Partial<AppSettings>
   const next: AppSettings = {
     ...current,
-    sidebarExpandedFolderIds: backup.settings.sidebarExpandedFolderIds,
-    sidebarActiveFolderId: backup.settings.sidebarActiveFolderId,
-    recentNoteAccess: backup.settings.recentNoteAccess,
+    sidebarExpandedFolderIds: backupSettings.sidebarExpandedFolderIds,
+    sidebarExpandedSpaceIds: resolveExpandedSpaceIds(backupSettings, backup.folders),
+    myFolderIntroMigrated:
+      backupSettings.sidebarExpandedSpaceIds === undefined ? true : backupSettings.myFolderIntroMigrated,
+    sidebarActiveFolderId: backupSettings.sidebarActiveFolderId,
+    recentNoteAccess: backupSettings.recentNoteAccess,
   }
   storage.saveSettings(next)
   return next

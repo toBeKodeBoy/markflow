@@ -22,36 +22,45 @@ describe('首页留白', () => {
     expect(home).not.toMatch(/知识库/)
   })
 
-  it('首页内边距与标题应拉开', () => {
-    expect(css).toMatch(/\.empty-tabs-state\s*\{[^}]*padding:\s*48px\s+40px\s+56px/)
-    expect(css).toMatch(/\.empty-tabs-state\s*\{[^}]*gap:\s*40px/)
-    expect(css).toMatch(/\.empty-tabs-title\s*\{[^}]*font-size:\s*28px/)
-    expect(css).toMatch(/\.empty-home-hero\s*\{[^}]*gap:\s*12px/)
+  it('欢迎标题必须居中可见，且首页溢出时不得从顶部裁切', () => {
+    expect(home).toMatch(/class="empty-tabs-title"/)
+    expect(css).toMatch(/\.empty-tabs-state\s*\{[^}]*text-align:\s*center/)
+    expect(css).toMatch(/\.empty-tabs-state\s*\{[^}]*overflow-y:\s*auto/)
+    expect(css).toMatch(/\.empty-tabs-state\s*\{[^}]*justify-content:\s*safe\s+center/)
+    expect(css).toMatch(/\.empty-tabs-title\s*\{[^}]*font-size:\s*32px/)
+    expect(css).toMatch(/\.empty-tabs-title\s*\{[^}]*color:\s*var\(--text\)/)
   })
 
-  it('模板区应更宽、卡片间距与内边距更大', () => {
-    expect(css).toMatch(/\.empty-home-templates\s*\{[^}]*width:\s*min\(920px,\s*100%\)/)
-    expect(css).toMatch(/\.empty-home-template-grid\s*\{[^}]*gap:\s*20px/)
-    expect(css).toMatch(/\.empty-home-template-card\s*\{[^}]*padding:\s*20px/)
-    expect(css).toMatch(/\.empty-home-template-card\s*\{[^}]*min-height:\s*160px/)
-    expect(css).toMatch(/\.empty-home-template-icon\s*\{[^}]*width:\s*36px/)
-    expect(css).toMatch(/\.empty-home-templates-title\s*\{[^}]*margin:\s*0\s+0\s+16px/)
-  })
-
-  it('首页操作按钮应为更高的胶囊形', () => {
-    expect(css).toMatch(/\.empty-tabs-actions[\s\S]*?min-height:\s*40px/)
+  it('三个主操作按钮必须单行居中且不换行', () => {
+    expect(css).toMatch(/\.empty-tabs-actions\s*\{[^}]*flex-wrap:\s*nowrap/)
+    expect(css).toMatch(/\.empty-tabs-actions\s*\{[^}]*justify-content:\s*center/)
     expect(css).toMatch(/\.empty-tabs-actions[\s\S]*?border-radius:\s*999px/)
   })
 
-  it('窄窗应收缩首页边距，说明最多两行以免撑破网格', () => {
+  it('模板区四卡必须同一行等宽均分，禁止 3+1 与 2×2', () => {
+    expect(css).toMatch(
+      /\.empty-home-templates\s*\{[^}]*width:\s*min\(\s*var\(--content-max\),\s*100%\s*\)/,
+    )
+    expect(css).toMatch(
+      /\.empty-home-template-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/,
+    )
+    expect(css).not.toMatch(/\.empty-home-template-grid[^{]*\{[^}]*repeat\([23]/)
+    expect(home).toMatch(/class="empty-home-template-grid"/)
+  })
+
+  it('窄窗只收缩边距，描述最多两行，卡片不得改列数换行', () => {
     expect(css).toMatch(/@media\s*\(max-width:\s*720px\)[\s\S]*\.empty-tabs-state[\s\S]*?padding:\s*32px\s+16px\s+40px/)
     expect(css).toMatch(/\.empty-home-template-desc[\s\S]*?-webkit-line-clamp:\s*2/)
     expect(home).toMatch(/empty-home-template-desc/)
+    expect(css).not.toMatch(
+      /@media\s*\(max-width:\s*900px\)[\s\S]*?\.empty-home-template-grid[\s\S]*?repeat\([23]/,
+    )
   })
 
-  it('首页不再渲染侧栏管理提示句', () => {
+  it('首页不再渲染侧栏管理提示句与三条 hint', () => {
     expect(home).not.toMatch(/EMPTY_HOME_SIDEBAR_HINT/)
     expect(home).not.toMatch(/侧边栏可管理所有文件夹与笔记/)
+    expect(home).not.toMatch(/empty-home-hints/)
   })
 })
 
@@ -92,14 +101,13 @@ describe('侧栏留白', () => {
     expect(spaces).toMatch(/gap:\s*var\(--sidebar-space-gap\)/)
     expect(spaces).toMatch(/padding:\s*var\(--sidebar-section-y\)\s+8px/)
     expect(spaces).toMatch(/\.sidebar-spaces-header[\s\S]*?padding:\s*4px\s+var\(--sidebar-pad-x\)\s+2px/)
-    expect(spaces).toMatch(/\.sidebar-space-item[\s\S]*?padding:\s*var\(--sidebar-item-py\)\s+var\(--sidebar-pad-x\)/)
+    expect(spaces).toMatch(/\.sidebar-space-select[\s\S]*?padding:\s*var\(--sidebar-item-py\)\s+var\(--sidebar-pad-x\)/)
     expect(footer).toMatch(/\.sidebar-footer\s*\{[^}]*padding:\s*var\(--sidebar-section-y\)/)
     expect(footer).toMatch(/padding:\s*var\(--sidebar-item-py\)\s+var\(--sidebar-pad-x\)/)
   })
 
-  it('树节点垂直 padding 应与导航对齐，行高保持 42', () => {
+  it('树节点垂直 padding 应与导航对齐', () => {
     expect(css).toMatch(/\.folder-item\s*\{[^}]*padding:\s*8px\s+12px/)
-    expect(sidebar).toMatch(/SIDEBAR_ROW_HEIGHT = 42/)
   })
 
   it('导航与设置应使用 AppIcon，且提供 home', () => {
@@ -107,6 +115,7 @@ describe('侧栏留白', () => {
     expect(nav).toMatch(/name=["']file["']/)
     expect(nav).toMatch(/name=["']trash["']/)
     expect(footer).toMatch(/name=["']settings["']/)
+    expect(footer).toMatch(/name=["']help["']/)
     expect(icons).toMatch(/name === 'home'/)
     expect(icons).toMatch(/\| 'home'/)
   })

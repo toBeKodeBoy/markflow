@@ -10,6 +10,7 @@
           data-testid="empty-home-create"
           @click="emit('create')"
         >
+          <AppIcon name="plus" :size="16" />
           {{ EMPTY_HOME_CREATE_LABEL }}
         </button>
         <button
@@ -17,6 +18,7 @@
           data-testid="empty-home-create-folder"
           @click="emit('createFolder')"
         >
+          <AppIcon name="folder" :size="16" />
           {{ EMPTY_HOME_CREATE_FOLDER_LABEL }}
         </button>
         <button
@@ -24,6 +26,7 @@
           data-testid="empty-home-import"
           @click="emit('import')"
         >
+          <AppIcon name="upload" :size="16" />
           {{ EMPTY_HOME_IMPORT_LABEL }}
         </button>
       </div>
@@ -38,6 +41,7 @@
           :key="item.id"
           type="button"
           class="empty-home-template-card"
+          :class="'tone-' + item.iconTone"
           data-testid="empty-home-template-card"
           @click="emit('useTemplate', item.id)"
         >
@@ -47,44 +51,24 @@
               :class="'tone-' + item.iconTone"
               data-testid="empty-home-template-icon"
             >
-              <AppIcon :name="item.icon" :size="20" />
+              <AppIcon :name="item.icon" :size="24" />
             </span>
             <strong>{{ item.title }}</strong>
             <span class="empty-home-template-desc">{{ item.description }}</span>
           </span>
-          <em>一键创建</em>
+          <span class="empty-home-template-cta" data-testid="empty-home-template-cta">一键创建</span>
         </button>
       </div>
     </section>
 
     <div v-if="emptyLibrary" class="empty-home-footer">
-      <ul data-testid="empty-home-hints" class="empty-home-hints">
-        <li>
-          <span data-testid="empty-home-hint-icon" class="empty-home-hint-icon">
-            <AppIcon name="info" :size="14" />
-          </span>
-          <span>{{ EMPTY_HOME_HINT_EXPORT }}</span>
-        </li>
-        <li>
-          <span data-testid="empty-home-hint-icon" class="empty-home-hint-icon">
-            <AppIcon name="info" :size="14" />
-          </span>
-          <span>{{ EMPTY_HOME_HINT_THEME }}</span>
-        </li>
-        <li>
-          <span data-testid="empty-home-hint-icon" class="empty-home-hint-icon">
-            <AppIcon name="info" :size="14" />
-          </span>
-          <span>{{ EMPTY_HOME_HINT_FOLDER_COUNT }}</span>
-        </li>
-      </ul>
-
       <button
         type="button"
         class="empty-home-example-link"
         data-testid="empty-home-example-library"
         @click="emit('importExample')"
       >
+        <AppIcon name="download" :size="14" />
         {{ EMPTY_HOME_EXAMPLE_LIBRARY_LABEL }}
       </button>
     </div>
@@ -96,9 +80,6 @@ import {
   EMPTY_HOME_CREATE_FOLDER_LABEL,
   EMPTY_HOME_CREATE_LABEL,
   EMPTY_HOME_EXAMPLE_LIBRARY_LABEL,
-  EMPTY_HOME_HINT_EXPORT,
-  EMPTY_HOME_HINT_FOLDER_COUNT,
-  EMPTY_HOME_HINT_THEME,
   EMPTY_HOME_IMPORT_LABEL,
   EMPTY_HOME_STORAGE_HINT,
   EMPTY_HOME_SUBTITLE,

@@ -192,7 +192,7 @@ describe('Toolbar', () => {
     const wrapper = mountToolbar()
 
     expect(wrapper.find('[data-testid="toolbar-search-bar"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="toolbar-search-bar"]').text()).toContain('搜索笔记')
+    expect(wrapper.find('[data-testid="toolbar-search-bar"]').text()).toContain('搜索文档')
     expect(wrapper.find('[data-testid="toolbar-history-back"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="toolbar-history-forward"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="toolbar-history-back"]').attributes('disabled')).toBeDefined()
@@ -305,6 +305,20 @@ describe('Toolbar', () => {
     expect(window.markflow.showNotification).toHaveBeenCalledWith(
       '导出完成，但有 2 张外链图片下载失败，已保留原链接。外链图片下载失败：https://example.com/a.png（HTTP 404）；另有 1 条同类问题'
     )
+  })
+
+  it('首页隐藏目录按钮，编辑视图才显示', () => {
+    const homeToolbar = mount(Toolbar, {
+      props: { tocVisible: false, tocAvailable: false },
+      global: {
+        plugins: [pinia],
+        stubs: { PdfExportModal: true, SettingsModal: true, ImportFolderModal: true, AppIcon: true },
+      },
+    })
+    expect(homeToolbar.find('[aria-label="目录"]').exists()).toBe(false)
+
+    const editorToolbar = mountToolbar()
+    expect(editorToolbar.find('[aria-label="目录"]').exists()).toBe(true)
   })
 
   it('点击搜索条应派发 openSearch', async () => {

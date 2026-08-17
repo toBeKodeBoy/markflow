@@ -3,9 +3,8 @@ import { mount } from '@vue/test-utils'
 import SidebarFooter from '../../../../src/components/sidebar/SidebarFooter.vue'
 
 describe('SidebarFooter', () => {
-  it('设置行应带 settings 图标，点击发出 openSettings', async () => {
-    const wrapper = mount(SidebarFooter, {
-      props: { caption: '数据：uTools 本地数据库' },
+  function mountFooter() {
+    return mount(SidebarFooter, {
       global: {
         stubs: {
           AppIcon: {
@@ -15,14 +14,20 @@ describe('SidebarFooter', () => {
         },
       },
     })
+  }
 
-    expect(wrapper.get('.app-icon-stub').attributes('data-name')).toBe('settings')
+  it('设置与帮助应为图标加文字，点击分别发出 openSettings / openHelp', async () => {
+    const wrapper = mountFooter()
+    const icons = wrapper.findAll('.app-icon-stub').map((el) => el.attributes('data-name'))
+
+    expect(icons).toEqual(['settings', 'help'])
     expect(wrapper.get('[data-testid="sidebar-settings"]').text()).toContain('设置')
-    expect(wrapper.get('[data-testid="sidebar-storage-caption"]').text()).toBe(
-      '数据：uTools 本地数据库',
-    )
+    expect(wrapper.get('[data-testid="sidebar-help"]').text()).toContain('帮助与反馈')
+    expect(wrapper.find('[data-testid="sidebar-storage-caption"]').exists()).toBe(false)
 
     await wrapper.get('[data-testid="sidebar-settings"]').trigger('click')
+    await wrapper.get('[data-testid="sidebar-help"]').trigger('click')
     expect(wrapper.emitted('openSettings')).toHaveLength(1)
+    expect(wrapper.emitted('openHelp')).toHaveLength(1)
   })
 })

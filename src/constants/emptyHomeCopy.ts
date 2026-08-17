@@ -17,11 +17,3 @@ export const EMPTY_HOME_IMPORT_LABEL = '导入 .md'
 export const EMPTY_HOME_TEMPLATES_TITLE = '从模板开始'
 
 export const EMPTY_HOME_EXAMPLE_LIBRARY_LABEL = '导入示例笔记'
-
-export const EMPTY_HOME_HINT_EXPORT = '笔记保存在 uTools 本地数据库，可在「文件」中导出或备份'
-
-export const EMPTY_HOME_HINT_THEME = '深色/浅色主题请到右上角设置中切换'
-
-export const EMPTY_HOME_HINT_FOLDER_COUNT = '文件夹右侧数字 = 该文件夹笔记总数'
-
-export const SIDEBAR_STORAGE_CAPTION = '数据：uTools 本地数据库'

@@ -15,9 +15,13 @@ describe('NOTE_TEMPLATES', () => {
       'agent-prompt',
     ])
     expect(NOTE_TEMPLATES).toHaveLength(4)
+    expect(NOTE_TEMPLATES[0].description).toBe('接口说明、故障排查与协作文档模板')
+    expect(NOTE_TEMPLATES[1].description).toBe('知识点清单、复习提纲，适合每天学完整理')
+    expect(NOTE_TEMPLATES[2].description).toBe('工作计划、随手记录，晚上再复盘整理')
+    expect(NOTE_TEMPLATES[3].description).toBe('可复用的 AI 提示模板，保持语气简洁')
     for (const item of NOTE_TEMPLATES) {
       expect(item.title.length).toBeGreaterThan(0)
-      expect(item.description.length).toBeGreaterThan(0)
+      expect(item.description.length).toBeGreaterThan(12)
       expect(item.icon).toBeTruthy()
       expect(item.iconTone).toBeTruthy()
       expect(item.content).toMatch(/^# /)

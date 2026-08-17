@@ -29,11 +29,13 @@ describe('空白首页架构约束', () => {
     expect(existsSync(resolve(root, 'src/components/OnboardingCoach.vue'))).toBe(true)
   })
 
-  it('侧栏应展示 uTools 本地数据库说明而非伪造路径', () => {
-    const sidebar = readSrc('src/components/Sidebar.vue')
+  it('存储说明只出现在首页文案，侧栏底栏不再放 caption', () => {
+    const copy = readSrc('src/constants/emptyHomeCopy.ts')
     const footer = readSrc('src/components/sidebar/SidebarFooter.vue')
-    expect(sidebar + footer).toMatch(/sidebar-storage-caption/)
-    expect(sidebar).toMatch(/SIDEBAR_STORAGE_CAPTION/)
+    expect(copy).toMatch(/EMPTY_HOME_STORAGE_HINT/)
+    expect(copy).toMatch(/uTools 本地数据库/)
+    expect(footer).not.toMatch(/sidebar-storage-caption/)
+    expect(footer).not.toMatch(/Documents/)
   })
 
   it('App.vue 应挂载 EmptyHome，且无打开 Tab 时不渲染字数', () => {
