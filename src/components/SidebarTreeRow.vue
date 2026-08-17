@@ -54,12 +54,6 @@
       class="system-folder-icon my-folder-icon"
     />
     <AppIcon
-      v-else-if="row.isSystemFolder"
-      name="clock"
-      :size="14"
-      class="system-folder-icon"
-    />
-    <AppIcon
       v-else
       name="folder"
       :size="14"
@@ -89,20 +83,19 @@
       pinned: row.note!.pinned,
       selected: selectedNoteIds?.has(row.note!.id) ?? false,
       highlighted: highlightedNoteId === row.note!.id,
-      'recent-view': row.isRecentView,
-      'drag-over-top': !row.isRecentView && dragOverNoteId === row.note!.id && dragOverNotePosition === 'before',
-      'drag-over-bottom': !row.isRecentView && dragOverNoteId === row.note!.id && dragOverNotePosition === 'after',
+      'drag-over-top': dragOverNoteId === row.note!.id && dragOverNotePosition === 'before',
+      'drag-over-bottom': dragOverNoteId === row.note!.id && dragOverNotePosition === 'after',
     }"
     :data-note-id="row.note!.id"
     :style="rowStyle"
-    :draggable="!row.isRecentView"
+    draggable="true"
     @click="onNoteClick($event, row.note!.id)"
     @dblclick.stop="$emit('start-rename-note', row.note!.id)"
     @contextmenu.prevent="$emit('note-context', $event, row.note!.id)"
-    @dragstart.stop="!row.isRecentView && onDragStart('note', row.note!.id, $event)"
-    @dragover.prevent.stop="!row.isRecentView && onNoteDragOver($event, row.note!.id)"
-    @dragleave.stop="!row.isRecentView && $emit('drag-leave-note')"
-    @drop.prevent.stop="!row.isRecentView && onNoteDrop($event, row.note!.id)"
+    @dragstart.stop="onDragStart('note', row.note!.id, $event)"
+    @dragover.prevent.stop="onNoteDragOver($event, row.note!.id)"
+    @dragleave.stop="$emit('drag-leave-note')"
+    @drop.prevent.stop="onNoteDrop($event, row.note!.id)"
   >
     <span v-if="row.note!.pinned" class="note-pin-icon" title="已置顶" aria-label="已置顶">
       <AppIcon name="pin" :size="12" />

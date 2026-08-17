@@ -2,6 +2,7 @@
   <div :class="['app', 'mode-' + viewMode]">
     <Toolbar
       :tocVisible="tocVisible"
+      :toc-available="isEditorView"
       @toggleSidebar="sidebarVisible = !sidebarVisible"
       @toggleToc="toggleToc"
       @openSearch="toggleSearchModal"

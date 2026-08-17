@@ -2,38 +2,50 @@
   <div class="sidebar-footer">
     <button
       type="button"
-      class="sidebar-footer-settings"
+      class="sidebar-footer-item"
       data-testid="sidebar-settings"
+      :title="SIDEBAR_SETTINGS_LABEL"
+      :aria-label="SIDEBAR_SETTINGS_LABEL"
       @click="emit('openSettings')"
     >
       <AppIcon name="settings" :size="16" />
-      {{ SIDEBAR_SETTINGS_LABEL }}
+      <span>{{ SIDEBAR_SETTINGS_LABEL }}</span>
     </button>
-    <p data-testid="sidebar-storage-caption" class="sidebar-storage-caption">{{ caption }}</p>
+    <button
+      type="button"
+      class="sidebar-footer-item"
+      data-testid="sidebar-help"
+      :title="SIDEBAR_HELP_LABEL"
+      :aria-label="SIDEBAR_HELP_LABEL"
+      @click="emit('openHelp')"
+    >
+      <AppIcon name="help" :size="16" />
+      <span>{{ SIDEBAR_HELP_LABEL }}</span>
+    </button>
   </div>
 </template>
 
 <script setup lang="ts">
 import AppIcon from '../AppIcon.vue'
-import { SIDEBAR_SETTINGS_LABEL } from '../../constants/sidebarShell'
-
-defineProps<{
-  caption: string
-}>()
+import { SIDEBAR_HELP_LABEL, SIDEBAR_SETTINGS_LABEL } from '../../constants/sidebarShell'
 
 const emit = defineEmits<{
   openSettings: []
+  openHelp: []
 }>()
 </script>
 
 <style scoped>
 .sidebar-footer {
-  padding: var(--sidebar-section-y);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sidebar-section-y) 8px 10px;
   border-top: 1px solid var(--border-color, var(--border));
   background: var(--bg-secondary, var(--bg-sidebar));
 }
 
-.sidebar-footer-settings {
+.sidebar-footer-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -47,14 +59,8 @@ const emit = defineEmits<{
   cursor: pointer;
 }
 
-.sidebar-footer-settings:hover {
+.sidebar-footer-item:hover {
   background: var(--bg-hover);
-}
-
-.sidebar-storage-caption {
-  margin: 6px 4px 0;
-  font-size: 11px;
-  line-height: 1.4;
-  color: var(--text-muted, var(--text-secondary));
+  color: var(--text-primary, var(--text));
 }
 </style>

@@ -188,6 +188,8 @@ export interface AppSettings {
   sidebarWidth?: number
   /** 侧栏展开的文件夹 id */
   sidebarExpandedFolderIds?: string[]
+  /** 侧栏展开的空间 id */
+  sidebarExpandedSpaceIds?: string[]
   /** 「我的文件夹」容器一次性展开迁移标记（老用户升级兼容） */
   myFolderIntroMigrated?: boolean
   /** 侧栏选中的文件夹（新建笔记目标） */
@@ -285,11 +287,11 @@ export interface MarkFlowBridge {
   getAsset: (id: string) => AssetRecord | null
   saveAsset: (id: string, record: AssetRecord) => void
   removeAsset: (id: string) => void
-  
+
   // 回收站相关
   getTrashNotes: () => TrashNote[]
   saveTrashNotes: (notes: TrashNote[]) => void
-  
+
   ensureDirectory?: (dirPath: string) => { ok: true } | { ok: false; reason: 'error' }
   writeAssetFile?: (
     filePath: string,

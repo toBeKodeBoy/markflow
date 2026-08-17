@@ -62,6 +62,7 @@ describe('backup', () => {
     expect(savedFolders).toEqual(folders)
     expect(savedNotes).toHaveLength(1)
     expect(savedSettings.sidebarExpandedFolderIds).toEqual(['f1'])
+    expect(savedSettings.sidebarExpandedSpaceIds).toEqual(['f1'])
     expect(savedSettings.recentNoteAccess).toEqual([{ noteId: 'n1', openedAt: 99 }])
   })
 
@@ -243,4 +244,51 @@ describe('backup', () => {
     expect(savedAssets).toHaveLength(1)
     expect(savedAssets[0].data).toBe('abcd')
   })
-})
+
+  it('applyBackup migrates missing space ids from folder ids', () => {
+    const savedSettings: AppSettings[] = []
+    const storage = {
+      getNoteList: () => [],
+      getNote: () => null,
+      getFolderList: () => [{ id: 'root', name: 'root', order: 0 } as Folder],
+      getSettings: () =>
+        ({
+          theme: 'light',
+          fontSize: 14,
+          editorFontFamily: 'monospace',
+          previewVisible: true,
+          sidebarVisible: true,
+          sidebarExpandedSpaceIds: ['my-folder'],
+        }) satisfies AppSettings,
+      saveNote: () => {},
+      saveFolderList: () => {},
+      saveSettings: (settings: AppSettings) => {
+        savedSettings.push(settings)
+      },
+      clearAllNotesAndFolders: () => {},
+    }
+
+    const restored = applyBackup(
+      {
+        version: BACKUP_VERSION,
+        exportedAt: Date.now(),
+        notes: [],
+        folders: [{ id: 'root', name: 'root', order: 0 }],
+        settings: {
+          theme: 'light',
+          fontSize: 14,
+          editorFontFamily: 'monospace',
+          previewVisible: true,
+          sidebarVisible: true,
+          sidebarExpandedFolderIds: ['root'],
+          sidebarActiveFolderId: 'root',
+        } as AppSettings,
+        assets: { index: [], records: {} },
+      },
+      storage,
+    )
+
+    expect(restored.sidebarExpandedSpaceIds).toEqual(['root'])
+    expect(restored.myFolderIntroMigrated).toBe(true)
+    expect(savedSettings[0].sidebarExpandedSpaceIds).toEqual(['root'])
+  })})

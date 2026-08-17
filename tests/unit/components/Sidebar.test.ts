@@ -141,30 +141,51 @@ describe('Sidebar', () => {
     expect(wrapper.get('[data-testid="sidebar-spaces"]').text()).toContain('项目文档')
     expect(wrapper.find('.sidebar-bottom-bar .trash-btn').exists()).toBe(false)
     expect(wrapper.find('[data-testid="sidebar-settings"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="sidebar-settings"]').text()).toContain('设置')
+    expect(wrapper.find('[data-testid="sidebar-help"]').text()).toContain('帮助与反馈')
+    expect(wrapper.find('[data-testid="sidebar-create-note"]').text()).toContain('新建文档')
+    expect(wrapper.find('[data-testid="sidebar-logo"] .logo-mark').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="sidebar-storage-caption"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('数据：uTools 本地数据库')
   })
 
-  it('selecting a space filters the tree to that subtree', async () => {
+  it('点击帮助与反馈应打开教程笔记', async () => {
+    const wrapper = mountSidebar()
+    const tabsStore = useEditorTabsStore()
+    expect(tabsStore.tabs).toHaveLength(0)
+
+    await wrapper.get('[data-testid="sidebar-help"]').trigger('click')
+    await flushPromises()
+
+    expect(tabsStore.tabs.length).toBeGreaterThan(0)
+  })
+
+  it('selecting a space expands its body and shows its subtree', async () => {
     const store = useNoteStore()
     const spaceA = store.createFolder('空间A')
-    const spaceB = store.createFolder('空间B')
+    const child = store.createFolder('子目录', spaceA.id)
     store.createNoteWithContent('# A笔记\n', { folderId: spaceA.id })
-    store.createNoteWithContent('# B笔记\n', { folderId: spaceB.id })
+    store.createNoteWithContent('# 子笔记\n', { folderId: child.id })
+    store.createNoteWithContent('# B笔记\n')
 
     const wrapper = mountSidebar()
     await flushPromises()
 
-    const spaceButtons = wrapper.findAll('[data-testid="sidebar-space-item"]')
-    const spaceABtn = spaceButtons.find((btn) => btn.text().includes('空间A'))
-    expect(spaceABtn).toBeTruthy()
-    await spaceABtn!.trigger('click')
+    expect(wrapper.find(`[data-testid="sidebar-space-toggle-${spaceA.id}"]`).exists()).toBe(true)
+    await wrapper.get(`[data-testid="sidebar-space-item-${spaceA.id}"]`).trigger('click')
     await flushPromises()
 
     expect(store.activeFolderId).toBe(spaceA.id)
-    expect(wrapper.text()).toContain('A笔记')
-    expect(wrapper.text()).not.toContain('B笔记')
+    const spaceBody = wrapper.get(`[data-testid="sidebar-space-body-${spaceA.id}"]`)
+    expect(spaceBody.text()).toContain('A笔记')
+    expect(spaceBody.text()).toContain('子目录')
+    await findFolderRow(wrapper, '子目录')!.find('.folder-click-trigger').trigger('click')
+    await flushPromises()
+    expect(wrapper.get(`[data-testid="sidebar-space-body-${spaceA.id}"]`).text()).toContain('子笔记')
+    expect(wrapper.get('[data-testid="sidebar-space-body-my"]').text()).toContain('B笔记')
   })
 
-  it('selecting 我的空间 clears the space filter and shows all notes', async () => {
+  it('selecting 我的空间 shows root notes again', async () => {
     const store = useNoteStore()
     const spaceA = store.createFolder('空间A')
     store.createNoteWithContent('# 根笔记\n')
@@ -173,12 +194,9 @@ describe('Sidebar', () => {
     const wrapper = mountSidebar()
     await flushPromises()
 
-    const spaceABtn = wrapper
-      .findAll('[data-testid="sidebar-space-item"]')
-      .find((btn) => btn.text().includes('空间A'))
-    await spaceABtn!.trigger('click')
+    await wrapper.get('[data-testid="sidebar-space-item-' + spaceA.id + '"]').trigger('click')
     await flushPromises()
-    expect(wrapper.text()).not.toContain('根笔记')
+    expect(wrapper.get(`[data-testid="sidebar-space-body-${spaceA.id}"]`).text()).toContain('A笔记')
 
     await wrapper.get('[data-testid="sidebar-space-my"]').trigger('click')
     await flushPromises()
@@ -224,10 +242,9 @@ describe('Sidebar', () => {
     expect(created).toBeTruthy()
     expect(created?.parentId).toBeUndefined()
     expect(store.activeFolderId).toBe(created!.id)
-    expect(
-      wrapper.findAll('[data-testid="sidebar-space-item"]').find((btn) => btn.text().includes('新空间'))?.classes(),
-    ).toContain('active')
-    expect(wrapper.findAll('.sidebar-row-stub').some((row) => row.text().includes('其他笔记'))).toBe(false)
+    expect(wrapper.get(`[data-testid="sidebar-space-item-${created!.id}"]`).element.parentElement?.className).toContain('active')
+    expect(wrapper.find(`[data-testid="sidebar-space-body-${created!.id}"]`).exists()).toBe(true)
+    expect(wrapper.get(`[data-testid="sidebar-space-body-${other.id}"]`).text()).toContain('其他笔记')
   })
 
   it('spaces + opens the create modal without writing a folder', async () => {
@@ -285,7 +302,9 @@ describe('Sidebar', () => {
     expect(wrapper.text()).toContain('置顶')
     expect(wrapper.text()).toContain('删除')
 
-    await findFolderRow(wrapper, '工作区')!.find('.folder-context-trigger').trigger('click')
+    await wrapper.get(`[data-testid="sidebar-space-item-${folder.id}"]`).element.parentElement!.dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, clientX: 12, clientY: 34 })
+    )
     await flushPromises()
     expect(wrapper.text()).toContain('新建子文件夹')
     expect(wrapper.text()).toContain('新建笔记')
@@ -307,7 +326,9 @@ describe('Sidebar', () => {
     expect(wrapper.text()).toContain('定位文件夹')
 
     // 文件夹右键菜单新增「置顶」，删除改为「移入回收站」
-    await findFolderRow(wrapper, '工作区')!.find('.folder-context-trigger').trigger('click')
+    await wrapper.get(`[data-testid="sidebar-space-item-${folder.id}"]`).element.parentElement!.dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, clientX: 12, clientY: 34 })
+    )
     await flushPromises()
     expect(wrapper.text()).toContain('置顶')
     expect(wrapper.text()).toContain('移入回收站')
@@ -348,7 +369,7 @@ describe('Sidebar', () => {
     await wrapper.unmount()
   })
 
-  it('renders the recent virtual folder at the top of the sidebar tree', async () => {
+  it('does not render the recent virtual folder but still records access', async () => {
     const store = useNoteStore()
     const tabsStore = useEditorTabsStore()
     const note = store.createNoteWithContent('# Recent note\n')
@@ -357,28 +378,16 @@ describe('Sidebar', () => {
     const wrapper = mountSidebar()
     await flushPromises()
 
-    const rows = wrapper.findAll('.sidebar-row-stub')
-    expect(rows[0].text()).toContain('最新')
-    expect(rows.some((row) => row.text().includes('Recent note'))).toBe(true)
+    expect(wrapper.text()).not.toContain('最新')
+    const recentRows = wrapper
+      .findAll('.sidebar-row-stub')
+      .filter((row) => row.attributes('data-recent') === '1')
+    expect(recentRows).toHaveLength(0)
+    expect(wrapper.text()).toContain('Recent note')
+    expect(useAppSettings().get().recentNoteAccess?.[0]?.noteId).toBe(note.id)
   })
 
-  it('clicking the recent folder does not change activeFolderId', async () => {
-    const store = useNoteStore()
-    const folder = store.createFolder('工作区')
-    store.activeFolderId = folder.id
-    store.createNoteWithContent('# Recent\n')
-
-    const wrapper = mountSidebar()
-    await flushPromises()
-
-    const recentTrigger = wrapper.find('.folder-click-trigger')
-    await recentTrigger.trigger('click')
-    await flushPromises()
-
-    expect(store.activeFolderId).toBe(folder.id)
-  })
-
-  it('filters recent notes when searching', async () => {
+  it('search does not surface recent-view rows', async () => {
     const store = useNoteStore()
     const tabsStore = useEditorTabsStore()
     const alpha = store.createNoteWithContent('# Alpha\n')
@@ -392,11 +401,12 @@ describe('Sidebar', () => {
     store.searchQuery = 'beta'
     await flushPromises()
 
+    expect(wrapper.text()).not.toContain('最新')
     const recentRows = wrapper
       .findAll('.sidebar-row-stub')
       .filter((row) => row.attributes('data-recent') === '1')
-    expect(recentRows).toHaveLength(1)
-    expect(recentRows[0].text()).toContain('Beta')
+    expect(recentRows).toHaveLength(0)
+    expect(wrapper.text()).toContain('Beta')
   })
 
   it('does not render batch collapse or expand toolbar', async () => {
@@ -422,45 +432,8 @@ describe('Sidebar', () => {
     expect(badge.text()).toBe('2')
   })
 
-  it('collapsing the recent folder should persist after remount', async () => {
-    const store = useNoteStore()
-    const tabsStore = useEditorTabsStore()
-
-    const note = store.createNoteWithContent('# Recent note\n')
-    tabsStore.openTab(note.id)
-
-    const wrapper = mountSidebar()
-    await flushPromises()
-
-    // Collapse the only folder row ("最新")
-    const recentFolderRow = wrapper
-      .findAll('.sidebar-row-stub')
-      .find((row) => row.attributes('data-kind') === 'folder' && row.text().includes('最新'))
-    expect(recentFolderRow).toBeTruthy()
-
-    const toggleBtn = recentFolderRow!.find('.folder-click-trigger')
-    await toggleBtn.trigger('click')
-    await flushPromises()
-
-    const recentNoteRowsAfterCollapse = wrapper
-      .findAll('.sidebar-row-stub')
-      .filter((row) => row.attributes('data-recent') === '1')
-    expect(recentNoteRowsAfterCollapse).toHaveLength(0)
-
-    await wrapper.unmount()
-
-    const wrapper2 = mountSidebar()
-    await flushPromises()
-
-    const recentNoteRowsAfterRemount = wrapper2
-      .findAll('.sidebar-row-stub')
-      .filter((row) => row.attributes('data-recent') === '1')
-    // If collapse persisted, recent notes should not render.
-    expect(recentNoteRowsAfterRemount).toHaveLength(0)
-  })
-
   // ===== 「我的文件夹」虚拟容器 =====
-  it('renders my-folder container after recent and wraps real content with depth +1', async () => {
+  it('renders my-folder container first and wraps real content with depth +1', async () => {
     const store = useNoteStore()
     const folder = store.createFolder('工作区')
     store.createNoteWithContent('# 根笔记\n')
@@ -470,15 +443,14 @@ describe('Sidebar', () => {
     await flushPromises()
 
     const rows = wrapper.findAll('.sidebar-row-stub')
-    expect(rows[0].text()).toContain('最新')
-    expect(rows[1].text()).toContain('我的文件夹')
-    expect(rows[1].attributes('data-my')).toBe('1')
+    expect(rows[0].text()).toContain('我的文件夹')
+    expect(rows[0].attributes('data-my')).toBe('1')
+    expect(wrapper.text()).not.toContain('最新')
 
-    // 真实文件夹与根笔记都成为容器子行，深度 +1
-    const folderRow = rows.find((r) => r.text().includes('工作区'))!
-    expect(folderRow.attributes('data-depth')).toBe('1')
+    // 根笔记仍成为容器子行，顶层文件夹由空间列表承载，避免重复渲染
     const rootNoteRow = rows.find((r) => r.text().includes('根笔记'))!
     expect(rootNoteRow.attributes('data-depth')).toBe('1')
+    expect(wrapper.get(`[data-testid="sidebar-space-item-${folder.id}"]`).text()).toContain('工作区')
   })
 
   it('clicking my-folder container does not change activeFolderId', async () => {
@@ -509,30 +481,25 @@ describe('Sidebar', () => {
     expect(wrapper.findAll('.context-menu')).toHaveLength(0)
   })
 
-  it('collapsing my-folder hides real folders and persists after remount', async () => {
+  it('toggling a space body persists after remount', async () => {
     const store = useNoteStore()
-    const folder = store.createFolder('工作区')
-    // 不打开标签页，避免笔记进入「最新」视图干扰折叠断言
-    store.createNoteWithContent('# 根笔记\n')
+    const spaceA = store.createFolder('空间A')
+    store.createNoteWithContent('# A笔记\n', { folderId: spaceA.id })
 
     const wrapper = mountSidebar()
     await flushPromises()
 
-    await findFolderRow(wrapper, '我的文件夹')!.find('.folder-click-trigger').trigger('click')
-    await flushPromises()
+    expect(wrapper.find(`[data-testid="sidebar-space-body-${spaceA.id}"]`).exists()).toBe(true)
 
-    // 折叠后真实文件夹与根笔记从树中隐藏；空间列表仍可显示顶层名
-    const treeText = wrapper.findAll('.sidebar-row-stub').map((row) => row.text()).join('\n')
-    expect(treeText).not.toContain('工作区')
-    expect(treeText).not.toContain('根笔记')
-    expect(treeText).toContain('最新')
+    await wrapper.get(`[data-testid="sidebar-space-toggle-${spaceA.id}"]`).trigger('click')
+    await flushPromises()
+    expect(wrapper.find(`[data-testid="sidebar-space-body-${spaceA.id}"]`).exists()).toBe(false)
 
     await wrapper.unmount()
 
     const wrapper2 = mountSidebar()
     await flushPromises()
-    const remountTreeText = wrapper2.findAll('.sidebar-row-stub').map((row) => row.text()).join('\n')
-    expect(remountTreeText).not.toContain('工作区')
+    expect(wrapper2.find(`[data-testid="sidebar-space-body-${spaceA.id}"]`).exists()).toBe(false)
   })
 
   it('expands my-folder once for legacy users whose saved state lacks the container id', async () => {
@@ -550,14 +517,13 @@ describe('Sidebar', () => {
     expect((window.markflow.getSettings() as { myFolderIntroMigrated?: boolean }).myFolderIntroMigrated).toBe(true)
 
     // 迁移后用户手动折叠的意图应被保留
-    await findFolderRow(wrapper, '我的文件夹')!.find('.folder-click-trigger').trigger('click')
+    await wrapper.get('[data-testid="sidebar-space-my-toggle"]').trigger('click')
     await flushPromises()
     await wrapper.unmount()
 
     const wrapper2 = mountSidebar()
     await flushPromises()
-    const remountTreeText = wrapper2.findAll('.sidebar-row-stub').map((row) => row.text()).join('\n')
-    expect(remountTreeText).not.toContain('工作区')
+    expect(wrapper2.find('[data-testid="sidebar-space-body-my"]').exists()).toBe(false)
   })
 
   it('dropping a folder onto my-folder container moves it to root', async () => {

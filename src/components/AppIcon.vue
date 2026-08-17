@@ -165,6 +165,21 @@
       <circle cx="12" cy="12" r="9" />
       <path d="M12 11v6M12 8h.01" />
     </template>
+    <template v-else-if="name === 'upload'">
+      <path d="M12 3v12" />
+      <path d="M7 8l5-5 5 5" />
+      <path d="M5 21h14" />
+    </template>
+    <template v-else-if="name === 'download'">
+      <path d="M12 3v12" />
+      <path d="M7 10l5 5 5-5" />
+      <path d="M5 21h14" />
+    </template>
+    <template v-else-if="name === 'help'">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9a2.5 2.5 0 1 1 3.4 2.3c-.8.4-1.4 1-1.4 1.9V14" />
+      <path d="M12 17h.01" />
+    </template>
   </svg>
 </template>
 
@@ -213,6 +228,9 @@ export type AppIconName =
   | 'template-calendar'
   | 'template-sparkle'
   | 'info'
+  | 'upload'
+  | 'download'
+  | 'help'
 
 withDefaults(
   defineProps<{

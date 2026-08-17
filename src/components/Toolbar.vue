@@ -1,23 +1,13 @@
 <template>
-
   <header class="topbar">
-
     <div class="topbar-left">
-
       <button
-
         class="btn-icon"
-
         @click="$emit('toggleSidebar')"
-
         title="切换侧边栏"
-
         aria-label="切换侧边栏"
-
       >
-
         <AppIcon name="menu" :size="18" />
-
       </button>
 
       <button
@@ -47,7 +37,6 @@
       <div v-if="store.currentNote && folderPath" class="note-context">
         <div class="note-context-path">{{ folderPath }}</div>
       </div>
-
     </div>
 
     <div class="topbar-center">
@@ -61,86 +50,54 @@
         @click="$emit('openSearch')"
       >
         <AppIcon name="search" :size="16" />
-        <span>搜索笔记</span>
+        <span>搜索文档</span>
       </button>
     </div>
 
     <div class="topbar-right">
-
       <button
-
+        v-if="tocAvailable"
         class="btn-icon btn-icon-text"
-
         :class="{ active: tocVisible }"
-
         @click="$emit('toggleToc')"
-
         title="目录"
-
         aria-label="目录"
-
       >
-
         <AppIcon name="toc" :size="16" />
-
         <span class="btn-icon-label">目录</span>
-
       </button>
 
       <div class="import-menu-wrap" ref="overflowMenuRef">
-
         <button
-
           class="btn-icon"
-
           data-testid="toolbar-overflow-btn"
-
           :class="{ active: overflowOpen }"
-
           @click="toggleOverflowMenu"
-
           title="更多"
-
           aria-label="更多"
-
           aria-haspopup="menu"
-
           :aria-expanded="overflowOpen"
-
         >
-
           <AppIcon name="more" :size="16" />
-
         </button>
 
         <div v-if="overflowOpen" class="import-dropdown file-dropdown" role="menu">
-
           <button type="button" role="menuitem" :disabled="!store.currentNote" @click="exportNote">
-
             导出 Markdown
-
           </button>
 
           <button
-
             type="button"
-
             role="menuitem"
-
             :disabled="!store.currentNote || pdfExporting"
-
             @click="openPdfFromMenu"
-
           >
-
             {{ pdfExporting ? '正在导出 PDF…' : '导出 PDF' }}
-
           </button>
 
           <div class="dropdown-divider" role="separator" />
 
           <button type="button" role="menuitem" @click="importNote">导入文件</button>
-
           <button type="button" role="menuitem" @click="openImportFolder">导入文件夹</button>
 
           <div class="dropdown-divider" role="separator" />
@@ -153,109 +110,65 @@
           >
             新手教程
           </button>
-
         </div>
-
       </div>
-
     </div>
-
   </header>
 
-
-
   <PdfExportModal
-
     :visible="pdfModalVisible"
-
     :exporting="pdfExporting"
-
     @confirm="onPdfConfirm"
-
     @cancel="pdfModalVisible = false"
-
   />
-
-
 
   <ImportFolderModal
-
     :visible="importFolderVisible"
-
     :scan="importFolderScan"
-
     @cancel="closeImportFolder"
-
     @done="closeImportFolder"
-
   />
-
 </template>
 
-
-
 <script setup lang="ts">
-
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-
 import { useNoteStore } from '../stores/note'
 import { useEditorTabsStore } from '../stores/editorTabs'
-
 import { exportPdf, pdfExporting, sanitizeFilename } from '../utils/exportPdf'
 import { DEFAULT_IMAGE_EXPORT_SETTINGS, exportMarkdownAssets } from '../utils/exportMarkdownAssets'
 import { resolveImageExportTarget } from '../utils/imageExportPath'
-
 import { pickFolderScan } from '../utils/importFolderDevScan'
-
 import { getFolderPathLabel } from '../utils/folderTree'
-
 import PdfExportModal from './PdfExportModal.vue'
-
 import ImportFolderModal from './ImportFolderModal.vue'
-
 import AppIcon from './AppIcon.vue'
-
 import type { ImportFolderScanResult, PdfExportOptions } from '../types'
 import { useNoteHistory } from '../composables/useNoteHistory'
-
 import { useAppSettings } from '../composables/useAppSettings'
 import { useImportMarkdown } from '../composables/useImportMarkdown'
 
-
-
-defineProps<{ tocVisible: boolean }>()
-
+withDefaults(
+  defineProps<{ tocVisible: boolean; tocAvailable?: boolean }>(),
+  { tocAvailable: true },
+)
 defineEmits<{ toggleSidebar: []; toggleToc: []; openSearch: [] }>()
-
-
 
 const store = useNoteStore()
 const tabsStore = useEditorTabsStore()
 const { importMarkdownToActiveFolder } = useImportMarkdown()
 const { canGoBack, canGoForward, goBack, goForward } = useNoteHistory()
-
 const appSettings = useAppSettings()
 
 const pdfModalVisible = ref(false)
-
 const overflowOpen = ref(false)
-
 const importFolderVisible = ref(false)
-
 const importFolderScan = ref<ImportFolderScanResult | null>(null)
-
 const overflowMenuRef = ref<HTMLElement | null>(null)
 
-
-
 const folderPath = computed(() => {
-
   const folderId = store.currentNote?.folderId
-
   if (!folderId) return ''
-
   return getFolderPathLabel(store.folderList, folderId)
-
 })
 
 

@@ -13,3 +13,5 @@ export const SIDEBAR_SPACES_TITLE = '空间'
 export const SIDEBAR_MY_SPACE_LABEL = '我的空间'
 
 export const SIDEBAR_SETTINGS_LABEL = '设置'
+
+export const SIDEBAR_HELP_LABEL = '帮助与反馈'

@@ -10,12 +10,10 @@ export interface SidebarTreeRow {
   hasChildren: boolean
   /** 子树笔记数（仅 folder 行） */
   noteCount?: number
-  /** 「最新」虚拟系统文件夹 */
+  /** 虚拟系统文件夹（如「我的文件夹」） */
   isSystemFolder?: boolean
   /** 「我的文件夹」虚拟容器行（与 isSystemFolder 同时为 true） */
   isMyFolder?: boolean
-  /** 「最新」下的笔记行 */
-  isRecentView?: boolean
   /** 置顶区标记：该行属于置顶文件夹区 */
   isPinnedSection?: boolean
   /** 置顶区分隔线行 */

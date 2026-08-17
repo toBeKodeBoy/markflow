@@ -5,6 +5,7 @@ import { useEditorTabsStore } from '../../../src/stores/editorTabs'
 import { useAppSettings } from '../../../src/composables/useAppSettings'
 import { importExampleLibrary } from '../../../src/utils/exampleLibrary'
 import { EXAMPLE_LIBRARY_FOLDER_NAMES } from '../../../src/constants/exampleLibrary'
+import { MY_FOLDER_ID } from '../../../src/constants/myFolder'
 
 describe('importExampleLibrary', () => {
   beforeEach(() => {
@@ -24,8 +25,11 @@ describe('importExampleLibrary', () => {
     expect(store.currentNote?.title).toBe('提示词模板示例')
     expect(tabsStore.activeTabId).toBe(result.openedNoteId)
     expect(useAppSettings().get().exampleLibraryImported).toBe(true)
-    const expanded = useAppSettings().get().sidebarExpandedFolderIds ?? []
-    expect(expanded.length).toBeGreaterThan(0)
+    const settings = useAppSettings().get()
+    expect(settings.sidebarExpandedFolderIds ?? []).toEqual(expect.arrayContaining([MY_FOLDER_ID]))
+    expect(settings.sidebarExpandedSpaceIds ?? []).toEqual(expect.arrayContaining([MY_FOLDER_ID]))
+    expect((settings.sidebarExpandedSpaceIds ?? []).every((id) => !id.includes('/'))).toBe(true)
+    expect((settings.sidebarExpandedSpaceIds ?? []).every((id) => !id.includes('recent'))).toBe(true)
   })
 
   it('第二次调用不复制文件夹', () => {

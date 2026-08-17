@@ -33,6 +33,18 @@ describe('EmptyHome', () => {
     expect(EMPTY_HOME_EXAMPLE_LIBRARY_LABEL).not.toContain('知识库')
   })
 
+  it('标题、三按钮与存储提示按约定顺序渲染', () => {
+    const wrapper = mountHome({ emptyLibrary: true })
+    const text = wrapper.text().replace(/\s+/g, ' ')
+
+    expect(wrapper.find('h2.empty-tabs-title').text()).toBe(EMPTY_HOME_TITLE)
+    expect(text.indexOf(EMPTY_HOME_TITLE)).toBeLessThan(text.indexOf(EMPTY_HOME_SUBTITLE))
+    expect(text.indexOf(EMPTY_HOME_CREATE_LABEL)).toBeLessThan(text.indexOf(EMPTY_HOME_CREATE_FOLDER_LABEL))
+    expect(text.indexOf(EMPTY_HOME_CREATE_FOLDER_LABEL)).toBeLessThan(text.indexOf(EMPTY_HOME_IMPORT_LABEL))
+    expect(text.indexOf(EMPTY_HOME_IMPORT_LABEL)).toBeLessThan(text.indexOf(EMPTY_HOME_STORAGE_HINT))
+    expect(text.indexOf(EMPTY_HOME_STORAGE_HINT)).toBeLessThan(text.indexOf(EMPTY_HOME_TEMPLATES_TITLE))
+  })
+
   it('空库时渲染欢迎文案、存储说明与三个主操作', () => {
     const wrapper = mountHome({ emptyLibrary: true })
 
@@ -54,10 +66,15 @@ describe('EmptyHome', () => {
     expect(wrapper.text()).toContain(EMPTY_HOME_TEMPLATES_TITLE)
     expect(wrapper.findAll('[data-testid="empty-home-template-card"]')).toHaveLength(NOTE_TEMPLATES.length)
     expect(wrapper.findAll('[data-testid="empty-home-template-icon"]')).toHaveLength(NOTE_TEMPLATES.length)
-    expect(wrapper.findAll('[data-testid="empty-home-hint-icon"]').length).toBeGreaterThanOrEqual(3)
+    expect(wrapper.findAll('[data-testid="empty-home-template-cta"]')).toHaveLength(NOTE_TEMPLATES.length)
+    expect(wrapper.find('[data-testid="empty-home-hints"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="empty-home-create"] .app-icon').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="empty-home-create-folder"] .app-icon').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="empty-home-import"] .app-icon').exists()).toBe(true)
     expect(wrapper.find('[data-testid="empty-home-example-library"]').text()).toContain(
       EMPTY_HOME_EXAMPLE_LIBRARY_LABEL,
     )
+    expect(wrapper.find('[data-testid="empty-home-example-library"] .app-icon').exists()).toBe(true)
   })
 
   it('点击主按钮发出 create，新建文件夹发出 createFolder，导入发出 import', async () => {

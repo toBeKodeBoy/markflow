@@ -8,7 +8,7 @@
       aria-label="首页"
       @click="emit('navigateHome')"
     >
-      <span class="logo-icon">M↓</span>
+      <span class="logo-mark">M</span>
       <span class="logo-name">MarkFlow</span>
     </button>
     <button
@@ -18,6 +18,7 @@
       data-onboarding="create"
       @click="emit('createNote')"
     >
+      <AppIcon name="plus" :size="16" />
       {{ SIDEBAR_CREATE_NOTE_LABEL }}
     </button>
   </div>
@@ -25,6 +26,7 @@
 
 <script setup lang="ts">
 import { SIDEBAR_CREATE_NOTE_LABEL } from '../../constants/sidebarShell'
+import AppIcon from '../AppIcon.vue'
 
 const emit = defineEmits<{
   createNote: []
@@ -51,10 +53,27 @@ const emit = defineEmits<{
   cursor: pointer;
 }
 
-.sidebar-create-note {
-  width: 100%;
+.logo-mark {
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  border-radius: var(--sidebar-item-radius);
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.sidebar-create-note {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
   height: var(--sidebar-create-h);
+  border-radius: var(--sidebar-item-radius);
 }
 </style>

@@ -58,7 +58,7 @@ export const NOTE_TEMPLATES: NoteTemplate[] = [
   {
     id: 'tech-doc',
     title: '技术开发文档',
-    description: '接口说明、故障排查',
+    description: '接口说明、故障排查与协作文档模板',
     icon: 'template-doc',
     iconTone: 'blue',
     content: `# {{title}}
@@ -106,7 +106,7 @@ Authorization: Bearer <token>
   {
     id: 'study-note',
     title: '学习教程笔记',
-    description: '知识点清单、复习提纲',
+    description: '知识点清单、复习提纲，适合每天学完整理',
     icon: 'template-book',
     iconTone: 'green',
     content: `# {{title}}
@@ -142,7 +142,7 @@ Authorization: Bearer <token>
   {
     id: 'journal-plan',
     title: '日常随笔计划',
-    description: '工作计划、随手记录',
+    description: '工作计划、随手记录，晚上再复盘整理',
     icon: 'template-calendar',
     iconTone: 'orange',
     content: `# {{title}}
@@ -174,7 +174,7 @@ Authorization: Bearer <token>
   {
     id: 'agent-prompt',
     title: 'Agent 提示词',
-    description: '可复用的 AI 提示模板',
+    description: '可复用的 AI 提示模板，保持语气简洁',
     icon: 'template-sparkle',
     iconTone: 'purple',
     content: `# {{title}}

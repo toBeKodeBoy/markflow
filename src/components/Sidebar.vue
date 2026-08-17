@@ -5,14 +5,7 @@
       @navigate-home="workspace.showHome()"
     />
     <SidebarNav :active="activeNav" :trash-count="trashCount" @select="onNavSelect" />
-    <SidebarSpaces
-      :spaces="spaceFolders"
-      :active-space-id="activeSpaceId"
-      @select="selectSpace"
-      @create-space="openCreateModal('folder', undefined, true)"
-    />
 
-    <!-- 批量操作工具栏 -->
     <div v-if="selectedNoteIds.size > 0" class="sidebar-batch-bar">
       <span class="batch-count">已选 {{ selectedNoteIds.size }} 篇</span>
       <button class="batch-btn" @click="startBatchMove">移动到</button>
@@ -24,96 +17,103 @@
         ref="treeRef"
         class="sidebar-tree"
         :class="{ 'is-drag-over-root': dragOverRoot }"
-        @scroll="onTreeScroll"
         @dragover.prevent="onRootDragOver"
         @dragleave="onRootDragLeave"
         @drop.prevent="onRootDrop"
       >
-        <div
-          v-if="useVirtualTree"
-          class="sidebar-tree-virtual"
-          :style="{ height: virtualListHeight + 'px' }"
+        <SidebarSpaces
+          :spaces="spaceFolders"
+          :active-space-id="activeSpaceId"
+          :expanded-space-ids="expandedSpaceIds"
+          :my-expanded="expandedFolderIds.has(MY_FOLDER_ID)"
+          @select="selectSpace"
+          @toggle="toggleSpace"
+          @folder-context="openFolderContextMenu"
+          @create-space="openCreateModal('folder', undefined, true)"
         >
-          <template v-for="(row, i) in visibleSidebarRows" :key="rowKey(row, String(virtualStart + i))">
-            <SidebarTreeRowView
-              :row="row"
-              :expanded="expandedFolderIds.has(row.folder?.id ?? '')"
-              :active-folder-id="store.activeFolderId"
-              :current-note-id="store.currentNote?.id"
-              :renaming-folder-id="renamingFolderId"
-              v-model:renaming-folder-name="renamingFolderName"
-              :renaming-note-id="renamingNoteId"
-              v-model:renaming-note-name="renamingNoteName"
-              :drag-over-folder-id="dragOverFolderId"
-              :drag-over-note-id="dragOverNoteId"
-              :drag-over-note-position="dragOverNotePosition"
-              :drag-over-folder-position="dragOverFolderPosition"
-              :highlighted-note-id="highlightedNoteId"
-              :selected-note-ids="selectedNoteIds"
-              virtual
-              :virtual-style="{ top: (virtualStart + i) * SIDEBAR_ROW_HEIGHT + 'px' }"
-              @folder-click="onFolderClick"
-              @toggle-expand="toggleExpand"
-              @folder-context="openFolderContextMenu"
-              @commit-rename-folder="commitRenameFolder"
-              @cancel-rename-folder="renamingFolderId = null"
-              @start-rename-folder="startRenameFolder"
-              @note-click="openNoteTab"
-              @note-ctrl-click="onNoteCtrlClick"
-              @start-rename-note="startRenameNote"
-              @commit-rename-note="commitRenameNote"
-              @cancel-rename-note="cancelRenameNote"
-              @note-context="openNoteContextMenu"
-              @drag-start="onDragStart"
-              @drag-over-folder="onFolderDragOver"
-              @drag-leave-folder="onFolderDragLeave"
-              @drop-on-folder="onDropOnFolder"
-              @drag-over-note="onNoteDragOver"
-              @drag-leave-note="onNoteDragLeave"
-              @drop-on-note="onDropOnNote"
-            />
+          <template #body="{ space }">
+            <div class="sidebar-space-body">
+              <template v-if="space">
+                <SidebarTreeRowView
+                  v-for="row in (spaceRowsMap.get(space.id) ?? [])"
+                  :key="rowKey(row, space.id)"
+                  :row="row"
+                  :expanded="expandedFolderIds.has(row.folder?.id ?? '')"
+                  :active-folder-id="store.activeFolderId"
+                  :current-note-id="store.currentNote?.id"
+                  :renaming-folder-id="renamingFolderId"
+                  v-model:renaming-folder-name="renamingFolderName"
+                  :renaming-note-id="renamingNoteId"
+                  v-model:renaming-note-name="renamingNoteName"
+                  :drag-over-folder-id="dragOverFolderId"
+                  :drag-over-note-id="dragOverNoteId"
+                  :drag-over-note-position="dragOverNotePosition"
+                  :drag-over-folder-position="dragOverFolderPosition"
+                  :highlighted-note-id="highlightedNoteId"
+                  :selected-note-ids="selectedNoteIds"
+                  @folder-click="onFolderClick"
+                  @toggle-expand="toggleExpand"
+                  @folder-context="openFolderContextMenu"
+                  @commit-rename-folder="commitRenameFolder"
+                  @cancel-rename-folder="renamingFolderId = null"
+                  @start-rename-folder="startRenameFolder"
+                  @note-click="openNoteTab"
+                  @note-ctrl-click="onNoteCtrlClick"
+                  @start-rename-note="startRenameNote"
+                  @commit-rename-note="commitRenameNote"
+                  @cancel-rename-note="cancelRenameNote"
+                  @note-context="openNoteContextMenu"
+                  @drag-start="onDragStart"
+                  @drag-over-folder="onFolderDragOver"
+                  @drag-leave-folder="onFolderDragLeave"
+                  @drop-on-folder="onDropOnFolder"
+                  @drag-over-note="onNoteDragOver"
+                  @drag-leave-note="onNoteDragLeave"
+                  @drop-on-note="onDropOnNote"
+                />
+              </template>
+              <template v-else>
+                <SidebarTreeRowView
+                  v-for="row in mySpaceRows"
+                  :key="rowKey(row, 'my')"
+                  :row="row"
+                  :expanded="expandedFolderIds.has(row.folder?.id ?? '')"
+                  :active-folder-id="store.activeFolderId"
+                  :current-note-id="store.currentNote?.id"
+                  :renaming-folder-id="renamingFolderId"
+                  v-model:renaming-folder-name="renamingFolderName"
+                  :renaming-note-id="renamingNoteId"
+                  v-model:renaming-note-name="renamingNoteName"
+                  :drag-over-folder-id="dragOverFolderId"
+                  :drag-over-note-id="dragOverNoteId"
+                  :drag-over-note-position="dragOverNotePosition"
+                  :drag-over-folder-position="dragOverFolderPosition"
+                  :highlighted-note-id="highlightedNoteId"
+                  :selected-note-ids="selectedNoteIds"
+                  @folder-click="onFolderClick"
+                  @toggle-expand="toggleExpand"
+                  @folder-context="openFolderContextMenu"
+                  @commit-rename-folder="commitRenameFolder"
+                  @cancel-rename-folder="renamingFolderId = null"
+                  @start-rename-folder="startRenameFolder"
+                  @note-click="openNoteTab"
+                  @note-ctrl-click="onNoteCtrlClick"
+                  @start-rename-note="startRenameNote"
+                  @commit-rename-note="commitRenameNote"
+                  @cancel-rename-note="cancelRenameNote"
+                  @note-context="openNoteContextMenu"
+                  @drag-start="onDragStart"
+                  @drag-over-folder="onFolderDragOver"
+                  @drag-leave-folder="onFolderDragLeave"
+                  @drop-on-folder="onDropOnFolder"
+                  @drag-over-note="onNoteDragOver"
+                  @drag-leave-note="onNoteDragLeave"
+                  @drop-on-note="onDropOnNote"
+                />
+              </template>
+            </div>
           </template>
-        </div>
-
-        <template v-else>
-          <SidebarTreeRowView
-            v-for="row in sidebarRows"
-            :key="rowKey(row)"
-            :row="row"
-            :expanded="expandedFolderIds.has(row.folder?.id ?? '')"
-            :active-folder-id="store.activeFolderId"
-            :current-note-id="store.currentNote?.id"
-            :renaming-folder-id="renamingFolderId"
-            v-model:renaming-folder-name="renamingFolderName"
-            :renaming-note-id="renamingNoteId"
-            v-model:renaming-note-name="renamingNoteName"
-            :drag-over-folder-id="dragOverFolderId"
-            :drag-over-note-id="dragOverNoteId"
-            :drag-over-note-position="dragOverNotePosition"
-            :drag-over-folder-position="dragOverFolderPosition"
-            :highlighted-note-id="highlightedNoteId"
-            :selected-note-ids="selectedNoteIds"
-            @folder-click="onFolderClick"
-            @toggle-expand="toggleExpand"
-            @folder-context="openFolderContextMenu"
-            @commit-rename-folder="commitRenameFolder"
-            @cancel-rename-folder="renamingFolderId = null"
-            @start-rename-folder="startRenameFolder"
-            @note-click="openNoteTab"
-            @note-ctrl-click="onNoteCtrlClick"
-            @start-rename-note="startRenameNote"
-            @commit-rename-note="commitRenameNote"
-            @cancel-rename-note="cancelRenameNote"
-            @note-context="openNoteContextMenu"
-            @drag-start="onDragStart"
-            @drag-over-folder="onFolderDragOver"
-            @drag-leave-folder="onFolderDragLeave"
-            @drop-on-folder="onDropOnFolder"
-            @drag-over-note="onNoteDragOver"
-            @drag-leave-note="onNoteDragLeave"
-            @drop-on-note="onDropOnNote"
-          />
-        </template>
+        </SidebarSpaces>
 
         <div v-if="showTreeEmpty" class="empty-tip">
           {{ emptyTip }}
@@ -272,7 +272,7 @@
       @created="handleCreateEntry"
     />
 
-    <SidebarFooter :caption="SIDEBAR_STORAGE_CAPTION" @open-settings="settingsModalVisible = true" />
+    <SidebarFooter @open-settings="settingsModalVisible = true" @open-help="onOpenHelp" />
 
     <SettingsModal
       :visible="settingsModalVisible"
@@ -329,14 +329,7 @@ import { useTheme } from '../composables/useTheme'
 import { useAppSettings, clampSidebarWidth } from '../composables/useAppSettings'
 import { useNoteSort } from '../composables/useNoteSort'
 import { sortNotes } from '../utils/noteSort'
-import { buildRecentNoteList } from '../utils/recentNotes'
-import { RECENT_FOLDER_ID, RECENT_FOLDER_NAME } from '../constants/recentFolder'
 import { MY_FOLDER_ID, MY_FOLDER_NAME } from '../constants/myFolder'
-import { SIDEBAR_STORAGE_CAPTION } from '../constants/emptyHomeCopy'
-
-const SIDEBAR_ROW_HEIGHT = 42
-const VIRTUAL_THRESHOLD = 150
-const VIRTUAL_BUFFER = 8
 
 // 模板中使用：根目录对外统一展示为「我的文件夹」
 const myFolderName = MY_FOLDER_NAME
@@ -359,6 +352,43 @@ const settingsModalVisible = ref(false)
 const importFolderVisible = ref(false)
 const importFolderScan = ref<ImportFolderScanResult | null>(null)
 const spaceFolders = computed(() => store.folderList.filter((folder) => !folder.parentId))
+const expandedSpaceIds = ref(new Set<string>())
+
+function resolveTopLevelSpaceId(folderId: string | null | undefined) {
+  if (!folderId) return null
+  let current = store.folderList.find((folder) => folder.id === folderId)
+  while (current?.parentId) {
+    const parentId = current.parentId
+    current = store.folderList.find((folder) => folder.id === parentId)
+  }
+  return current?.id ?? null
+}
+
+function syncActiveSpaceId(folderId: string | null | undefined) {
+  activeSpaceId.value = resolveTopLevelSpaceId(folderId)
+}
+
+function toggleSpace(folderId: string | null) {
+  const spaceId = folderId ?? MY_FOLDER_ID
+  const next = new Set(expandedSpaceIds.value)
+  if (next.has(spaceId)) next.delete(spaceId)
+  else next.add(spaceId)
+  expandedSpaceIds.value = next
+  const expandedFolderNext = new Set(expandedFolderIds.value)
+  if (next.has(spaceId)) expandedFolderNext.add(spaceId)
+  else expandedFolderNext.delete(spaceId)
+  expandedFolderIds.value = expandedFolderNext
+  persistSidebarState()
+}
+
+function syncExpandedSpaceIds() {
+  const next = new Set<string>()
+  if (expandedFolderIds.value.has(MY_FOLDER_ID)) next.add(MY_FOLDER_ID)
+  for (const folder of spaceFolders.value) {
+    if (expandedFolderIds.value.has(folder.id)) next.add(folder.id)
+  }
+  expandedSpaceIds.value = next
+}
 
 function openNoteTab(noteId: string) {
   // 普通点击：清空多选并打开笔记
@@ -371,7 +401,6 @@ const appSettings = useAppSettings()
 
 const sidebarWidth = ref(clampSidebarWidth(appSettings.get().sidebarWidth ?? 260))
 const treeRef = ref<HTMLElement>()
-const scrollTop = ref(0)
 const createModalVisible = ref(false)
 const createModalKind = ref<'note' | 'folder'>('folder')
 const createModalDefaultParentId = ref<string | undefined>(undefined)
@@ -403,15 +432,6 @@ const dragOverNoteId = ref<string | null>(null)
 const dragOverNotePosition = ref<'before' | 'after' | null>(null)
 const dragOverRoot = ref(false)
 
-// Task 9: 置顶文件夹 ID 集合
-const pinnedFolderIds = computed(() => {
-  const ids = new Set<string>()
-  for (const f of store.folderList) {
-    if (f.pinned) ids.add(f.id)
-  }
-  return ids
-})
-
 // Task 8: 定位高亮
 const highlightedNoteId = ref<string | null>(null)
 
@@ -434,77 +454,39 @@ const noteSort = useNoteSort({
 const treeIndex = computed(() => buildTreeIndex(store.folderList, store.searchedNoteList))
 const isSearching = computed(() => store.searchQuery.trim().length > 0)
 
-const recentNotes = computed(() =>
-  buildRecentNoteList(appSettings.settings.value?.recentNoteAccess ?? [], store.searchedNoteList)
-)
-
-const baseSidebarRows = computed(() =>
-  flattenSidebarTree(store.folderList, store.searchedNoteList, expandedFolderIds.value, {
+function flattenSpaceRows(rootFolderId: string | undefined) {
+  return flattenSidebarTree(store.folderList, store.searchedNoteList, expandedFolderIds.value, {
     hideEmptyFolders: isSearching.value,
     index: treeIndex.value,
-    pinnedFolderIds: activeSpaceId.value ? undefined : pinnedFolderIds.value,
-    rootFolderId: activeSpaceId.value ?? undefined,
+    pinnedFolderIds: undefined,
+    rootFolderId,
   })
-)
+}
 
-const sidebarRows = computed(() => {
-  const base = baseSidebarRows.value
-  const recent = recentNotes.value
-  // 「我的文件夹」虚拟容器：仅「我的空间」包裹全部真实文件夹/笔记
-  const myFolderRows = activeSpaceId.value
-    ? base
-    : wrapWithMyFolder(
-        base,
-        expandedFolderIds.value.has(MY_FOLDER_ID),
-        store.searchedNoteList.length
-      )
-
-  if (isSearching.value && recent.length === 0) {
-    return myFolderRows
+function flattenSpaceChildrenRows(rootFolderId: string | undefined) {
+  const rows = flattenSpaceRows(rootFolderId)
+  if (!rootFolderId) {
+    return rows.filter((row) => row.kind === 'note' && row.depth === 0)
   }
+  return rows.filter((row) => !(row.kind === 'folder' && row.folder?.id === rootFolderId))
+}
 
-  const recentExpanded = expandedFolderIds.value.has(RECENT_FOLDER_ID)
-  const recentFolderRow: SidebarTreeRow = {
-    kind: 'folder',
-    depth: 0,
-    folder: { id: RECENT_FOLDER_ID, name: RECENT_FOLDER_NAME, order: -1 },
-    hasChildren: recent.length > 0,
-    noteCount: recent.length,
-    isSystemFolder: true,
+const mySpaceRows = computed(() => {
+  const base = flattenSpaceChildrenRows(undefined)
+  return wrapWithMyFolder(base, expandedFolderIds.value.has(MY_FOLDER_ID), store.searchedNoteList.length)
+})
+
+const spaceRowsMap = computed(() => {
+  const map = new Map<string, SidebarTreeRow[]>()
+  for (const folder of spaceFolders.value) {
+    map.set(folder.id, flattenSpaceChildrenRows(folder.id))
   }
-
-  const recentNoteRows: SidebarTreeRow[] = recentExpanded
-    ? recent.map((note) => ({
-        kind: 'note' as const,
-        depth: 1,
-        note,
-        hasChildren: false,
-        isRecentView: true,
-      }))
-    : []
-
-  return [recentFolderRow, ...recentNoteRows, ...myFolderRows]
+  return map
 })
-
-const useVirtualTree = computed(() => sidebarRows.value.length > VIRTUAL_THRESHOLD)
-const virtualListHeight = computed(() => sidebarRows.value.length * SIDEBAR_ROW_HEIGHT)
-const virtualStart = computed(() => {
-  if (!useVirtualTree.value) return 0
-  return Math.max(0, Math.floor(scrollTop.value / SIDEBAR_ROW_HEIGHT) - VIRTUAL_BUFFER)
-})
-const virtualEnd = computed(() => {
-  if (!useVirtualTree.value) return sidebarRows.value.length
-  const containerH = treeRef.value?.clientHeight ?? 400
-  const count = Math.ceil(containerH / SIDEBAR_ROW_HEIGHT) + VIRTUAL_BUFFER * 2
-  return Math.min(sidebarRows.value.length, virtualStart.value + count)
-})
-const visibleSidebarRows = computed(() =>
-  sidebarRows.value.slice(virtualStart.value, virtualEnd.value)
-)
 
 const showTreeEmpty = computed(() => {
   if (isSearching.value) {
-    return store.searchedNoteList.length === 0 && recentNotes.value.length === 0
+    return store.searchedNoteList.length === 0
   }
   return store.noteList.length === 0 && store.folderList.length === 0
 })
@@ -519,18 +501,14 @@ const moveFolderRows = computed(() =>
 )
 
 function rowKey(row: SidebarTreeRow, suffix = '') {
-  const base =
-    row.kind === 'folder'
-      ? `f-${row.folder!.id}`
-      : row.isRecentView
-        ? `n-recent-${row.note!.id}`
-        : `n-${row.note!.id}`
+  const base = row.kind === 'folder' ? `f-${row.folder!.id}` : `n-${row.note!.id}`
   return suffix ? `${base}-${suffix}` : base
 }
 
 function persistSidebarState() {
   appSettings.save({
     sidebarExpandedFolderIds: [...expandedFolderIds.value],
+    sidebarExpandedSpaceIds: [...expandedSpaceIds.value],
     sidebarActiveFolderId: store.activeFolderId,
     // 用户已对展开状态做出显式选择，同步写入迁移标记，
     // 避免下次启动时一次性迁移覆盖用户折叠容器的意图
@@ -541,11 +519,19 @@ function persistSidebarState() {
 function selectSpace(id: string | null) {
   activeSpaceId.value = id
   store.activeFolderId = id
+  const nextFolder = new Set(expandedFolderIds.value)
+  const nextSpace = new Set(expandedSpaceIds.value)
+
   if (id) {
-    const next = new Set(expandedFolderIds.value)
-    next.add(id)
-    expandedFolderIds.value = next
+    nextFolder.add(id)
+    nextSpace.add(id)
+  } else {
+    nextFolder.add(MY_FOLDER_ID)
+    nextSpace.add(MY_FOLDER_ID)
   }
+
+  expandedFolderIds.value = nextFolder
+  expandedSpaceIds.value = nextSpace
   if (workspace.view === 'trash') workspace.showDocs(tabsStore.tabs.length > 0)
   persistSidebarState()
 }
@@ -561,6 +547,10 @@ function onNavSelect(id: SidebarNavId) {
     return
   }
   workspace.showDocs(tabsStore.tabs.length > 0)
+}
+
+function onOpenHelp() {
+  tabsStore.openTutorialNote()
 }
 
 function onSidebarSettingsConfirm(settings: AppSettings) {
@@ -584,10 +574,6 @@ async function onSidebarSettingsImportFolder() {
 function closeImportFolder() {
   importFolderVisible.value = false
   importFolderScan.value = null
-}
-
-function onTreeScroll(e: Event) {
-  scrollTop.value = (e.target as HTMLElement).scrollTop
 }
 
 function openCreateModal(kind: 'note' | 'folder', parentId?: string, locked = false) {
@@ -620,12 +606,17 @@ function handleCreateEntry(payload: { kind: 'note' | 'folder'; id: string; paren
   for (const id of collectAncestorFolderIds(payload.id, store.folderList)) next.add(id)
   next.add(payload.id)
   expandedFolderIds.value = next
+  if (created && !created.parentId) {
+    const nextSpace = new Set(expandedSpaceIds.value)
+    nextSpace.add(created.id)
+    expandedSpaceIds.value = nextSpace
+  }
   persistSidebarState()
 }
 
-/** 虚拟系统文件夹（「最新」/「我的文件夹」）：不参与激活、右键、拖拽 */
+/** 虚拟系统文件夹（「我的文件夹」）：不参与激活、右键、拖拽 */
 function isVirtualFolder(folderId: string) {
-  return folderId === RECENT_FOLDER_ID || folderId === MY_FOLDER_ID
+  return folderId === MY_FOLDER_ID
 }
 
 function onFolderClick(folderId: string, hasChildren: boolean) {
@@ -894,7 +885,6 @@ function onDropOnNote(targetId: string, position: 'before' | 'after') {
 }
 
 function onFolderDragOver(folderId: string, position: 'before' | 'after' | 'inside') {
-  if (folderId === RECENT_FOLDER_ID) return
   if (!dragPayload.value) return
   if (folderId === MY_FOLDER_ID) {
     // 容器行承载根目录语义：任何位置都视为拖入「我的文件夹」
@@ -919,7 +909,6 @@ function onFolderDragLeave() {
 }
 
 function onDropOnFolder(folderId: string, position: 'before' | 'after' | 'inside') {
-  if (folderId === RECENT_FOLDER_ID) return
   dragOverFolderId.value = null
   dragOverFolderPosition.value = null
   const payload = dragPayload.value
@@ -1024,11 +1013,21 @@ function onGlobalClick() {
 watch(
   () => store.activeFolderId,
   (folderId) => {
-    if (!folderId || isVirtualFolder(folderId)) return
+    syncActiveSpaceId(folderId)
+    if (!folderId || isVirtualFolder(folderId)) {
+      syncExpandedSpaceIds()
+      return
+    }
     const next = new Set(expandedFolderIds.value)
     next.add(MY_FOLDER_ID)
     for (const id of collectAncestorFolderIds(folderId, store.folderList)) next.add(id)
     expandedFolderIds.value = next
+    const topLevelSpaceId = resolveTopLevelSpaceId(folderId)
+    if (topLevelSpaceId) {
+      const nextSpace = new Set(expandedSpaceIds.value)
+      nextSpace.add(topLevelSpaceId)
+      expandedSpaceIds.value = nextSpace
+    }
   }
 )
 
@@ -1042,6 +1041,12 @@ watch(
     next.add(MY_FOLDER_ID)
     for (const id of collectAncestorIdsForNote(note, store.folderList)) next.add(id)
     expandedFolderIds.value = next
+    const topLevelSpaceId = resolveTopLevelSpaceId(note.folderId)
+    if (topLevelSpaceId) {
+      const nextSpace = new Set(expandedSpaceIds.value)
+      nextSpace.add(topLevelSpaceId)
+      expandedSpaceIds.value = nextSpace
+    }
   }
 )
 
@@ -1059,36 +1064,43 @@ watch(
   () => {
     const settings = appSettings.get()
     const ids = new Set(settings.sidebarExpandedFolderIds ?? [])
+    const spaceIds = new Set(settings.sidebarExpandedSpaceIds ?? [])
     // 备份恢复等配置重载场景同样需要容器展开迁移
     if (!settings.myFolderIntroMigrated) {
       ids.add(MY_FOLDER_ID)
+      spaceIds.add(MY_FOLDER_ID)
       appSettings.save({ myFolderIntroMigrated: true })
     }
     expandedFolderIds.value = ids
+    expandedSpaceIds.value = spaceIds
     if (settings.sidebarActiveFolderId !== undefined) {
       store.activeFolderId = settings.sidebarActiveFolderId
     }
+    syncActiveSpaceId(store.activeFolderId)
   }
 )
 
 onMounted(() => {
   document.addEventListener('click', onGlobalClick)
   const settings = appSettings.get()
-  // 只有在配置字段缺失（undefined）时才默认展开「最新」；
+  // 只有在配置字段缺失（undefined）时才默认展开；
   // 若用户显式折叠导致配置为空数组（[]），应保持折叠状态。
   const expandedFromSettings = settings.sidebarExpandedFolderIds
   if (expandedFromSettings !== undefined) {
     const ids = new Set(expandedFromSettings)
+    const spaceIds = new Set(settings.sidebarExpandedSpaceIds ?? [])
     // 老用户一次性迁移：容器 ID 在旧配置中不可能存在，默认展开，
     // 避免升级后整个资料库在侧边栏不可见；迁移后用户手动折叠的意图正常保留
     if (!settings.myFolderIntroMigrated) {
       ids.add(MY_FOLDER_ID)
+      spaceIds.add(MY_FOLDER_ID)
       appSettings.save({ myFolderIntroMigrated: true })
     }
     expandedFolderIds.value = ids
+    expandedSpaceIds.value = spaceIds
   } else {
-    // 首次启动：默认展开「最新」+「我的文件夹」+ 一级文件夹（depth=0 且有子项的文件夹）
-    const initialExpanded = new Set([RECENT_FOLDER_ID, MY_FOLDER_ID])
+    // 首次启动：默认展开「我的文件夹」+ 一级文件夹（depth=0 且有子项的文件夹）
+    const initialExpanded = new Set([MY_FOLDER_ID])
     const topLevelFolders = store.folderList.filter((f) => !f.parentId)
     for (const folder of topLevelFolders) {
       const hasChildren =
@@ -1099,10 +1111,12 @@ onMounted(() => {
       }
     }
     expandedFolderIds.value = initialExpanded
+    expandedSpaceIds.value = new Set([MY_FOLDER_ID, ...topLevelFolders.filter((folder) => initialExpanded.has(folder.id)).map((folder) => folder.id)])
   }
-  if (settings.sidebarActiveFolderId) {
+  if (settings.sidebarActiveFolderId !== undefined) {
     store.activeFolderId = settings.sidebarActiveFolderId
   }
+  syncActiveSpaceId(store.activeFolderId)
 })
 
 onUnmounted(() => document.removeEventListener('click', onGlobalClick))
