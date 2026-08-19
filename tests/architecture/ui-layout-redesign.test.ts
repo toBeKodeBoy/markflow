@@ -61,7 +61,8 @@ describe('壳层布局 DOM', () => {
 
   it('顶栏应有居中搜索条', () => {
     expect(toolbarSrc).toMatch(/data-testid=["']toolbar-search-bar["']/)
-    expect(toolbarSrc).toMatch(/搜索笔记/)
+    expect(toolbarSrc).toMatch(/SEARCH_DOCUMENTS_LABEL|搜索文档/)
+    expect(toolbarSrc).not.toMatch(/搜索笔记/)
   })
 
   it('顶栏不应再提供主题快捷切换入口（主题仅在设置面板）', () => {

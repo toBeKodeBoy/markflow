@@ -1,6 +1,6 @@
 <template>
   <div v-if="visible" class="search-modal-overlay" @click.self="emit('close')">
-    <div class="search-modal" role="dialog" aria-modal="true" aria-label="搜索笔记">
+    <div class="search-modal" role="dialog" aria-modal="true" :aria-label="SEARCH_DOCUMENTS_LABEL">
       <div class="search-modal-header">
         <AppIcon name="search" :size="16" class="search-modal-icon" />
         <input
@@ -8,8 +8,8 @@
           v-model="draft"
           type="text"
           class="search-modal-input"
-          placeholder="搜索笔记标题或正文..."
-          aria-label="搜索笔记"
+          :placeholder="SEARCH_DOCUMENTS_PLACEHOLDER"
+          :aria-label="SEARCH_DOCUMENTS_LABEL"
           :aria-expanded="draft.trim() ? results.length > 0 : undefined"
           :aria-activedescendant="results.length > 0 ? `search-option-${results[selectedIndex]?.note.id}` : undefined"
           aria-autocomplete="list"
@@ -24,7 +24,7 @@
       </div>
 
       <div v-if="draft.trim() && results.length === 0" class="search-modal-empty">
-        未找到匹配笔记「{{ draft.trim() }}」
+        {{ SEARCH_DOCUMENTS_EMPTY }}「{{ draft.trim() }}」
       </div>
 
       <!-- 最近打开的笔记区域 -->
@@ -82,6 +82,11 @@ import { fuzzyMatch, buildSearchSnippet, type SnippetSegment } from '../utils/se
 import { buildRecentNotesFromAccess, recordRecentNoteClick } from '../utils/searchHistory'
 import { useAppSettings } from '../composables/useAppSettings'
 import AppIcon from './AppIcon.vue'
+import {
+  SEARCH_DOCUMENTS_EMPTY,
+  SEARCH_DOCUMENTS_LABEL,
+  SEARCH_DOCUMENTS_PLACEHOLDER,
+} from '../constants/sidebarShell'
 import type { NoteListItem } from '../types'
 
 const props = defineProps<{ visible: boolean }>()

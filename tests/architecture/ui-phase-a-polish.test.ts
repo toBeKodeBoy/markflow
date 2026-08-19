@@ -19,7 +19,8 @@ describe('A1 顶栏搜索入口与 App 同源', () => {
   it('Toolbar 应提供可见搜索按钮并声明 openSearch 事件', () => {
     expect(toolbarSrc).toMatch(/data-testid=["']toolbar-search-bar["']/)
     expect(toolbarSrc).toMatch(/openSearch/)
-    expect(toolbarSrc).toMatch(/aria-label=["']搜索笔记["']/)
+    expect(toolbarSrc).toMatch(/SEARCH_DOCUMENTS_LABEL/)
+    expect(toolbarSrc).not.toMatch(/搜索笔记/)
   })
 
   it('App 应将 Toolbar openSearch 接到同一 searchModalVisible', () => {

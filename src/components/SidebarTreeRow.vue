@@ -10,7 +10,7 @@
     class="folder-item"
     :class="{
       active: !row.isSystemFolder && activeFolderId === row.folder!.id,
-      'drag-over': (!row.isSystemFolder || row.isMyFolder) && dragOverFolderId === row.folder!.id,
+      'drag-over': !row.isSystemFolder && dragOverFolderId === row.folder!.id,
       'drag-over-top': !row.isSystemFolder && dragOverFolderId === row.folder!.id && dragOverFolderPosition === 'before',
       'drag-over-bottom': !row.isSystemFolder && dragOverFolderId === row.folder!.id && dragOverFolderPosition === 'after',
       'is-empty': (row.noteCount ?? 0) === 0,
@@ -18,16 +18,15 @@
       'pinned-folder': row.folder?.pinned,
     }"
     :data-folder-id="row.folder?.id"
-    :data-onboarding="row.isMyFolder ? 'my-folder' : undefined"
     :style="rowStyle"
     :draggable="!row.isSystemFolder"
     @click="$emit('folder-click', row.folder!.id, row.hasChildren)"
     @dblclick.stop="!row.isSystemFolder && $emit('start-rename-folder', row.folder!)"
     @contextmenu.prevent="!row.isSystemFolder && $emit('folder-context', $event, row.folder!.id)"
     @dragstart.stop="!row.isSystemFolder && onDragStart('folder', row.folder!.id, $event)"
-    @dragover.prevent.stop="(!row.isSystemFolder || row.isMyFolder) && onFolderDragOver($event, row.folder!.id)"
-    @dragleave.stop="(!row.isSystemFolder || row.isMyFolder) && $emit('drag-leave-folder')"
-    @drop.prevent.stop="(!row.isSystemFolder || row.isMyFolder) && onFolderDrop($event, row.folder!.id)"
+    @dragover.prevent.stop="!row.isSystemFolder && onFolderDragOver($event, row.folder!.id)"
+    @dragleave.stop="!row.isSystemFolder && $emit('drag-leave-folder')"
+    @drop.prevent.stop="!row.isSystemFolder && onFolderDrop($event, row.folder!.id)"
   >
     <button
       v-if="row.hasChildren"
@@ -48,13 +47,6 @@
       <AppIcon name="pin" :size="12" />
     </span>
     <AppIcon
-      v-if="row.isMyFolder"
-      name="folder"
-      :size="14"
-      class="system-folder-icon my-folder-icon"
-    />
-    <AppIcon
-      v-else
       name="folder"
       :size="14"
       class="folder-icon"

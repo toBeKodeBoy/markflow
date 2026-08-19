@@ -46,6 +46,11 @@ describe('EditorTabBar', () => {
     styleEl = null
   })
 
+  it('页签栏 aria-label 应为打开的文档', () => {
+    const wrapper = mountTabBar()
+    expect(wrapper.find('.editor-tab-bar').attributes('aria-label')).toBe('打开的文档')
+  })
+
   it('shows current, other, and all close actions in the tab context menu', async () => {
     const noteStore = useNoteStore()
     const tabsStore = useEditorTabsStore()

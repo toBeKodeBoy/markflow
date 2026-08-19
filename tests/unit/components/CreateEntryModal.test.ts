@@ -31,6 +31,15 @@ describe('CreateEntryModal', () => {
     setActivePinia(pinia)
   })
 
+  it('新建文件选项应对用户说文档而非笔记', async () => {
+    const wrapper = mountModal()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="create-entry-template-blank"]').text()).toBe('空白文档')
+    expect(wrapper.text()).toContain('创建空白 Markdown 文档')
+    expect(wrapper.text()).not.toContain('空白笔记')
+    expect(wrapper.text()).not.toContain('Markdown 笔记')
+  })
+
   it('默认新建文件时可直接创建笔记并透出 parentId', async () => {
     const store = useNoteStore()
     const folder = store.createFolder('文档')
@@ -114,5 +123,27 @@ describe('CreateEntryModal', () => {
 
     expect(wrapper.find('.create-entry-select').exists()).toBe(false)
     expect(wrapper.find('.create-entry-location-pill').text()).toContain('知识库 / 前端')
+  })
+
+  it('根目录选项展示「我的空间」而非「我的文件夹」', async () => {
+    const wrapper = mountModal({ folders: [] })
+    await flushPromises()
+
+    const rootOption = wrapper.find('.create-entry-select option[value="__root__"]')
+    expect(rootOption.exists()).toBe(true)
+    expect(rootOption.text()).toBe('我的空间')
+    expect(wrapper.text()).not.toContain('我的文件夹')
+  })
+
+  it('锁定根目录时路径胶囊展示「我的空间」', async () => {
+    const wrapper = mountModal({
+      folders: [],
+      lockedParentId: null,
+    })
+    await flushPromises()
+
+    expect(wrapper.find('.create-entry-select').exists()).toBe(false)
+    expect(wrapper.find('.create-entry-location-pill').text()).toBe('我的空间')
+    expect(wrapper.text()).not.toContain('我的文件夹')
   })
 })

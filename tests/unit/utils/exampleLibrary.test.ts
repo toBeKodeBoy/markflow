@@ -4,7 +4,7 @@ import { useNoteStore } from '../../../src/stores/note'
 import { useEditorTabsStore } from '../../../src/stores/editorTabs'
 import { useAppSettings } from '../../../src/composables/useAppSettings'
 import { importExampleLibrary } from '../../../src/utils/exampleLibrary'
-import { EXAMPLE_LIBRARY_FOLDER_NAMES } from '../../../src/constants/exampleLibrary'
+import { EXAMPLE_LIBRARY, EXAMPLE_LIBRARY_FOLDER_NAMES } from '../../../src/constants/exampleLibrary'
 import { MY_FOLDER_ID } from '../../../src/constants/myFolder'
 
 describe('importExampleLibrary', () => {
@@ -30,6 +30,12 @@ describe('importExampleLibrary', () => {
     expect(settings.sidebarExpandedSpaceIds ?? []).toEqual(expect.arrayContaining([MY_FOLDER_ID]))
     expect((settings.sidebarExpandedSpaceIds ?? []).every((id) => !id.includes('/'))).toBe(true)
     expect((settings.sidebarExpandedSpaceIds ?? []).every((id) => !id.includes('recent'))).toBe(true)
+  })
+
+  it('教程正文用「我的空间」描述侧栏，不再出现「我的文件夹」', () => {
+    const contents = EXAMPLE_LIBRARY.flatMap((folder) => folder.notes.map((note) => note.content)).join('\n')
+    expect(contents).toContain('我的空间')
+    expect(contents).not.toContain('我的文件夹')
   })
 
   it('第二次调用不复制文件夹', () => {

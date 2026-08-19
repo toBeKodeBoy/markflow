@@ -1,5 +1,5 @@
 <template>
-  <div class="editor-tab-bar" role="tablist" aria-label="打开的笔记">
+  <div class="editor-tab-bar" role="tablist" :aria-label="EDITOR_TAB_BAR_ARIA_LABEL">
     <div class="editor-tab-bar-scroll">
       <div
         v-for="tab in tabsStore.tabs"
@@ -92,6 +92,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useNoteStore } from '../stores/note'
 import { useEditorTabsStore } from '../stores/editorTabs'
 import AppIcon from './AppIcon.vue'
+import { EDITOR_TAB_BAR_ARIA_LABEL } from '../constants/sidebarShell'
 
 type TabCloseScope = 'current' | 'others' | 'all'
 

@@ -283,43 +283,6 @@ describe('SidebarTreeRow', () => {
     expect(wrapper.text()).toContain('常用文件夹')
   })
 
-  it('「我的文件夹」容器行应渲染 folder 图标而非 clock', () => {
-    const wrapper = mount(SidebarTreeRow, {
-      props: {
-        row: {
-          kind: 'folder',
-          depth: 0,
-          folder: { id: '__markflow_my__', name: '我的文件夹', order: -1 },
-          hasChildren: true,
-          noteCount: 3,
-          isSystemFolder: true,
-          isMyFolder: true,
-        },
-        expanded: true,
-        activeFolderId: null,
-        renamingFolderId: null,
-        renamingFolderName: '',
-        renamingNoteId: null,
-        renamingNoteName: '',
-        dragOverFolderId: null,
-      },
-      global: {
-        stubs: {
-          AppIcon: {
-            props: ['name', 'size'],
-            template: '<span class="stub-app-icon" :data-name="name" />',
-          },
-        },
-      },
-    })
-
-    const folderItem = wrapper.get('.folder-item')
-    expect(folderItem.classes()).toContain('system-folder')
-    expect(folderItem.attributes('draggable')).toBe('false')
-    const icon = folderItem.find('.system-folder-icon')
-    expect(icon.attributes('data-name')).toBe('folder')
-  })
-
   it('选中笔记应添加 selected class', () => {
     const wrapper = mount(SidebarTreeRow, {
       props: {

@@ -190,7 +190,7 @@ export interface AppSettings {
   sidebarExpandedFolderIds?: string[]
   /** 侧栏展开的空间 id */
   sidebarExpandedSpaceIds?: string[]
-  /** 「我的文件夹」容器一次性展开迁移标记（老用户升级兼容） */
+  /** 「我的空间」一次性展开迁移标记（老用户升级兼容） */
   myFolderIntroMigrated?: boolean
   /** 侧栏选中的文件夹（新建笔记目标） */
   sidebarActiveFolderId?: string | null

@@ -1,6 +1,5 @@
 import type { Folder, NoteListItem } from '../types'
 import { buildTreeIndex, type TreeIndex } from './treeIndex'
-import { MY_FOLDER_ID, MY_FOLDER_NAME } from '../constants/myFolder'
 
 export interface SidebarTreeRow {
   kind: 'folder' | 'note'
@@ -10,10 +9,8 @@ export interface SidebarTreeRow {
   hasChildren: boolean
   /** 子树笔记数（仅 folder 行） */
   noteCount?: number
-  /** 虚拟系统文件夹（如「我的文件夹」） */
+  /** 虚拟系统文件夹（历史兼容；D1 后侧栏不再生成） */
   isSystemFolder?: boolean
-  /** 「我的文件夹」虚拟容器行（与 isSystemFolder 同时为 true） */
-  isMyFolder?: boolean
   /** 置顶区标记：该行属于置顶文件夹区 */
   isPinnedSection?: boolean
   /** 置顶区分隔线行 */
@@ -192,28 +189,4 @@ export function collectExpandIdsForSearch(
     }
   }
   return ids
-}
-
-/**
- * 将真实文件夹/笔记行包进「我的文件夹」虚拟容器：
- * - 首行插入容器行（系统文件夹，不可重命名/删除/拖拽）
- * - 展开时子行深度整体 +1；折叠时仅保留容器行
- * - noteCount 传入总笔记数（容器折叠时子行不含未展开笔记，不能用行数统计）
- */
-export function wrapWithMyFolder(
-  rows: SidebarTreeRow[],
-  expanded: boolean,
-  totalNoteCount: number
-): SidebarTreeRow[] {
-  const myFolderRow: SidebarTreeRow = {
-    kind: 'folder',
-    depth: 0,
-    folder: { id: MY_FOLDER_ID, name: MY_FOLDER_NAME, order: -1 },
-    hasChildren: rows.length > 0,
-    noteCount: totalNoteCount,
-    isSystemFolder: true,
-    isMyFolder: true,
-  }
-  if (!expanded) return [myFolderRow]
-  return [myFolderRow, ...rows.map((row) => ({ ...row, depth: row.depth + 1 }))]
 }
