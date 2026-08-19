@@ -1,6 +1,6 @@
 # MarkFlow - Markdown 笔记
 
-随叫随到的本地 Markdown 编辑器 uTools 插件，支持所见即所得编辑、多视图模式、多文档管理和导入导出。
+uTools 里随叫随到的本地 Markdown 写作软件。默认所见即所得，文档只存在本机，随时导出为 `.md`。
 
 ![Version](https://img.shields.io/badge/version-1.1.0-blue)
 ![Vue](https://img.shields.io/badge/Vue-3.5-42b883)
@@ -10,22 +10,37 @@
 
 ## 目录
 
-1. [项目介绍](#项目介绍)
-2. [功能特性](#功能特性)
-3. [环境依赖](#环境依赖)
-4. [快速启动](#快速启动)
-5. [视图模式](#视图模式)
-6. [项目结构](#项目结构)
-7. [配置说明](#配置说明)
-8. [常见问题 FAQ](#常见问题-faq)
-9. [贡献指南](#贡献指南)
-10. [许可证](#许可证)
+1. [产品定位](#产品定位)
+2. [项目介绍](#项目介绍)
+3. [功能特性](#功能特性)
+4. [环境依赖](#环境依赖)
+5. [快速启动](#快速启动)
+6. [视图模式](#视图模式)
+7. [项目结构](#项目结构)
+8. [配置说明](#配置说明)
+9. [常见问题 FAQ](#常见问题-faq)
+10. [贡献指南](#贡献指南)
+11. [许可证](#许可证)
+
+## 产品定位
+
+**MarkFlow：uTools 里随叫随到的本地 Markdown 写作软件。默认所见即所得，文档只存在本机，随时导出为 `.md`。**
+
+三件事构成产品：
+
+| 柱子 | 用户能感知到什么 |
+|------|------------------|
+| **本地为主** | 生产环境写入 `utools.dbStorage`，开发环境回退 `localStorage`。无账号、不上传；设置里可备份，随时导出 `.md` / PDF |
+| **所见即所得** | 默认视图是 Milkdown WYSIWYG（界面标签「预览」）。打开就能写；源码 / 分屏是进阶，不是主路径 |
+| **随叫随到** | uTools 插件，用 `md` / `markdown` / `笔记` 唤起，不必再开独立 IDE |
+
+**适合**：技术文档、学习笔记、会议记录、博客草稿。
+
+**不是**：云笔记、磁盘文件夹仓库（Obsidian 式）、知识库 / 标签 / 图谱产品。笔记不在 `Documents/MarkFlow笔记` 这类路径里，而在本机 uTools 数据库；需要分享或归档时再导出。
 
 ## 项目介绍
 
-MarkFlow 是一个面向日常 Markdown 写作的 uTools 插件。解决本地笔记编辑时需要频繁切换工具、预览不便的痛点，提供编辑预览一体化体验。
-
-**适用场景**：技术文档编写、个人知识管理、会议记录、博客草稿。
+MarkFlow 面向日常 Markdown 写作。默认所见即所得，避免「写源码再切预览」；文档按空间 / 文件夹管理，数据只在本机。
 
 **技术栈**：
 
@@ -43,48 +58,59 @@ MarkFlow 是一个面向日常 Markdown 写作的 uTools 插件。解决本地�
 
 ## 功能特性
 
-**笔记管理**
-- 创建、重命名、复制笔记，自动从首个标题提取笔记名；**新建笔记/文件夹弹窗**（`CreateEntryModal`）支持一步创建
-- 文件夹创建、重命名、拖拽移动与层级展开/折叠；多级文件夹树、虚拟列表（>150 行）；侧栏可拖拽调宽
-- **虚拟目录**：「我的文件夹」为根容器；「最新」展示最近打开的笔记（最多 30 篇）
-- **置顶**：笔记可置顶；顶层文件夹可置顶，侧栏单独显示「常用文件夹」分区
-- **回收站**（`TrashPanel`）：删除笔记/文件夹为软删除，可恢复或彻底删除；容量上限 200 条；启动时按保留天数自动清理（默认 30 天）
-- 删除文件夹时连同子树与其中笔记一并移入回收站（不再把笔记挪到父文件夹）
-- 笔记多选（Ctrl/Cmd 点击）后批量移动；右键可定位所在文件夹
-- **多文档页签**（`EditorTabBar`）：同时打开多个笔记，页签切换、拖拽排序、关闭，上限 10 个（`MAX_EDITOR_TABS`）
-- **全文搜索**：标题 + 正文联合搜索，匹配摘要高亮（`SearchModal`，顶栏入口与 `Ctrl+K`）
-- **排序**：笔记置顶优先，同文件夹内拖拽重排（`sortOrder`）
-- 导入/导出 `.md` 文件；**批量导入文件夹**（`ImportFolderModal`，可选保留目录结构与图片）
+**首启与空态**
+- 空库且无打开页签时进入空白首页（`EmptyHome`），不再自动创建欢迎笔记
+- 首页三按钮：新建文档、新建文件夹、导入 `.md`
+- 四张模板卡一键创建（技术开发文档 / 学习教程笔记 / 日常随笔计划 / Agent 提示词）
+- 空库可「导入示例笔记」（幂等，可整夹进回收站）
+- 空库首启 3 步引导气泡（`OnboardingCoach`）：新建 → 我的空间 → 搜索；可跳过，勾选后不再展示
+- 存储说明写清「uTools 本地数据库」，禁止伪造磁盘路径
+
+**文档管理**
+- 创建、重命名、复制文档；标题可从首个标题提取；`CreateEntryModal` 一步创建文档或文件夹
+- 侧栏壳层：品牌 + 导航（首页 / 文档 / 回收站）+ **空间**树（`SidebarSpaces`）
+- 「我的空间」为未归入顶层文件夹的文档；用户可新建顶层空间（即顶层文件夹），点箭头展开子树
+- 文件夹创建、重命名、拖拽移动与层级展开/折叠；多级树、虚拟列表（>150 行）；侧栏可拖拽调宽
+- **置顶**：文档可置顶；仅顶层文件夹可置顶，树内单独显示「常用文件夹」分区
+- **回收站**（`TrashPanel`）：删除文档/文件夹为软删除，可恢复或彻底删除；容量上限 200 条；启动时按保留天数自动清理（默认 30 天）
+- 删除文件夹时连同子树与其中文档一并移入回收站
+- 文档多选（Ctrl/Cmd 点击）后批量移动；右键可定位所在文件夹
+- **多文档页签**（`EditorTabBar`）：同时打开多个文档，页签切换、拖拽排序、关闭，上限 10 个（`MAX_EDITOR_TABS`）
+- 顶栏前进 / 后退浏览历史（`useNoteHistory`）
+- **全文搜索**：标题 + 正文联合搜索，匹配摘要高亮（`SearchModal`；顶栏「搜索文档」与 `Ctrl/Cmd+K`）
+- **排序**：文档置顶优先，同文件夹内拖拽重排（`sortOrder`）
+- 导入/导出 `.md`；**批量导入文件夹**（`ImportFolderModal`，可选保留目录结构与图片）
 - 导出 Markdown 时可按设置写出图片（同级目录 / `.assets` / 自定义模板 / Typora 缓存路径）
-- 导出 **PDF**（`PdfExportModal` 配置选项，uTools 环境走 Chromium `printToPDF`，浏览器环境回退系统打印）
-- **数据备份 v2**（JSON 含笔记、文件夹、设置与图片资产）；设置页可**清空全部数据**（同时清空回收站）；支持**自动备份**
+- 导出 **PDF**（`PdfExportModal`；uTools 走 Chromium `printToPDF`，浏览器回退系统打印）
+- **数据备份 v2**（JSON 含文档、文件夹、设置与图片资产）；设置页可**清空全部数据**（同时清空回收站）；支持**自动备份**
 - 生产环境使用 `utools.dbStorage`，开发环境自动回退 `localStorage`
 
 **编辑与预览**
-- 四种视图模式：预览、分屏、源码、专注
-- 预览/专注模式基于 Milkdown，所见即所得渲染
+- 四种视图模式：预览、分屏、源码、专注（编辑区格式工具栏下拉切换，不在顶栏）
+- 预览/专注模式基于 Milkdown，所见即所得
 - 源码/分屏模式基于 CodeMirror 6，支持语法高亮、行号、撤销/重做、Tab 缩进
-- GFM 语法支持：表格、删除线、任务列表、代码高亮
+- GFM：表格、删除线、任务列表、代码高亮
 - **LaTeX 数学**：`$E=mc^2$`（行内）、`$$...$$`（块级），KaTeX 渲染
-- **Mermaid 图示**：` ```mermaid ` 围栏，分屏预览 SVG + WYSIWYG 实时代码块预览
+- **Mermaid 图示**：`` ```mermaid `` 围栏，分屏预览 SVG + WYSIWYG 实时代码块预览
 - 下划线（`<u>`）、==高亮==、行内代码与反引号自动闭合
 - 代码块复制按钮、语言标签切换（含 `mermaid`）
-- **表格工具栏**（`TableToolbar`）：选中表格时浮动显示，支持插入/删除行列、合并单元格等快捷操作
-- **脚注**：`[^1]` 引用与 `[^1]: ` 定义语法，WYSIWYG 与分屏预览均支持
-- **任务列表增强**：支持勾选状态切换、完成态样式、列表项插入/删除
+- **表格工具栏**（`TableToolbar`）：选中表格时浮动显示，插入/删除行列、合并单元格等
+- **脚注**：`[^1]` 引用与 `[^1]: ` 定义；WYSIWYG 与分屏预览均支持
+- **任务列表增强**：勾选切换、完成态样式、列表项插入/删除
 - **图片**：粘贴/拖放入库（`markflow-asset://`）、压缩存储、比例缩放、**双击全屏预览**（`ImageLightbox`）
-- 格式化工具栏（`FormatToolbar`）支持加粗、斜体、标题、列表、引用、代码块等快捷插入；**专注模式浮动格式工具栏**（`FocusFormatToolbar`）
-- 按文档标题生成目录导航，点击可跳转
-- 分屏预览支持滚动同步
+- 格式化工具栏（`FormatToolbar`）；专注模式浮动工具栏（`FocusFormatToolbar`）
+- 按文档标题生成目录导航；分屏预览滚动同步
 - 超过 200KB 文件自动降级为分屏模式，避免卡顿
 - 一键复制预览内容为 HTML
 
 **界面与设置**
-- 工具栏 **设置面板**（`SettingsModal`）：主题（浅色 / 深色 / 跟随系统或 uTools）、源码字号、等宽字体、自动备份、Markdown 图片导出路径、存储用量、备份与清空
-- 视图模式通过下拉菜单切换（`ViewModeDropdown`）
-- 可独立隐藏侧边栏与目录面板（侧边栏显隐、宽度会记住）；侧栏底部打开回收站
-- 专注模式隐藏工具栏与侧边栏，居中宽屏写作，按 `Esc` 退出
-- **全屏模式**（`useFullscreen`）：编辑区独立全屏，配合专注模式沉浸写作
+- 顶栏：侧栏开关、前进/后退、当前路径、居中「搜索文档」、目录（仅编辑视图）、更多菜单（导出 / 导入 / 新手教程）
+- 主题只在设置面板切换（浅色 / 深色 / 跟随系统或 uTools），顶栏无主题快捷按钮
+- **设置面板**（`SettingsModal`，侧栏底栏入口）：主题、源码字号、等宽字体、自动备份、图片导出路径、存储用量、备份与清空
+- 侧栏底栏另有「帮助与反馈」，打开内置新手教程
+- 侧栏显隐与宽度会记住；回收站走导航，不在底栏
+- 专注模式隐藏顶栏与侧栏，居中宽屏写作，按 `Esc` 退出
+- **全屏模式**（`useFullscreen`）：编辑区独立全屏
 
 ## 环境依赖
 
@@ -141,7 +167,7 @@ npm run test:watch
 
 ## 视图模式
 
-顶部工具栏 / 编辑区下拉（`ViewModeDropdown`）提供四种编辑视图：
+编辑区格式工具栏（`FormatToolbar` / `FocusFormatToolbar`）的 `ViewModeDropdown` 提供四种编辑视图：
 
 | 模式 | 说明 | 编辑区 | 渲染引擎 |
 |------|------|--------|----------|
@@ -163,7 +189,7 @@ npm run test:watch
 | 链接、图片 | 支持 | 支持 |
 | 下划线 `<u>`、==高亮== | 支持 | 支持 |
 | LaTeX 数学 `$...$` / `$$...$$` | 支持 | 支持 |
-| Mermaid ` ```mermaid ` | 支持 | 支持 |
+| Mermaid `` ```mermaid `` | 支持 | 支持 |
 | 脚注 `[^1]` | 支持 | 支持 |
 | 任务列表 `- [ ]` | 支持 | 支持 |
 
@@ -177,162 +203,63 @@ markflow/
 │   └── logo.png             # 插件图标
 ├── src/
 │   ├── main.ts              # Vue 应用入口
-│   ├── App.vue              # 根布局与视图模式切换
+│   ├── App.vue              # 根布局：首页 / 编辑 / 回收站
 │   ├── style.css            # 全局样式与 CSS 变量（明/暗主题）
 │   ├── constants.ts         # 阈值与防抖常量
 │   ├── constants/
-│   │   ├── welcomeNote.ts   # 默认欢迎笔记内容
-│   │   ├── myFolder.ts      # 「我的文件夹」虚拟根目录
-│   │   └── recentFolder.ts  # 「最新」虚拟目录与最近笔记上限
-│   ├── types/
-│   │   ├── index.ts         # TypeScript 核心类型定义
-│   │   ├── asset.ts         # 图片资源类型
-│   │   ├── imageExport.ts   # Markdown 图片导出路径设置
-│   │   ├── import.ts        # 导入功能类型
-│   │   └── task.ts          # 任务列表类型
+│   │   ├── welcomeNote.ts       # 按需打开的新手教程正文
+│   │   ├── emptyHomeCopy.ts     # 空白首页文案（含本机库说明）
+│   │   ├── sidebarShell.ts      # 侧栏/顶栏用户可见文案
+│   │   ├── noteTemplates.ts     # 首页模板卡
+│   │   ├── exampleLibrary.ts    # 示例笔记种子
+│   │   ├── myFolder.ts          # 「我的空间」内部 id（非用户文案）
+│   │   └── recentFolder.ts      # 最近访问上限（内部 LRU）
+│   ├── types/               # TypeScript 核心类型
 │   ├── extensions/
-│   │   └── autoCloseBrackets.ts  # CodeMirror 括号自动闭合扩展
-│   ├── components/          # 界面组件
-│   │   ├── Toolbar.vue          # 工具栏（新建/搜索/导入导出/目录/设置）
-│   │   ├── Sidebar.vue          # 侧边栏（我的文件夹 / 最新 / 文件夹树 / 回收站）
-│   │   ├── SidebarTreeRow.vue   # 侧栏树行组件
-│   │   ├── TRashPanel.vue       # 回收站面板（恢复 / 彻底删除 / 清空）
-│   │   ├── EditorTabBar.vue     # 多文档页签栏
-│   │   ├── ViewModeDropdown.vue # 视图模式切换下拉
-│   │   ├── CreateEntryModal.vue # 新建笔记/文件夹弹窗
-│   │   ├── SearchModal.vue      # 全文搜索弹窗
-│   │   ├── WysiwygEditor.vue    # Milkdown WYSIWYG 编辑器
-│   │   ├── Editor.vue           # CodeMirror 源码编辑器
-│   │   ├── Preview.vue          # marked 实时预览（含 Mermaid hydrate）
-│   │   ├── FormatToolbar.vue    # 文本格式化工具栏
-│   │   ├── FocusFormatToolbar.vue # 专注模式浮动格式工具栏
-│   │   ├── TableToolbar.vue     # 表格编辑工具栏
-│   │   ├── Toc.vue              # 文档目录导航
-│   │   ├── ImageLightbox.vue    # 图片全屏预览灯箱
-│   │   ├── ImportFolderModal.vue# 批量导入文件夹弹窗
-│   │   ├── SettingsModal.vue    # 设置、备份、图片导出、清空数据
-│   │   ├── PdfExportModal.vue   # PDF 导出配置弹窗
-│   │   ├── LinkDialog.vue       # 链接编辑弹窗
-│   │   ├── HighlightTextModal.vue # 高亮文本弹窗
-│   │   └── AppIcon.vue          # 应用图标 / 状态指示
-│   ├── stores/              # Pinia 状态管理
-│   │   ├── note.ts              # 笔记/文件夹 CRUD、置顶、回收站
-│   │   ├── editorTabs.ts        # 多文档页签管理
-│   │   ├── editorTabsBridge.ts  # 页签与笔记同步桥接
-│   │   └── tabContentCache.ts   # 页签内容缓存
-│   ├── composables/         # 可复用组合式逻辑（17 个）
-│   │   ├── useStorage.ts        # 存储抽象（utools / localStorage，含回收站）
-│   │   ├── useTheme.ts          # 主题切换（明/暗/跟随系统）
-│   │   ├── useAppSettings.ts    # 应用设置读写
-│   │   ├── useScrollSync.ts     # 分屏滚动同步
-│   │   ├── useTocHeadings.ts    # 目录标题提取
-│   │   ├── useTocScroll.ts      # 目录滚动监听
-│   │   ├── useTocScrollSpy.ts   # 目录滚动跟踪
-│   │   ├── useTocJumpHandler.ts # 目录跳转处理
-│   │   ├── useNoteSort.ts       # 笔记排序逻辑
-│   │   ├── useAssetStorage.ts   # 图片资源存储
-│   │   ├── useImageLightbox.ts  # 图片灯箱控制
-│   │   ├── useAutoBackup.ts     # 自动备份
-│   │   ├── useBackup.ts         # 手动备份/恢复
-│   │   ├── useFocusToolbarVisibility.ts # 专注模式工具栏显隐
-│   │   ├── useFullscreen.ts     # 全屏状态管理
-│   │   ├── useTableToolbar.ts   # 表格工具栏逻辑
-│   │   └── useViewModeFlash.ts  # 视图切换高亮提示
+│   │   └── autoCloseBrackets.ts  # CodeMirror 括号自动闭合
+│   ├── components/
+│   │   ├── Toolbar.vue              # 顶栏（侧栏开关 / 历史 / 搜索 / 更多）
+│   │   ├── EmptyHome.vue            # 空白首页
+│   │   ├── OnboardingCoach.vue      # 首启引导气泡
+│   │   ├── Sidebar.vue              # 侧栏编排
+│   │   ├── sidebar/                 # Brand / Nav / Spaces / Footer
+│   │   ├── SidebarTreeRow.vue       # 空间内树行
+│   │   ├── TRashPanel.vue           # 回收站面板
+│   │   ├── EditorTabBar.vue         # 多文档页签栏
+│   │   ├── ViewModeDropdown.vue     # 视图模式切换
+│   │   ├── CreateEntryModal.vue     # 新建文档/文件夹
+│   │   ├── SearchModal.vue          # 全文搜索
+│   │   ├── WysiwygEditor.vue        # Milkdown WYSIWYG
+│   │   ├── Editor.vue               # CodeMirror 源码编辑
+│   │   ├── Preview.vue              # marked 实时预览
+│   │   ├── FormatToolbar.vue        # 格式化工具栏（含视图切换）
+│   │   ├── FocusFormatToolbar.vue   # 专注模式浮动工具栏
+│   │   ├── TableToolbar.vue         # 表格编辑工具栏
+│   │   ├── Toc.vue                  # 文档目录
+│   │   ├── SettingsModal.vue        # 设置、备份、清空
+│   │   └── …                        # 导入、PDF、灯箱、链接等弹窗
+│   ├── stores/
+│   │   ├── note.ts                  # 文档/文件夹 CRUD、置顶、回收站
+│   │   ├── editorTabs.ts            # 多文档页签、浏览历史、教程笔记
+│   │   ├── editorTabsBridge.ts      # 页签与文档同步
+│   │   ├── tabContentCache.ts       # 页签内容缓存
+│   │   └── workspace.ts             # 首页 / 编辑 / 回收站视图
+│   ├── composables/         # 可复用组合式逻辑（20 个）
 │   ├── plugins/             # Milkdown 插件（15 个）
-│   │   ├── math.ts              # LaTeX 数学公式支持
-│   │   ├── codeBlockLabel.ts    # 代码块语言标签
-│   │   ├── headingId.ts         # 标题自动编号
-│   │   ├── underlineMark.ts     # 下划线 `<u>` 语法
-│   │   ├── highlightMark.ts     # ==高亮== 语法
-│   │   ├── strongMark.ts        # 加粗/Strong 标记定制
-│   │   ├── imagePaste.ts        # 粘贴图片入库
-│   │   ├── imageScale.ts        # 图片比例缩放
-│   │   ├── markdownPaste.ts     # Markdown 粘贴解析
-│   │   ├── htmlRender.ts        # HTML 自定义渲染
-│   │   ├── autoCloseBrackets.ts # 括号自动闭合
-│   │   ├── plainTextFallback.ts # 纯文本回退保护
-│   │   ├── tableToolbar.ts      # 表格编辑工具栏
-│   │   ├── footnoteDisplay.ts   # 脚注渲染
-│   │   └── footnoteAutoConvert.ts # 脚注语法自动转为节点
-│   └── utils/               # 工具函数（约 60 个）
-│       ├── markedSetup.ts       # marked 解析器配置
-│       ├── mathRender.ts        # KaTeX 数学渲染
-│       ├── mermaidRender.ts     # Mermaid 图示渲染
-│       ├── mermaidBlock.ts      # Mermaid 代码块处理
-│       ├── sanitizeHtml.ts      # HTML 安全清洗
-│       ├── escapeHtml.ts        # HTML 转义
-│       ├── exportPdf.ts         # PDF 导出
-│       ├── pdfOptions.ts        # PDF 导出选项
-│       ├── printDocument.ts     # 系统打印
-│       ├── printStyles.ts       # 打印样式
-│       ├── clipboard.ts         # 剪贴板操作
-│       ├── codeCopy.ts          # 代码块复制按钮
-│       ├── codeLanguageDropdown.ts # 代码块语言切换
-│       ├── updateFenceLanguage.ts  # 围栏语言更新
-│       ├── imageCompress.ts     # 图片压缩
-│       ├── imageInsert.ts       # 图片插入
-│       ├── imageScale.ts        # 图片缩放
-│       ├── imageLightbox.ts     # 图片灯箱逻辑
-│       ├── imageExportPath.ts   # 导出 Markdown 时的图片路径
-│       ├── exportMarkdownAssets.ts # 导出时写出图片资源
-│       ├── exportAssetFilename.ts  # 导出资源文件名
-│       ├── assetUri.ts          # 资源 URI 处理
-│       ├── resolveMarkdownAssets.ts # Markdown 资源路径解析
-│       ├── backup.ts            # 备份/恢复核心逻辑
-│       ├── autoBackup.ts        # 自动备份核心
-│       ├── autoBackupBrowser.ts # 浏览器环境自动备份
-│       ├── autoPurgeTrash.ts    # 回收站到期自动清理
-│       ├── noteTitle.ts         # 笔记标题提取
-│       ├── noteSort.ts          # 笔记排序
-│       ├── migrateNoteSortOrder.ts # 排序兼容迁移
-│       ├── folderTree.ts        # 文件夹树操作
-│       ├── sidebarTree.ts       # 侧栏树构建（含我的文件夹 / 最新 / 置顶区）
-│       ├── treeIndex.ts         # 树形索引
-│       ├── recentNotes.ts       # 最近打开笔记
-│       ├── searchHistory.ts     # 搜索历史
-│       ├── searchSnippet.ts     # 搜索摘要高亮
-│       ├── importFolderDevScan.ts   # 开发环境文件夹扫描
-│       ├── importFolderHelpers.ts   # 导入辅助函数
-│       ├── importFolderOptions.ts   # 导入选项配置
-│       ├── importFolderService.ts   # 导入服务
-│       ├── importFolderTree.ts      # 导入目录树
-│       ├── importMarkdownImages.ts  # 导入 Markdown 图片
-│       ├── normalizeBlockMath.ts    # 块级数学标准化
-│       ├── headingSlug.ts       # 标题锚点生成
-│       ├── generateTocMarkdown.ts   # 目录 Markdown 生成
-│       ├── previewFragmentNav.ts    # 预览片段导航
-│       ├── previewLinkNav.ts        # 预览链接跳转
-│       ├── storageStats.ts      # 存储用量统计
-│       ├── inlineCode.ts        # 行内代码处理
-│       ├── notify.ts            # 通知提示
-│       ├── logger.ts            # 日志
-│       ├── formatRelativeTime.ts    # 相对时间（回收站等）
-│       ├── pathTemplate.ts      # 导出路径模板
-│       ├── linkEditing.ts       # 链接编辑
-│       ├── stripInlineMarkdown.ts   # 行内 Markdown 剥离
-│       ├── wysiwygFormat.ts     # WYSIWYG 格式化
-│       ├── taskListParse.ts     # 任务列表解析
-│       ├── taskListMutations.ts # 任务列表状态变更
-│       ├── taskListHtml.ts      # 任务列表 HTML 渲染
-│       └── footnoteFallback.ts  # 脚注回退渲染
+│   └── utils/               # 纯函数（约 63 个）：渲染、导入导出、备份、树构建等
 ├── tests/
-│   ├── unit/                   # 单元测试
-│   │   ├── components/             # 组件测试
-│   │   ├── composables/            # composables 测试
-│   │   ├── stores/                 # 状态管理测试
-│   │   ├── plugins/                # 插件测试
-│   │   └── utils/                  # 工具函数测试
-│   ├── integration/            # 集成测试（WYSIWYG、备份恢复、笔记 CRUD、文件夹回收站等）
-│   ├── architecture/           # 架构约束测试
-│   ├── helpers/                # 测试辅助工具
-│   ├── utils/                  # 测试工具函数
-│   ├── setup.ts                # 测试环境配置
-│   └── tsconfig.json           # 测试 TypeScript 配置
+│   ├── unit/                # 组件 / composables / stores / plugins / utils
+│   ├── integration/         # WYSIWYG、备份、CRUD、空态、工作区等
+│   ├── architecture/        # 壳层、空首页、存储、视图约束
+│   ├── helpers/
+│   └── setup.ts
 ├── vite.config.ts
 ├── vitest.config.ts
 ├── tsconfig.json
 └── package.json
 ```
+
+前端通过 `window.markflow` 访问宿主能力，禁止在 Vue 里直接扩散 Node / uTools 专属调用。目录职责见仓库 `AGENTS.md`。
 
 ## 配置说明
 
@@ -377,23 +304,24 @@ markflow/
 | `ASSET_MAX_BYTES` | 2 MB | 单张图片资源最大体积 |
 | `MAX_EDITOR_TABS` | 10 | 同时打开的最大编辑器页签数 |
 
-回收站与侧栏相关默认值（不在 `constants.ts`）：
+其它默认值：
 
 | 常量 / 设置 | 值 | 说明 |
 |-----|-----|------|
 | `TRASH_MAX_ITEMS` | 200 | 回收站容量上限（`stores/note.ts`） |
 | `trashRetentionDays` | 30 | 回收站保留天数（`AppSettings`，启动时自动清理） |
-| `RECENT_NOTE_LIMIT` | 30 | 「最新」虚拟目录最多展示篇数 |
+| `RECENT_NOTE_LIMIT` | 30 | 最近访问 LRU 上限（内部，非侧栏虚拟目录） |
+| 侧栏默认宽度 | 260 px | `useAppSettings` / CSS `--sidebar-width` |
 
 ### 数据存储 Key
 
 | Key | 内容 |
 |-----|------|
-| `markflow_note_list` | 笔记列表（id、标题、文件夹、时间等） |
-| `markflow_note_{id}` | 单篇笔记正文 |
-| `markflow_folder_list` | 文件夹列表 |
-| `markflow_settings` | 应用设置（主题、字号、PDF、图片导出、侧栏状态等） |
-| `markflow_trash_notes` | 回收站笔记 |
+| `markflow_note_list` | 文档列表（id、标题、文件夹、时间等） |
+| `markflow_note_{id}` | 单篇文档正文 |
+| `markflow_folder_list` | 文件夹 / 空间列表 |
+| `markflow_settings` | 应用设置（主题、字号、PDF、图片导出、侧栏状态、引导等） |
+| `markflow_trash_notes` | 回收站文档 |
 | `markflow_trash_folders` | 回收站文件夹条目（含子树快照） |
 | `markflow_asset_*` | 图片等资源索引与二进制（IndexedDB / 桥接层） |
 
@@ -403,29 +331,33 @@ markflow/
 
 开发环境不支持 uTools API，`useStorage` 会自动回退到 `localStorage`。确保以 `npm run dev` 方式在浏览器中开发，不要直接双击 `index.html`。
 
-**Q2：分屏预览不更新？**
+**Q2：文档存在哪里？找不到 `.md` 文件？**
 
-编辑内容通过 `liveContent` 实时同步到预览；若仍异常，可切换笔记或检查是否为大文件防抖延迟。
+生产环境保存在 **uTools 本地数据库**（`utools.dbStorage`），不是磁盘上的 `Documents/MarkFlow笔记`。需要文件时用「更多 → 导出 Markdown」，或在设置 → 数据管理里备份。
 
-**Q3：Mermaid 流程图只有形状、没有文字？**
+**Q3：分屏预览不更新？**
+
+编辑内容通过 `liveContent` 实时同步到预览；若仍异常，可切换文档或检查是否为大文件防抖延迟。默认「预览」模式是所见即所得，不必依赖分屏。
+
+**Q4：Mermaid 流程图只有形状、没有文字？**
 
 请使用最新版本；节点标签在 Mermaid SVG 的 `foreignObject` 中，勿对 hydrate 后的 SVG 二次 DOMPurify 清洗（见 `sanitizeMermaidSvg`）。
 
-**Q4：打开大文件卡顿？**
+**Q5：打开大文件卡顿？**
 
 超过 200KB 的文档会自动降级为分屏模式，渲染防抖延长。如需编辑大文件，建议切到源码模式操作。
 
-**Q5：构建后插件不显示？**
+**Q6：构建后插件不显示？**
 
 确认 `dist/plugin.json` 文件存在，且 uTools 插件的 `main` 字段指向 `index.html`。构建时 `plugin.json` 从 `public/` 复制到 `dist/` 根目录。
 
-**Q6：如何清除本地笔记数据？**
+**Q7：如何清除本地文档数据？**
 
-侧栏底部打开 **回收站**，可恢复或彻底删除单条；也可「清空回收站」。设置 → 数据管理 → **清空全部数据**（二次确认）会删除全部笔记、文件夹、图片与回收站（保留应用设置）；或移除 uTools 插件重装（清除 `utools.dbStorage`）。
+侧栏导航打开 **回收站**，可恢复或彻底删除单条；也可「清空回收站」。设置 → 数据管理 → **清空全部数据**（二次确认）会删除全部文档、文件夹、图片与回收站（保留应用设置）；或移除 uTools 插件重装（清除 `utools.dbStorage`）。
 
-**Q7：删除的笔记还能找回吗？**
+**Q8：删除的文档还能找回吗？**
 
-可以。删除笔记或文件夹会进入回收站，默认保留 30 天，启动时自动清理过期条目。容量上限 200 条；满了之后需要先清空部分条目才能继续删除。
+可以。删除文档或文件夹会进入回收站，默认保留 30 天，启动时自动清理过期条目。容量上限 200 条；满了之后需要先清空部分条目才能继续删除。
 
 ## 贡献指南
 
@@ -439,6 +371,8 @@ markflow/
 ```bash
 npm test
 ```
+
+用户可见文案不要使用「知识库」「我的文件夹」；存储说明必须写 uTools 本地数据库，不要写伪造磁盘路径。架构测试会锁这些约束。
 
 ## 许可证
 
