@@ -65,6 +65,14 @@ describe('空白首页架构约束', () => {
     expect(app).toMatch(/@create-folder=/)
   })
 
+  it('D3：首页副标题用「所有文档」并保留本机 uTools 库语义', () => {
+    const copy = readSrc('src/constants/emptyHomeCopy.ts')
+    expect(copy).toMatch(/所有文档仅保存在本机 uTools 数据库/)
+    expect(copy).toMatch(/可随时导出为 \.md/)
+    expect(copy).not.toMatch(/所有笔记仅保存/)
+    expect(copy).not.toMatch(/Documents/)
+  })
+
   it('src/constants 与 src/components 不得出现伪造 Documents 路径', () => {
     const files = [
       ...collectSourceFiles(resolve(root, 'src/constants')),

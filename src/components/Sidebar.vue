@@ -147,7 +147,7 @@
         @click.stop
       >
         <button @click="openCreateModal('folder', folderContextMenu.folderId, true)">新建子文件夹</button>
-        <button @click="openCreateModal('note', folderContextMenu.folderId, true)">新建笔记</button>
+        <button @click="openCreateModal('note', folderContextMenu.folderId, true)">{{ SIDEBAR_CREATE_NOTE_LABEL }}</button>
         <button @click="startRenameFolderById(folderContextMenu.folderId)">重命名</button>
         <button @click="startMoveFolder(folderContextMenu.folderId)">移动到</button>
         <button @click="toggleFolderPin(folderContextMenu.folderId)">
@@ -167,7 +167,7 @@
             :disabled="movingNoteFolderId === undefined"
             @click="commitMoveNote(undefined)"
           >
-            无文件夹（{{ myFolderName }}）
+            {{ mySpaceLabel }}
             <span v-if="movingNoteFolderId === undefined" class="move-folder-tag">当前</span>
           </button>
           <button
@@ -198,7 +198,7 @@
             class="move-folder-item"
             @click="commitBatchMove(undefined)"
           >
-            无文件夹（{{ myFolderName }}）
+            {{ mySpaceLabel }}
           </button>
           <button
             v-for="row in moveFolderRows"
@@ -226,7 +226,7 @@
             :disabled="isMoveFolderTargetDisabled(undefined)"
             @click="commitMoveFolder(undefined)"
           >
-            {{ myFolderName }}
+            {{ mySpaceLabel }}
           </button>
           <button
             v-for="row in moveFolderRows"
@@ -310,7 +310,6 @@ import {
   flattenSidebarTree,
   collectAncestorIdsForNote,
   collectExpandIdsForSearch,
-  wrapWithMyFolder,
   type SidebarTreeRow,
 } from '../utils/sidebarTree'
 import { buildTreeIndex } from '../utils/treeIndex'
@@ -329,10 +328,15 @@ import { useTheme } from '../composables/useTheme'
 import { useAppSettings, clampSidebarWidth } from '../composables/useAppSettings'
 import { useNoteSort } from '../composables/useNoteSort'
 import { sortNotes } from '../utils/noteSort'
-import { MY_FOLDER_ID, MY_FOLDER_NAME } from '../constants/myFolder'
+import { MY_FOLDER_ID } from '../constants/myFolder'
+import {
+  SIDEBAR_CREATE_NOTE_LABEL,
+  SIDEBAR_EMPTY_SEARCH,
+  SIDEBAR_EMPTY_TREE,
+  SIDEBAR_MY_SPACE_LABEL,
+} from '../constants/sidebarShell'
 
-// 模板中使用：根目录对外统一展示为「我的文件夹」
-const myFolderName = MY_FOLDER_NAME
+const mySpaceLabel = SIDEBAR_MY_SPACE_LABEL
 
 const emit = defineEmits<{
   navigateHome: []
@@ -472,8 +476,8 @@ function flattenSpaceChildrenRows(rootFolderId: string | undefined) {
 }
 
 const mySpaceRows = computed(() => {
-  const base = flattenSpaceChildrenRows(undefined)
-  return wrapWithMyFolder(base, expandedFolderIds.value.has(MY_FOLDER_ID), store.searchedNoteList.length)
+  if (!expandedFolderIds.value.has(MY_FOLDER_ID)) return []
+  return flattenSpaceChildrenRows(undefined)
 })
 
 const spaceRowsMap = computed(() => {
@@ -492,8 +496,8 @@ const showTreeEmpty = computed(() => {
 })
 
 const emptyTip = computed(() => {
-  if (isSearching.value) return '无匹配笔记'
-  return '暂无笔记，点击「新建文档」'
+  if (isSearching.value) return SIDEBAR_EMPTY_SEARCH
+  return SIDEBAR_EMPTY_TREE
 })
 
 const moveFolderRows = computed(() =>
@@ -614,7 +618,7 @@ function handleCreateEntry(payload: { kind: 'note' | 'folder'; id: string; paren
   persistSidebarState()
 }
 
-/** 虚拟系统文件夹（「我的文件夹」）：不参与激活、右键、拖拽 */
+/** 历史虚拟根目录 ID：侧栏不再渲染该行，但仍兼容旧事件/状态 */
 function isVirtualFolder(folderId: string) {
   return folderId === MY_FOLDER_ID
 }
@@ -749,7 +753,7 @@ function locateFolder(noteId: string) {
   noteContextMenu.value = null
   const ancestorIds = store.locateNoteFolder(noteId)
   if (ancestorIds.length === 0) {
-    showAppNotification(`该笔记位于${MY_FOLDER_NAME}`)
+    showAppNotification(`该笔记位于${SIDEBAR_MY_SPACE_LABEL}`)
     return
   }
   const next = new Set(expandedFolderIds.value)
@@ -832,7 +836,7 @@ function startMoveNote(id: string) {
 }
 
 function folderLabel(folderId: string | undefined) {
-  if (folderId === undefined) return MY_FOLDER_NAME
+  if (folderId === undefined) return SIDEBAR_MY_SPACE_LABEL
   return getFolderPathLabel(store.folderList, folderId) || '未知文件夹'
 }
 
@@ -887,7 +891,7 @@ function onDropOnNote(targetId: string, position: 'before' | 'after') {
 function onFolderDragOver(folderId: string, position: 'before' | 'after' | 'inside') {
   if (!dragPayload.value) return
   if (folderId === MY_FOLDER_ID) {
-    // 容器行承载根目录语义：任何位置都视为拖入「我的文件夹」
+    // 兼容历史虚拟根目录事件：任何位置都视为拖入根目录
     dragOverFolderId.value = folderId
     dragOverFolderPosition.value = null
     return
@@ -916,13 +920,13 @@ function onDropOnFolder(folderId: string, position: 'before' | 'after' | 'inside
   if (!payload) return
 
   if (folderId === MY_FOLDER_ID) {
-    // 释放在容器行 = 移动到「我的文件夹」（根目录）
+    // 兼容历史虚拟根目录事件：移动到根目录
     if (payload.kind === 'note') {
       store.moveNote(payload.id, undefined)
-      showAppNotification(`已移动到：${MY_FOLDER_NAME}`)
+      showAppNotification(`已移动到：${SIDEBAR_MY_SPACE_LABEL}`)
     } else {
       const ok = store.moveFolder(payload.id, undefined)
-      if (ok) showAppNotification(`文件夹已移动到：${MY_FOLDER_NAME}`)
+      if (ok) showAppNotification(`文件夹已移动到：${SIDEBAR_MY_SPACE_LABEL}`)
     }
     persistSidebarState()
     return
@@ -978,10 +982,10 @@ function onRootDrop() {
   if (!payload) return
   if (payload.kind === 'note') {
     store.moveNote(payload.id, undefined)
-    showAppNotification(`已移动到：${MY_FOLDER_NAME}`)
+    showAppNotification(`已移动到：${SIDEBAR_MY_SPACE_LABEL}`)
   } else {
     const ok = store.moveFolder(payload.id, undefined)
-    if (ok) showAppNotification(`文件夹已移动到：${MY_FOLDER_NAME}`)
+    if (ok) showAppNotification(`文件夹已移动到：${SIDEBAR_MY_SPACE_LABEL}`)
   }
   persistSidebarState()
 }
@@ -1089,7 +1093,7 @@ onMounted(() => {
   if (expandedFromSettings !== undefined) {
     const ids = new Set(expandedFromSettings)
     const spaceIds = new Set(settings.sidebarExpandedSpaceIds ?? [])
-    // 老用户一次性迁移：容器 ID 在旧配置中不可能存在，默认展开，
+    // 老用户一次性迁移：旧配置中没有根空间 ID 时默认展开，
     // 避免升级后整个资料库在侧边栏不可见；迁移后用户手动折叠的意图正常保留
     if (!settings.myFolderIntroMigrated) {
       ids.add(MY_FOLDER_ID)
@@ -1099,7 +1103,7 @@ onMounted(() => {
     expandedFolderIds.value = ids
     expandedSpaceIds.value = spaceIds
   } else {
-    // 首次启动：默认展开「我的文件夹」+ 一级文件夹（depth=0 且有子项的文件夹）
+    // 首次启动：默认展开「我的空间」+ 一级文件夹（depth=0 且有子项的文件夹）
     const initialExpanded = new Set([MY_FOLDER_ID])
     const topLevelFolders = store.folderList.filter((f) => !f.parentId)
     for (const folder of topLevelFolders) {

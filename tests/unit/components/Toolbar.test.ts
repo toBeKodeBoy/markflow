@@ -325,8 +325,9 @@ describe('Toolbar', () => {
     const wrapper = mountToolbar()
     const btn = wrapper.find('[data-testid="toolbar-search-bar"]')
     expect(btn.exists()).toBe(true)
-    expect(btn.attributes('aria-label')).toBe('搜索笔记')
-    expect(btn.attributes('title')).toMatch(/Ctrl\+K|Cmd\+K|搜索/)
+    expect(btn.attributes('aria-label')).toBe('搜索文档')
+    expect(btn.attributes('title')).toMatch(/搜索文档/)
+    expect(btn.attributes('title')).toMatch(/Ctrl\/Cmd\+K/)
 
     await btn.trigger('click')
     expect(wrapper.emitted('openSearch')).toEqual([[]])

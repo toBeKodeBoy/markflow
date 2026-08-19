@@ -104,16 +104,31 @@ describe('P0 顶栏视觉', () => {
   const toolbar = readSrc('src/components/Toolbar.vue')
   const app = readSrc('src/App.vue')
 
-  it('搜索条应加宽，可见文案为搜索文档', () => {
+  it('搜索条应加宽，可见文案与 aria 均为搜索文档', () => {
     expect(css).toMatch(/\.topbar-center\s*\{[^}]*flex:\s*0 1 440px/)
     expect(css).toMatch(/\.toolbar-search-bar\s*\{[^}]*width:\s*min\(\s*100%,\s*440px\s*\)/)
-    expect(toolbar).toMatch(/>搜索文档</)
-    expect(toolbar).toMatch(/aria-label=["']搜索笔记["']/)
+    expect(toolbar).toMatch(/SEARCH_DOCUMENTS_LABEL/)
+    expect(toolbar).not.toMatch(/搜索笔记/)
   })
 
   it('首页应隐藏目录按钮，仅编辑视图传入 tocAvailable', () => {
     expect(toolbar).toMatch(/tocAvailable/)
     expect(toolbar).toMatch(/v-if="tocAvailable"/)
     expect(app).toMatch(/:toc-available="isEditorView"|:tocAvailable="isEditorView"/)
+  })
+})
+
+describe('D3 文档用词', () => {
+  it('Toolbar 搜索控件与 SearchModal 不得出现「搜索笔记」', () => {
+    const shell = readSrc('src/constants/sidebarShell.ts')
+    const toolbar = readSrc('src/components/Toolbar.vue')
+    const searchModal = readSrc('src/components/SearchModal.vue')
+    expect(shell).toMatch(/SEARCH_DOCUMENTS_LABEL = '搜索文档'/)
+    expect(shell).toMatch(/SEARCH_DOCUMENTS_PLACEHOLDER = '搜索文档标题或正文\.\.\.'/)
+    expect(toolbar).not.toMatch(/搜索笔记/)
+    expect(searchModal).not.toMatch(/搜索笔记/)
+    expect(toolbar).toMatch(/SEARCH_DOCUMENTS_LABEL/)
+    expect(searchModal).toMatch(/SEARCH_DOCUMENTS_LABEL/)
+    expect(searchModal).toMatch(/SEARCH_DOCUMENTS_PLACEHOLDER/)
   })
 })

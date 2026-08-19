@@ -61,4 +61,31 @@ describe('侧栏壳层架构约束', () => {
     expect(sidebar).not.toMatch(/class="sidebar-bottom-btn trash-btn"/)
     expect(sidebar).toMatch(/sidebar-storage-caption|SidebarFooter/)
   })
+
+  it('D1：用户可见壳层文案不得再出现「我的文件夹」桶名', () => {
+    const files = [
+      'src/components/Sidebar.vue',
+      'src/components/SidebarTreeRow.vue',
+      'src/components/CreateEntryModal.vue',
+      'src/constants/sidebarShell.ts',
+      'src/constants/exampleLibrary.ts',
+      'src/constants/myFolder.ts',
+      'src/utils/sidebarTree.ts',
+      ...collectVueFiles(resolve(root, 'src/components/sidebar')).map((file) => file.slice(root.length + 1).replace(/\\/g, '/')),
+    ]
+    const offenders = files.filter((rel) => readSrc(rel).includes('我的文件夹'))
+    expect(offenders).toEqual([])
+    expect(readSrc('src/utils/sidebarTree.ts')).not.toMatch(/wrapWithMyFolder/)
+    expect(readSrc('src/constants/myFolder.ts')).toMatch(/MY_FOLDER_ID/)
+    expect(readSrc('src/constants/myFolder.ts')).not.toMatch(/MY_FOLDER_NAME/)
+  })
+
+  it('D3：侧栏右键与空态不得再写「新建笔记」', () => {
+    const sidebar = readSrc('src/components/Sidebar.vue')
+    const copy = readSrc('src/constants/sidebarShell.ts')
+    expect(copy).toMatch(/SIDEBAR_CREATE_NOTE_LABEL = '新建文档'/)
+    expect(sidebar).toMatch(/SIDEBAR_CREATE_NOTE_LABEL/)
+    expect(sidebar).not.toMatch(/>新建笔记</)
+    expect(copy).toMatch(/SIDEBAR_EMPTY_TREE = '暂无文档，点击「新建文档」'/)
+  })
 })

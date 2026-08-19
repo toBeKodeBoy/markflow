@@ -28,7 +28,7 @@
             <AppIcon name="file" :size="18" />
           </span>
           <span class="create-entry-kind-title">新建文件</span>
-          <span class="create-entry-kind-desc">创建空白 Markdown 笔记</span>
+          <span class="create-entry-kind-desc">{{ CREATE_BLANK_DOCUMENT_DESC }}</span>
         </button>
         <button
           type="button"
@@ -66,7 +66,7 @@
             v-model="parentValue"
             class="create-entry-select"
           >
-            <option value="__root__">{{ myFolderName }}</option>
+            <option value="__root__">{{ mySpaceLabel }}</option>
             <option
               v-for="option in folderOptions"
               :key="option.folder.id"
@@ -87,7 +87,7 @@
               data-testid="create-entry-template-blank"
               @click="templateId = null"
             >
-              空白笔记
+              {{ CREATE_BLANK_DOCUMENT_LABEL }}
             </button>
             <button
               v-for="item in NOTE_TEMPLATES"
@@ -128,16 +128,20 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Folder } from '../types'
 import { flattenFolderTree, getFolderPathLabel } from '../utils/folderTree'
 import { useNoteStore } from '../stores/note'
-import { MY_FOLDER_NAME } from '../constants/myFolder'
 import { NOTE_TEMPLATES, type NoteTemplateId } from '../constants/noteTemplates'
+import {
+  CREATE_BLANK_DOCUMENT_DESC,
+  CREATE_BLANK_DOCUMENT_HINT,
+  CREATE_BLANK_DOCUMENT_LABEL,
+  SIDEBAR_MY_SPACE_LABEL,
+} from '../constants/sidebarShell'
 import { createNoteFromTemplate } from '../utils/createFromTemplate'
 import AppIcon from './AppIcon.vue'
 
 type CreateEntryKind = 'note' | 'folder'
 
 const ROOT_VALUE = '__root__'
-// 根目录对外统一展示为「我的文件夹」
-const myFolderName = MY_FOLDER_NAME
+const mySpaceLabel = SIDEBAR_MY_SPACE_LABEL
 
 const props = defineProps<{
   visible: boolean
@@ -175,18 +179,18 @@ const resolvedParentId = computed(() => {
 })
 
 const currentParentLabel = computed(() => {
-  if (resolvedParentId.value === undefined) return MY_FOLDER_NAME
-  return getFolderPathLabel(props.folders, resolvedParentId.value) || MY_FOLDER_NAME
+  if (resolvedParentId.value === undefined) return SIDEBAR_MY_SPACE_LABEL
+  return getFolderPathLabel(props.folders, resolvedParentId.value) || SIDEBAR_MY_SPACE_LABEL
 })
 
 const canSubmit = computed(() => kind.value === 'note' || name.value.trim().length > 0)
 
 const noteHint = computed(() => {
-  if (!templateId.value) return '将创建一份空白 Markdown 笔记，标题可在创建后直接重命名。'
+  if (!templateId.value) return CREATE_BLANK_DOCUMENT_HINT
   const template = NOTE_TEMPLATES.find((item) => item.id === templateId.value)
   return template
-    ? `将按「${template.title}」模板创建笔记，创建后可直接重命名。`
-    : '将创建一份空白 Markdown 笔记，标题可在创建后直接重命名。'
+    ? `将按「${template.title}」模板创建文档，创建后可直接重命名。`
+    : CREATE_BLANK_DOCUMENT_HINT
 })
 
 function resetState() {

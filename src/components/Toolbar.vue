@@ -45,12 +45,12 @@
         class="toolbar-search-bar"
         data-testid="toolbar-search-bar"
         data-onboarding="search"
-        title="搜索笔记（Ctrl/Cmd+K）"
-        aria-label="搜索笔记"
+        :title="SEARCH_DOCUMENTS_TITLE"
+        :aria-label="SEARCH_DOCUMENTS_LABEL"
         @click="$emit('openSearch')"
       >
         <AppIcon name="search" :size="16" />
-        <span>搜索文档</span>
+        <span>{{ SEARCH_DOCUMENTS_LABEL }}</span>
       </button>
     </div>
 
@@ -146,6 +146,10 @@ import type { ImportFolderScanResult, PdfExportOptions } from '../types'
 import { useNoteHistory } from '../composables/useNoteHistory'
 import { useAppSettings } from '../composables/useAppSettings'
 import { useImportMarkdown } from '../composables/useImportMarkdown'
+import {
+  SEARCH_DOCUMENTS_LABEL,
+  SEARCH_DOCUMENTS_TITLE,
+} from '../constants/sidebarShell'
 
 withDefaults(
   defineProps<{ tocVisible: boolean; tocAvailable?: boolean }>(),

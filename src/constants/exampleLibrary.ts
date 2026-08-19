@@ -56,7 +56,7 @@ export const EXAMPLE_LIBRARY: ExampleLibraryFolderSeed[] = [
         title: '如何管理本地笔记',
         content: `# 如何管理本地笔记
 
-左侧「我的文件夹」用于分类；删除的内容会进入回收站。
+左侧「我的空间」用于分类；删除的内容会进入回收站。
 `,
       },
       {

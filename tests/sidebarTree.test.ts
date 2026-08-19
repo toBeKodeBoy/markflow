@@ -4,10 +4,8 @@ import {
   folderHasTreeChildren,
   collectAncestorIdsForNote,
   collectExpandIdsForSearch,
-  wrapWithMyFolder,
-  type SidebarTreeRow,
 } from '../src/utils/sidebarTree'
-import { MY_FOLDER_ID, MY_FOLDER_NAME } from '../src/constants/myFolder'
+import { MY_FOLDER_ID } from '../src/constants/myFolder'
 import { buildTreeIndex } from '../src/utils/treeIndex'
 import type { Folder, NoteListItem } from '../src/types'
 
@@ -175,63 +173,14 @@ describe('sidebarTree', () => {
     expect(n1Idx).toBeGreaterThan(sepIdx)
   })
 
-  // ===== 「我的文件夹」虚拟容器测试 =====
-  const baseRows: SidebarTreeRow[] = [
-    {
-      kind: 'folder',
-      depth: 0,
-      folder: { id: 'f1', name: 'docs', order: 0 },
-      hasChildren: true,
-      noteCount: 2,
-    },
-    {
-      kind: 'note',
-      depth: 1,
-      note: { id: 'n1', title: 'Intro', updatedAt: 1 },
-      hasChildren: false,
-    },
-    {
-      kind: 'note',
-      depth: 0,
-      note: { id: 'n3', title: 'Root', updatedAt: 3 },
-      hasChildren: false,
-    },
-  ]
+  it('D1 扁平化后不再导出 wrapWithMyFolder，也不注入「我的文件夹」容器', async () => {
+    const mod = await import('../src/utils/sidebarTree')
+    expect(mod).not.toHaveProperty('wrapWithMyFolder')
 
-  it('wrapWithMyFolder 在首行生成「我的文件夹」系统容器行', () => {
-    const rows = wrapWithMyFolder(baseRows, true, 5)
-    const head = rows[0]
-    expect(head.kind).toBe('folder')
-    expect(head.folder?.id).toBe(MY_FOLDER_ID)
-    expect(head.folder?.name).toBe(MY_FOLDER_NAME)
-    expect(head.isSystemFolder).toBe(true)
-    expect(head.isMyFolder).toBe(true)
-    expect(head.depth).toBe(0)
-  })
-
-  it('wrapWithMyFolder 容器行笔记数使用总笔记数而非可见行数', () => {
-    const rows = wrapWithMyFolder(baseRows, true, 5)
-    expect(rows[0].noteCount).toBe(5)
-    expect(rows[0].hasChildren).toBe(true)
-  })
-
-  it('wrapWithMyFolder 展开时子行深度整体 +1 且顺序不变', () => {
-    const rows = wrapWithMyFolder(baseRows, true, 3)
-    expect(rows).toHaveLength(4)
-    expect(rows.slice(1).map((r) => r.depth)).toEqual([1, 2, 1])
-    expect(rows[1].folder?.id).toBe('f1')
-    expect(rows[3].note?.title).toBe('Root')
-  })
-
-  it('wrapWithMyFolder 折叠时仅保留容器行', () => {
-    const rows = wrapWithMyFolder(baseRows, false, 3)
-    expect(rows).toHaveLength(1)
-    expect(rows[0].isMyFolder).toBe(true)
-  })
-
-  it('wrapWithMyFolder 空内容时容器行无子项', () => {
-    const rows = wrapWithMyFolder([], true, 0)
-    expect(rows[0].hasChildren).toBe(false)
-    expect(rows[0].noteCount).toBe(0)
+    const rows = flattenSidebarTree(folders, notes, new Set())
+    expect(rows.some((row) => row.folder?.id === MY_FOLDER_ID)).toBe(false)
+    expect(rows.some((row) => row.folder?.name === '我的文件夹')).toBe(false)
+    const rootNote = rows.find((row) => row.kind === 'note' && row.note?.title === 'Root')
+    expect(rootNote?.depth).toBe(0)
   })
 })

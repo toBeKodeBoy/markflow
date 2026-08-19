@@ -38,12 +38,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-
-const ONBOARDING_COPY = [
-  '点击创建第一篇 Markdown 笔记',
-  '所有笔记自动保存在本地，不会丢失',
-  '支持全文检索所有笔记内容',
-] as const
+import { ONBOARDING_COPY } from '../constants/emptyHomeCopy'
 
 const props = withDefaults(defineProps<{
   step?: number

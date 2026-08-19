@@ -41,6 +41,15 @@ describe('SearchModal', () => {
     expect(wrapper.find('.search-modal-input').exists()).toBe(true)
   })
 
+  it('弹窗 aria 与输入框应使用「搜索文档」而非「搜索笔记」', () => {
+    const wrapper = mountModal()
+    const dialog = wrapper.find('.search-modal')
+    const input = wrapper.find('.search-modal-input')
+    expect(dialog.attributes('aria-label')).toBe('搜索文档')
+    expect(input.attributes('aria-label')).toBe('搜索文档')
+    expect(input.attributes('placeholder')).toBe('搜索文档标题或正文...')
+  })
+
   it('头部应使用 AppIcon search 而非 emoji', () => {
     const wrapper = mount(SearchModal, {
       props: { visible: true },
