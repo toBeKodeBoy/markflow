@@ -21,6 +21,13 @@ function mountApp() {
 describe('workspace view', () => {
   beforeEach(() => {
     localStorage.clear()
+    localStorage.setItem('markflow_settings', JSON.stringify({
+      theme: 'light',
+      fontSize: 14,
+      editorFontFamily: 'monospace',
+      previewVisible: true,
+      sidebarVisible: true,
+    }))
     setActivePinia(createPinia())
   })
 
@@ -95,7 +102,8 @@ describe('workspace view', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="empty-home-recent"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="empty-home-templates"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="empty-home-commands"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="empty-home-templates"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="empty-home-example-library"]').exists()).toBe(false)
   })
 

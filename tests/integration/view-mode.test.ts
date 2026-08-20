@@ -65,6 +65,13 @@ async function clickMode(wrapper: ReturnType<typeof mountApp>, label: string) {
 describe('四视图模式切换', () => {
   beforeEach(() => {
     localStorage.clear()
+    localStorage.setItem('markflow_settings', JSON.stringify({
+      theme: 'light',
+      fontSize: 14,
+      editorFontFamily: 'monospace',
+      previewVisible: true,
+      sidebarVisible: true,
+    }))
     setActivePinia(createPinia())
     const store = useNoteStore()
     store.createNote()

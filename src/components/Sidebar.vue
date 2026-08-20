@@ -272,23 +272,7 @@
       @created="handleCreateEntry"
     />
 
-    <SidebarFooter @open-settings="settingsModalVisible = true" @open-help="onOpenHelp" />
-
-    <SettingsModal
-      :visible="settingsModalVisible"
-      @confirm="onSidebarSettingsConfirm"
-      @cancel="settingsModalVisible = false"
-      @import-folder="onSidebarSettingsImportFolder"
-      @backup-restored="settingsModalVisible = false"
-      @library-cleared="settingsModalVisible = false"
-    />
-
-    <ImportFolderModal
-      :visible="importFolderVisible"
-      :scan="importFolderScan"
-      @cancel="closeImportFolder"
-      @done="closeImportFolder"
-    />
+    <SidebarFooter @open-settings="emit('openSettings')" @open-help="onOpenHelp" />
 
   </aside>
 </template>
@@ -315,16 +299,11 @@ import {
 import { buildTreeIndex } from '../utils/treeIndex'
 import CreateEntryModal from './CreateEntryModal.vue'
 import SidebarTreeRowView from './SidebarTreeRow.vue'
-import SettingsModal from './SettingsModal.vue'
-import ImportFolderModal from './ImportFolderModal.vue'
-import { pickFolderScan } from '../utils/importFolderDevScan'
-import type { AppSettings, ImportFolderScanResult } from '../types'
 import SidebarBrand from './sidebar/SidebarBrand.vue'
 import SidebarNav from './sidebar/SidebarNav.vue'
 import SidebarSpaces from './sidebar/SidebarSpaces.vue'
 import SidebarFooter from './sidebar/SidebarFooter.vue'
 import type { SidebarNavId } from './sidebar/types'
-import { useTheme } from '../composables/useTheme'
 import { useAppSettings, clampSidebarWidth } from '../composables/useAppSettings'
 import { useNoteSort } from '../composables/useNoteSort'
 import { sortNotes } from '../utils/noteSort'
@@ -340,21 +319,18 @@ const mySpaceLabel = SIDEBAR_MY_SPACE_LABEL
 
 const emit = defineEmits<{
   navigateHome: []
+  openSettings: []
 }>()
 
 const store = useNoteStore()
 const tabsStore = useEditorTabsStore()
 const workspace = useWorkspaceStore()
-const theme = useTheme()
 const activeNav = computed<SidebarNavId>(() => {
   if (workspace.view === 'home') return 'home'
   if (workspace.view === 'trash') return 'trash'
   return 'docs'
 })
 const activeSpaceId = ref<string | null>(null)
-const settingsModalVisible = ref(false)
-const importFolderVisible = ref(false)
-const importFolderScan = ref<ImportFolderScanResult | null>(null)
 const spaceFolders = computed(() => store.folderList.filter((folder) => !folder.parentId))
 const expandedSpaceIds = ref(new Set<string>())
 
@@ -555,29 +531,6 @@ function onNavSelect(id: SidebarNavId) {
 
 function onOpenHelp() {
   tabsStore.openTutorialNote()
-}
-
-function onSidebarSettingsConfirm(settings: AppSettings) {
-  settingsModalVisible.value = false
-  theme.setTheme(settings.theme)
-  appSettings.save({
-    fontSize: settings.fontSize,
-    editorFontFamily: settings.editorFontFamily,
-    imageExport: settings.imageExport,
-  })
-}
-
-async function onSidebarSettingsImportFolder() {
-  settingsModalVisible.value = false
-  const scan = await pickFolderScan()
-  if (!scan) return
-  importFolderScan.value = scan
-  importFolderVisible.value = true
-}
-
-function closeImportFolder() {
-  importFolderVisible.value = false
-  importFolderScan.value = null
 }
 
 function openCreateModal(kind: 'note' | 'folder', parentId?: string, locked = false) {

@@ -29,11 +29,8 @@ describe('空白首页架构约束', () => {
     expect(existsSync(resolve(root, 'src/components/OnboardingCoach.vue'))).toBe(true)
   })
 
-  it('存储说明只出现在首页文案，侧栏底栏不再放 caption', () => {
-    const copy = readSrc('src/constants/emptyHomeCopy.ts')
+  it('侧栏底栏不再放存储路径 caption', () => {
     const footer = readSrc('src/components/sidebar/SidebarFooter.vue')
-    expect(copy).toMatch(/EMPTY_HOME_STORAGE_HINT/)
-    expect(copy).toMatch(/uTools 本地数据库/)
     expect(footer).not.toMatch(/sidebar-storage-caption/)
     expect(footer).not.toMatch(/Documents/)
   })
@@ -44,15 +41,15 @@ describe('空白首页架构约束', () => {
     expect(app).toMatch(/v-if="isEditorView"[\s\S]*status-bar-right|status-bar-right[\s\S]*v-if="isEditorView"/)
   })
 
-  it('首页与空态常量不得出现产品名词「知识库」，且无侧栏开关', () => {
+  it('首页不得出现产品名词「知识库」，且无侧栏开关', () => {
     const copy = readSrc('src/constants/emptyHomeCopy.ts')
     const emptyHome = readSrc('src/components/EmptyHome.vue')
     expect(copy).not.toMatch(/知识库/)
     expect(emptyHome).not.toMatch(/知识库/)
     expect(emptyHome).not.toMatch(/toggleSidebar|empty-home-open-sidebar|openSidebar/)
-    expect(emptyHome).toMatch(/empty-home-create-folder/)
-    expect(emptyHome).toMatch(/createFolder/)
-    expect(copy).toMatch(/EMPTY_HOME_CREATE_FOLDER_LABEL/)
+    expect(emptyHome).not.toMatch(/empty-home-create-folder|createFolder/)
+    expect(emptyHome).not.toMatch(/empty-home-templates|useTemplate/)
+    expect(emptyHome).not.toMatch(/empty-home-import|importExample/)
   })
 
   it('侧栏显隐仅由顶栏汉堡负责，首页不再绑定开关', () => {
@@ -62,15 +59,25 @@ describe('空白首页架构约束', () => {
     expect(app).toMatch(/@toggleSidebar="sidebarVisible = !sidebarVisible"/)
     expect(app).not.toMatch(/:sidebar-visible="sidebarVisible"/)
     expect(app).not.toMatch(/@toggle-sidebar="sidebarVisible = !sidebarVisible"/)
-    expect(app).toMatch(/@create-folder=/)
   })
 
-  it('D3：首页副标题用「所有文档」并保留本机 uTools 库语义', () => {
+  it('首页三行命令应对齐新建 / 搜索 / 设置', () => {
     const copy = readSrc('src/constants/emptyHomeCopy.ts')
-    expect(copy).toMatch(/所有文档仅保存在本机 uTools 数据库/)
-    expect(copy).toMatch(/可随时导出为 \.md/)
-    expect(copy).not.toMatch(/所有笔记仅保存/)
-    expect(copy).not.toMatch(/Documents/)
+    const emptyHome = readSrc('src/components/EmptyHome.vue')
+    expect(copy).toMatch(/EMPTY_HOME_CREATE_LABEL = '新建文档'/)
+    expect(copy).toMatch(/EMPTY_HOME_SEARCH_LABEL = '搜索文档'/)
+    expect(copy).toMatch(/EMPTY_HOME_SETTINGS_LABEL = '打开设置'/)
+    expect(emptyHome).toMatch(/empty-home-create/)
+    expect(emptyHome).toMatch(/empty-home-search/)
+    expect(emptyHome).toMatch(/empty-home-settings/)
+    expect(emptyHome).toMatch(/empty-home-mark/)
+  })
+
+  it('首次打开默认关闭侧栏', () => {
+    const storage = readSrc('src/composables/useStorage.ts')
+    const app = readSrc('src/App.vue')
+    expect(storage).toMatch(/sidebarVisible:\s*false/)
+    expect(app).toMatch(/sidebarVisible \?\? false/)
   })
 
   it('src/constants 与 src/components 不得出现伪造 Documents 路径', () => {

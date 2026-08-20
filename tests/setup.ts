@@ -48,7 +48,7 @@ if (typeof window !== 'undefined') {
         fontSize: 14,
         editorFontFamily: 'monospace',
         previewVisible: true,
-        sidebarVisible: true,
+        sidebarVisible: false,
       }
     }),
     saveSettings: vi.fn((settings) => {

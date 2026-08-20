@@ -118,7 +118,9 @@ describe('editor tab empty state', () => {
     const folderCountBefore = store.folderList.length
     await flushPromises()
 
-    await wrapper.find('[data-testid="empty-home-create-folder"]').trigger('click')
+    await wrapper.find('[data-testid="empty-home-create"]').trigger('click')
+    await flushPromises()
+    await wrapper.findAll('.create-entry-kind-card')[1].trigger('click')
     await flushPromises()
 
     expect(store.noteList.length).toBe(noteCountBefore)
@@ -133,7 +135,9 @@ describe('editor tab empty state', () => {
     tabsStore.closeAllTabs({ save: false })
     await flushPromises()
 
-    await wrapper.find('[data-testid="empty-home-create-folder"]').trigger('click')
+    await wrapper.find('[data-testid="empty-home-create"]').trigger('click')
+    await flushPromises()
+    await wrapper.findAll('.create-entry-kind-card')[1].trigger('click')
     await flushPromises()
     expect(wrapper.find('.create-entry-kind-card.active').text()).toContain('新建文件夹')
 
@@ -143,6 +147,16 @@ describe('editor tab empty state', () => {
     await wrapper.find('[data-testid="empty-home-create"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('.create-entry-kind-card.active').text()).toContain('新建文件')
+  })
+
+  it('首次打开空首页默认关闭侧栏', async () => {
+    const wrapper = mount(App, { global: { stubs } })
+    const tabsStore = useEditorTabsStore()
+    tabsStore.closeAllTabs({ save: false })
+    await flushPromises()
+
+    expect(wrapper.find('.stub-sidebar').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="empty-home-commands"]').exists()).toBe(true)
   })
 
   it('顶栏汉堡在空首页关闭时可展开并写入设置', async () => {
@@ -169,6 +183,13 @@ describe('editor tab empty state', () => {
   })
 
   it('顶栏汉堡在空首页可收起，连点两次回到原状态', async () => {
+    localStorage.setItem('markflow_settings', JSON.stringify({
+      theme: 'light',
+      fontSize: 14,
+      editorFontFamily: 'monospace',
+      sidebarVisible: true,
+    }))
+
     const wrapper = mount(App, { global: { stubs } })
     const tabsStore = useEditorTabsStore()
     tabsStore.closeAllTabs({ save: false })
