@@ -19,7 +19,7 @@
     </button>
 
     <div class="workspace">
-      <Sidebar v-if="showSidebar" />
+      <Sidebar v-if="showSidebar" @open-settings="openSettingsModal" />
 
       <main class="workspace-main">
         <div
@@ -34,12 +34,9 @@
           <div class="editor-stage">
             <EmptyHome
               v-if="isHomeView"
-              :empty-library="store.noteList.length === 0"
               @create="openCreateModal('note')"
-              @create-folder="openCreateModal('folder')"
-              @import="onEmptyHomeImport"
-              @use-template="onUseTemplate"
-              @import-example="onImportExample"
+              @open-search="searchModalVisible = true"
+              @open-settings="openSettingsModal"
             />
 
             <div
@@ -111,6 +108,22 @@
       @select="onSearchSelect"
     />
 
+    <SettingsModal
+      :visible="settingsModalVisible"
+      @confirm="onSettingsConfirm"
+      @cancel="settingsModalVisible = false"
+      @import-folder="onSettingsImportFolder"
+      @backup-restored="settingsModalVisible = false"
+      @library-cleared="settingsModalVisible = false"
+    />
+
+    <ImportFolderModal
+      :visible="importFolderVisible"
+      :scan="importFolderScan"
+      @cancel="closeImportFolder"
+      @done="closeImportFolder"
+    />
+
     <OnboardingCoach
       :visible="onboardingVisible && workspace.view === 'home'"
       :step="onboardingStep"
@@ -133,16 +146,15 @@ import Toc from './components/Toc.vue'
 import ImageLightbox from './components/ImageLightbox.vue'
 import CreateEntryModal from './components/CreateEntryModal.vue'
 import SearchModal from './components/SearchModal.vue'
+import SettingsModal from './components/SettingsModal.vue'
+import ImportFolderModal from './components/ImportFolderModal.vue'
 import AppIcon from './components/AppIcon.vue'
 import EditorTabBar from './components/EditorTabBar.vue'
 import EmptyHome from './components/EmptyHome.vue'
 import TrashPanel from './components/TRashPanel.vue'
 import OnboardingCoach from './components/OnboardingCoach.vue'
-import { useImportMarkdown } from './composables/useImportMarkdown'
 import { useOnboarding } from './composables/useOnboarding'
-import type { NoteTemplateId } from './constants/noteTemplates'
-import { importExampleLibrary } from './utils/exampleLibrary'
-import { createNoteFromTemplate } from './utils/createFromTemplate'
+import { pickFolderScan } from './utils/importFolderDevScan'
 import { useNoteStore } from './stores/note'
 import { useEditorTabsStore } from './stores/editorTabs'
 import { useWorkspaceStore } from './stores/workspace'
@@ -154,11 +166,12 @@ import { collectAncestorFolderIds } from './utils/folderTree'
 import { useAutoBackup } from './composables/useAutoBackup'
 import { useFullscreen } from './composables/useFullscreen'
 import { autoPurgeTrash } from './utils/autoPurgeTrash'
+import { isModAltKeyShortcut, isModKeyShortcut } from './utils/keyboardShortcut'
 import {
   createViewModeFlashRegistry,
   provideViewModeFlash,
 } from './composables/useViewModeFlash'
-import type { ViewMode } from './types'
+import type { AppSettings, ImportFolderScanResult, ViewMode } from './types'
 
 const VIEW_MODE_SHORTCUTS: Record<string, ViewMode> = {
   j: 'live',
@@ -173,7 +186,7 @@ const workspace = useWorkspaceStore()
 const viewModeFlash = createViewModeFlashRegistry()
 provideViewModeFlash(viewModeFlash)
 
-useTheme()
+const theme = useTheme()
 useAppSettings().load()
 
 const { visible: lightboxVisible, closeLightbox } = useImageLightbox()
@@ -183,12 +196,14 @@ const prevMode = ref<ViewMode>('live')
 const appSettings = useAppSettings()
 const { startScheduler, stopScheduler } = useAutoBackup()
 const { isFullscreen, enter: enterFullscreen, exit: exitFullscreen } = useFullscreen()
-const sidebarVisible = ref(appSettings.get().sidebarVisible ?? true)
+const sidebarVisible = ref(appSettings.get().sidebarVisible ?? false)
 const tocVisible = ref(false)
 const createModalVisible = ref(false)
 const createModalKind = ref<'note' | 'folder'>('note')
 const searchModalVisible = ref(false)
-const { importMarkdownToActiveFolder } = useImportMarkdown()
+const settingsModalVisible = ref(false)
+const importFolderVisible = ref(false)
+const importFolderScan = ref<ImportFolderScanResult | null>(null)
 
 const showSidebar = computed(() => viewMode.value !== 'focus' && sidebarVisible.value)
 const hasOpenTabs = computed(() => tabsStore.tabs.length > 0)
@@ -345,22 +360,31 @@ function openCreateModal(kind: 'note' | 'folder') {
   createModalVisible.value = true
 }
 
-async function onEmptyHomeImport() {
-  const imported = await importMarkdownToActiveFolder()
-  if (!imported) return
-  const note = store.currentNote
-  if (!note) return
-  revealNoteInSidebar(note.id, note.folderId)
+function openSettingsModal() {
+  settingsModalVisible.value = true
 }
 
-function onUseTemplate(id: NoteTemplateId) {
-  const note = createNoteFromTemplate(id, store.activeFolderId ?? undefined)
-  if (!note) return
-  revealNoteInSidebar(note.id, note.folderId)
+function onSettingsConfirm(settings: AppSettings) {
+  settingsModalVisible.value = false
+  theme.setTheme(settings.theme)
+  appSettings.save({
+    fontSize: settings.fontSize,
+    editorFontFamily: settings.editorFontFamily,
+    imageExport: settings.imageExport,
+  })
 }
 
-function onImportExample() {
-  importExampleLibrary()
+async function onSettingsImportFolder() {
+  settingsModalVisible.value = false
+  const scan = await pickFolderScan()
+  if (!scan) return
+  importFolderScan.value = scan
+  importFolderVisible.value = true
+}
+
+function closeImportFolder() {
+  importFolderVisible.value = false
+  importFolderScan.value = null
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -382,14 +406,30 @@ function onKeydown(e: KeyboardEvent) {
       return
     }
   }
-  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-    e.preventDefault()
-    toggleSearchModal()
-    return
+  if (e.ctrlKey || e.metaKey) {
+    if (isModKeyShortcut(e, 'k')) {
+      e.preventDefault()
+      toggleSearchModal()
+      return
+    }
+    if (isModKeyShortcut(e, 'n')) {
+      e.preventDefault()
+      if (!createModalVisible.value) openCreateModal('note')
+      return
+    }
+    if (isModAltKeyShortcut(e, 's')) {
+      e.preventDefault()
+      settingsModalVisible.value = !settingsModalVisible.value
+      return
+    }
   }
   if (e.key !== 'Escape') return
   if (searchModalVisible.value) {
     searchModalVisible.value = false
+    return
+  }
+  if (settingsModalVisible.value) {
+    settingsModalVisible.value = false
     return
   }
   if (lightboxVisible.value) {
@@ -404,7 +444,7 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 onMounted(() => {
-  window.addEventListener('keydown', onKeydown)
+  window.addEventListener('keydown', onKeydown, true)
   startScheduler()
   // 异步清理过期回收站条目，不阻塞首屏；保留天数读取用户设置（默认 30 天）
   const retentionDays = appSettings.settings.value?.trashRetentionDays ?? 30
@@ -412,7 +452,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('keydown', onKeydown, true)
   stopScheduler()
 })
 </script>

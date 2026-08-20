@@ -17,44 +17,38 @@ describe('P0 首页视觉', () => {
   const copy = readSrc('src/constants/emptyHomeCopy.ts')
   const templates = readSrc('src/constants/noteTemplates.ts')
 
-  it('欢迎标题应为展示级 32px，且不得出现知识库', () => {
-    expect(css).toMatch(/\.empty-tabs-title\s*\{[^}]*font-size:\s*32px/)
+  it('首页不得出现知识库，主视觉是淡 Logo', () => {
     expect(home).not.toMatch(/知识库/)
     expect(copy).not.toMatch(/知识库/)
-  })
-
-  it('三个主操作按钮应带图标，且第三颗仍是导入 .md', () => {
-    expect(home).toMatch(/data-testid="empty-home-create"[\s\S]*?AppIcon name="plus"/)
-    expect(home).toMatch(/data-testid="empty-home-create-folder"[\s\S]*?AppIcon name="folder"/)
-    expect(home).toMatch(/data-testid="empty-home-import"[\s\S]*?AppIcon name="upload"/)
-    expect(copy).toMatch(/EMPTY_HOME_IMPORT_LABEL = '导入 \.md'/)
+    expect(home).toMatch(/data-testid="empty-home-mark"/)
+    expect(css).toMatch(/\.empty-home-mark\s*\{/)
     expect(home).not.toMatch(/新建知识库/)
   })
 
-  it('模板卡应是展示级：大图标、色边、独立一键创建样式', () => {
-    expect(css).toMatch(/\.empty-home-template-card\s*\{[^}]*min-height:\s*180px/)
-    expect(css).toMatch(/\.empty-home-template-icon\s*\{[^}]*width:\s*48px/)
-    expect(css).toMatch(/\.empty-home-template-icon\s*\{[^}]*height:\s*48px/)
-    expect(css).toMatch(/\.empty-home-template-cta\s*\{/)
-    expect(home).toMatch(/class="empty-home-template-cta"/)
-    expect(home).toMatch(/一键创建/)
-    expect(css).toMatch(/\.empty-home-template-card\.tone-blue/)
+  it('三行命令应为无边框行，右对齐按键，而不是胶囊主按钮', () => {
+    expect(home).toMatch(/data-testid="empty-home-create"/)
+    expect(home).toMatch(/data-testid="empty-home-search"/)
+    expect(home).toMatch(/data-testid="empty-home-settings"/)
+    expect(home).toMatch(/<kbd>/)
+    expect(css).toMatch(/\.empty-home-command\s*\{[^}]*justify-content:\s*space-between/)
+    expect(css).toMatch(/\.empty-home-commands\s*\{/)
+    expect(home).not.toMatch(/empty-home-import/)
+    expect(home).not.toMatch(/empty-home-create-folder/)
   })
 
-  it('模板描述应写满两行用途，而不是短标签', () => {
+  it('创建弹窗模板描述应写满两行用途，而不是短标签', () => {
     expect(templates).toMatch(/接口说明、故障排查与协作文档模板/)
     expect(templates).toMatch(/知识点清单、复习提纲，适合每天学完整理/)
     expect(templates).toMatch(/工作计划、随手记录，晚上再复盘整理/)
     expect(templates).toMatch(/可复用的 AI 提示模板，保持语气简洁/)
   })
 
-  it('空库首页只保留导入示例链接，不再渲染三条 hint', () => {
+  it('首页不再渲染模板卡、示例导入与 hint', () => {
     expect(home).not.toMatch(/empty-home-hints/)
     expect(home).not.toMatch(/EMPTY_HOME_HINT_/)
     expect(copy).not.toMatch(/EMPTY_HOME_HINT_/)
-    expect(home).toMatch(/data-testid="empty-home-example-library"/)
-    expect(home).toMatch(/AppIcon name="download"/)
-    expect(copy).toMatch(/EMPTY_HOME_EXAMPLE_LIBRARY_LABEL = '导入示例笔记'/)
+    expect(home).not.toMatch(/empty-home-templates/)
+    expect(home).not.toMatch(/empty-home-example-library/)
     expect(copy).not.toMatch(/示例知识库/)
   })
 })
@@ -109,6 +103,18 @@ describe('P0 顶栏视觉', () => {
     expect(css).toMatch(/\.toolbar-search-bar\s*\{[^}]*width:\s*min\(\s*100%,\s*440px\s*\)/)
     expect(toolbar).toMatch(/SEARCH_DOCUMENTS_LABEL/)
     expect(toolbar).not.toMatch(/搜索笔记/)
+  })
+
+  it('浅色顶栏只比画布深约 1%，搜索条再浅一档；深色 token 保持现状', () => {
+    expect(css).toMatch(/:root\s*\{[^}]*--bg-toolbar:\s*#fcfcfd/i)
+    expect(css).toMatch(/:root\s*\{[^}]*--bg-editor:\s*#ffffff/i)
+    expect(css).toMatch(/:root\s*\{[^}]*--bg-search:\s*#fefefe/i)
+    expect(css).toMatch(/\[data-theme="dark"\]\s*\{[^}]*--bg-toolbar:\s*#181825/i)
+    expect(css).toMatch(/\[data-theme="dark"\]\s*\{[^}]*--bg-editor:\s*#1e1e2e/i)
+    expect(css).toMatch(/\[data-theme="dark"\]\s*\{[^}]*--bg-search:\s*#2a2a3e/i)
+    expect(css).toMatch(/\.toolbar-search-bar\s*\{[^}]*background:\s*var\(--bg-search\)/)
+    expect(css).toMatch(/\.topbar\s*\{[^}]*background:\s*var\(--bg-toolbar\)/)
+    expect(css).toMatch(/\.status-bar\s*\{[^}]*background:\s*var\(--bg-toolbar\)/)
   })
 
   it('首页应隐藏目录按钮，仅编辑视图传入 tocAvailable', () => {

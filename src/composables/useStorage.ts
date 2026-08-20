@@ -101,7 +101,7 @@ function defaultSettings(): AppSettings {
     fontSize: 14,
     editorFontFamily: 'monospace',
     previewVisible: true,
-    sidebarVisible: true,
+    sidebarVisible: false,
     sidebarWidth: 260,
     pdfExport: {
       pageSize: 'A4',

@@ -15,43 +15,37 @@ describe('首页留白', () => {
   const css = readSrc('src/style.css')
   const home = readSrc('src/components/EmptyHome.vue')
 
-  it('首页应分组为 hero 与模板，避免所有区块共用 12px 缝', () => {
-    expect(home).toMatch(/class="empty-home-hero"/)
-    expect(home).toMatch(/data-testid="empty-home-templates"/)
+  it('首页应为 Logo + 命令列表，避免所有区块共用 12px 缝', () => {
+    expect(home).toMatch(/class="empty-home-brand"/)
+    expect(home).toMatch(/data-testid="empty-home-commands"/)
     expect(home).toMatch(/empty-home-create/)
     expect(home).not.toMatch(/知识库/)
+    expect(home).not.toMatch(/empty-home-templates/)
   })
 
-  it('欢迎标题必须居中可见，且首页溢出时不得从顶部裁切', () => {
-    expect(home).toMatch(/class="empty-tabs-title"/)
-    expect(css).toMatch(/\.empty-tabs-state\s*\{[^}]*text-align:\s*center/)
+  it('空态画布铺满区域 2，M 绝对居中，命令行在标记下方', () => {
+    expect(css).toMatch(/\.empty-tabs-state\s*\{[^}]*position:\s*relative/)
     expect(css).toMatch(/\.empty-tabs-state\s*\{[^}]*overflow-y:\s*auto/)
-    expect(css).toMatch(/\.empty-tabs-state\s*\{[^}]*justify-content:\s*safe\s+center/)
-    expect(css).toMatch(/\.empty-tabs-title\s*\{[^}]*font-size:\s*32px/)
-    expect(css).toMatch(/\.empty-tabs-title\s*\{[^}]*color:\s*var\(--text\)/)
+    expect(css).toMatch(/\.empty-tabs-state\s*\{[^}]*background:\s*var\(--bg-editor\)/)
+    expect(css).not.toMatch(/\.empty-tabs-state\s*\{[^}]*radial-gradient/)
+    expect(css).toMatch(/\.empty-home-mark\s*\{[^}]*width:\s*280px/)
+    expect(css).toMatch(/\.empty-home-mark\s*\{[^}]*height:\s*280px/)
+    expect(css).toMatch(/\.empty-home-brand\s*\{[^}]*position:\s*absolute/)
+    expect(css).toMatch(/\.empty-home-brand\s*\{[^}]*top:\s*50%/)
+    expect(css).toMatch(/\.empty-home-commands\s*\{[^}]*position:\s*absolute/)
+    expect(css).toMatch(/\.empty-home-commands\s*\{[^}]*top:\s*calc\(\s*50%\s*\+\s*172px\s*\)/)
+    expect(css).toMatch(/\.editor-stage:has\(\.empty-tabs-state\)[\s\S]{0,180}?max-width:\s*none/)
+    expect(css).toMatch(/\.editor-stage:has\(\.empty-tabs-state\)[\s\S]{0,180}?padding:\s*0/)
   })
 
-  it('三个主操作按钮必须单行居中且不换行', () => {
-    expect(css).toMatch(/\.empty-tabs-actions\s*\{[^}]*flex-wrap:\s*nowrap/)
-    expect(css).toMatch(/\.empty-tabs-actions\s*\{[^}]*justify-content:\s*center/)
-    expect(css).toMatch(/\.empty-tabs-actions[\s\S]*?border-radius:\s*999px/)
+  it('三行命令应纵向排列且左右对齐文案与按键', () => {
+    expect(css).toMatch(/\.empty-home-commands\s*\{[^}]*flex-direction:\s*column/)
+    expect(css).toMatch(/\.empty-home-command\s*\{[^}]*justify-content:\s*space-between/)
+    expect(css).toMatch(/\.empty-home-command\s*\{[^}]*background:\s*transparent/)
   })
 
-  it('模板区四卡必须同一行等宽均分，禁止 3+1 与 2×2', () => {
-    expect(css).toMatch(
-      /\.empty-home-templates\s*\{[^}]*width:\s*min\(\s*var\(--content-max\),\s*100%\s*\)/,
-    )
-    expect(css).toMatch(
-      /\.empty-home-template-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/,
-    )
-    expect(css).not.toMatch(/\.empty-home-template-grid[^{]*\{[^}]*repeat\([23]/)
-    expect(home).toMatch(/class="empty-home-template-grid"/)
-  })
-
-  it('窄窗只收缩边距，描述最多两行，卡片不得改列数换行', () => {
-    expect(css).toMatch(/@media\s*\(max-width:\s*720px\)[\s\S]*\.empty-tabs-state[\s\S]*?padding:\s*32px\s+16px\s+40px/)
-    expect(css).toMatch(/\.empty-home-template-desc[\s\S]*?-webkit-line-clamp:\s*2/)
-    expect(home).toMatch(/empty-home-template-desc/)
+  it('窄窗不得把命令改成模板网格', () => {
+    expect(home).not.toMatch(/empty-home-template-grid/)
     expect(css).not.toMatch(
       /@media\s*\(max-width:\s*900px\)[\s\S]*?\.empty-home-template-grid[\s\S]*?repeat\([23]/,
     )

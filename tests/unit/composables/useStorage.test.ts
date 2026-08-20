@@ -124,6 +124,10 @@ describe('useStorage', () => {
     expect(storage.getSettings().fontSize).toBe(16)
   })
 
+  it('缺省设置首次打开应关闭侧栏', () => {
+    expect(storage.getSettings().sidebarVisible).toBe(false)
+  })
+
   it('uTools mode uses bridge save', () => {
     const note = {
       id: 'persist',

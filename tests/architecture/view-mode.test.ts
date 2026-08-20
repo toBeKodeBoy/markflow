@@ -19,7 +19,7 @@ describe('ViewMode 类型', () => {
   })
 
   it('App.vue 应引用共享 ViewMode；Toolbar 不再承载模式切换', () => {
-    expect(readSrc('src/App.vue')).toMatch(/import type \{ ViewMode \} from '\.\/types'/)
+    expect(readSrc('src/App.vue')).toMatch(/import type \{[^}]*ViewMode[^}]*\} from '\.\/types'/)
     expect(readSrc('src/components/ViewModeDropdown.vue')).toMatch(/import type \{ ViewMode \} from '\.\.\/types'/)
     expect(readSrc('src/components/Toolbar.vue')).not.toMatch(/ViewMode/)
   })

@@ -35,11 +35,11 @@ describe('P0 一致性', () => {
     }
   })
 
-  it('空 Tab 态渐变应使用主色 #5243E8 / --primary，而非旧 indigo', () => {
+  it('空 Tab 态应为实色画布，不再铺主色渐变', () => {
     expect(css).not.toMatch(/empty-tabs-state[\s\S]*?rgba\(\s*99\s*,\s*102\s*,\s*241/)
-    expect(css).toMatch(
-      /\.empty-tabs-state[\s\S]*?(?:#5243E8|var\(--primary\)|rgba\(\s*82\s*,\s*67\s*,\s*232)/,
-    )
+    expect(css).not.toMatch(/\.empty-tabs-state\s*\{[^}]*radial-gradient/)
+    expect(css).not.toMatch(/\.empty-tabs-state\s*\{[^}]*(?:#5243E8|var\(--primary\))/)
+    expect(css).toMatch(/\.empty-tabs-state\s*\{[^}]*background:\s*var\(--bg-editor\)/)
   })
 
   it('FocusFormatToolbar 应使用 AppIcon，而非纯文字标签', () => {
