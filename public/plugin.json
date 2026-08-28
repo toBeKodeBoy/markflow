@@ -4,10 +4,10 @@
   "version": "1.1.0",
   "logo": "logo.png",
   "main": "index.html",
-  "preload": "preload.js",
+  "preload": "preload.cjs",
   "development": {
     "main": "http://localhost:5174",
-    "preload": "preload.js"
+    "preload": "preload.cjs"
   },
   "features": [
     {

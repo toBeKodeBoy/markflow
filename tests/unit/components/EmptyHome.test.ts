@@ -17,8 +17,21 @@ describe('EmptyHome', () => {
     const text = wrapper.text().replace(/\s+/g, ' ')
 
     expect(wrapper.find('[data-testid="empty-tabs-state"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="empty-home-cluster"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="empty-home-mark"]').text()).toBe('M')
-    expect(wrapper.find('[data-testid="empty-home-create"]').text()).toContain(EMPTY_HOME_CREATE_LABEL)
+    expect(
+      wrapper
+        .find('[data-testid="empty-home-cluster"]')
+        .find('[data-testid="empty-home-mark"]')
+        .exists(),
+    ).toBe(true)
+    expect(
+      wrapper
+        .find('[data-testid="empty-home-cluster"]')
+        .find('[data-testid="empty-home-commands"]')
+        .exists(),
+    ).toBe(true)
+    expect(wrapper.findAll('.empty-home-command-label')).toHaveLength(3)
     expect(wrapper.find('[data-testid="empty-home-search"]').text()).toContain(EMPTY_HOME_SEARCH_LABEL)
     expect(wrapper.find('[data-testid="empty-home-settings"]').text()).toContain(EMPTY_HOME_SETTINGS_LABEL)
     expect(text.indexOf(EMPTY_HOME_CREATE_LABEL)).toBeLessThan(text.indexOf(EMPTY_HOME_SEARCH_LABEL))
@@ -38,6 +51,8 @@ describe('EmptyHome', () => {
     expect(settings).toContain('Ctrl')
     expect(settings).toContain('Alt')
     expect(settings).toContain('S')
+    expect(wrapper.findAll('.empty-home-key-sep')).toHaveLength(4)
+    expect(wrapper.findAll('.empty-home-key-sep').every((node) => node.text() === '+')).toBe(true)
     expect(wrapper.find('[data-testid="empty-home-templates"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="empty-home-import"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="empty-home-create-folder"]').exists()).toBe(false)

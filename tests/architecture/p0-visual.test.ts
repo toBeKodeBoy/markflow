@@ -21,16 +21,20 @@ describe('P0 首页视觉', () => {
     expect(home).not.toMatch(/知识库/)
     expect(copy).not.toMatch(/知识库/)
     expect(home).toMatch(/data-testid="empty-home-mark"/)
-    expect(css).toMatch(/\.empty-home-mark\s*\{/)
+    expect(css).toMatch(/\.empty-home-mark\s*\{[^}]*background:\s*transparent/)
+    expect(css).toMatch(/\.empty-home-mark\s*\{[^}]*color:\s*color-mix\(in srgb, var\(--text-muted\) 42%, var\(--bg-editor\)\)/)
+    expect(css).not.toMatch(/\.empty-home-mark\s*\{[^}]*color:\s*var\(--bg-editor\)/)
     expect(home).not.toMatch(/新建知识库/)
   })
 
-  it('三行命令应为无边框行，右对齐按键，而不是胶囊主按钮', () => {
+  it('三行命令应为无边框行，快捷键首键对齐，而不是胶囊主按钮', () => {
     expect(home).toMatch(/data-testid="empty-home-create"/)
     expect(home).toMatch(/data-testid="empty-home-search"/)
     expect(home).toMatch(/data-testid="empty-home-settings"/)
     expect(home).toMatch(/<kbd>/)
-    expect(css).toMatch(/\.empty-home-command\s*\{[^}]*justify-content:\s*space-between/)
+    expect(css).toMatch(/\.empty-home-command\s*\{[^}]*display:\s*flex/)
+    expect(css).not.toMatch(/grid-template-columns:\s*subgrid/)
+    expect(css).not.toMatch(/\.empty-home-command\s*\{[^}]*justify-content:\s*space-between/)
     expect(css).toMatch(/\.empty-home-commands\s*\{/)
     expect(home).not.toMatch(/empty-home-import/)
     expect(home).not.toMatch(/empty-home-create-folder/)
@@ -105,7 +109,7 @@ describe('P0 顶栏视觉', () => {
     expect(toolbar).not.toMatch(/搜索笔记/)
   })
 
-  it('浅色顶栏只比画布深约 1%，搜索条再浅一档；深色 token 保持现状', () => {
+  it('浅色顶栏只比画布深约 1%，搜索条再浅一档；深色搜索条保持亮于顶栏并用内凹分层', () => {
     expect(css).toMatch(/:root\s*\{[^}]*--bg-toolbar:\s*#fcfcfd/i)
     expect(css).toMatch(/:root\s*\{[^}]*--bg-editor:\s*#ffffff/i)
     expect(css).toMatch(/:root\s*\{[^}]*--bg-search:\s*#fefefe/i)
@@ -113,6 +117,10 @@ describe('P0 顶栏视觉', () => {
     expect(css).toMatch(/\[data-theme="dark"\]\s*\{[^}]*--bg-editor:\s*#1e1e2e/i)
     expect(css).toMatch(/\[data-theme="dark"\]\s*\{[^}]*--bg-search:\s*#2a2a3e/i)
     expect(css).toMatch(/\.toolbar-search-bar\s*\{[^}]*background:\s*var\(--bg-search\)/)
+    expect(css).toMatch(/\.toolbar-search-bar\s*\{[^}]*box-shadow:\s*inset/)
+    expect(css).toMatch(/\[data-theme="dark"\]\s+\.toolbar-search-bar\s*\{[^}]*box-shadow:\s*inset/)
+    expect(css).not.toMatch(/\[data-theme="dark"\]\s+\.toolbar-search-bar\s*\{[^}]*color-mix/)
+    expect(css).not.toMatch(/\[data-theme="dark"\]\s+\.toolbar-search-bar\s*\{[^}]*#000/)
     expect(css).toMatch(/\.topbar\s*\{[^}]*background:\s*var\(--bg-toolbar\)/)
     expect(css).toMatch(/\.status-bar\s*\{[^}]*background:\s*var\(--bg-toolbar\)/)
   })
