@@ -145,7 +145,7 @@ npm run build
 npm run preview
 ```
 
-构建产物输出至 `dist/` 目录，包含 `plugin.json`、`preload.cjs`、`index.html` 及静态资源。将 `dist/` 目录作为 uTools 插件目录加载即可。
+构建产物输出至 `dist/` 目录，包含 `plugin.json`、`preload.js`、`index.html` 及静态资源。将 `dist/` 目录作为 uTools 插件目录加载即可。
 
 ### 使用方式
 
@@ -199,7 +199,8 @@ npm run test:watch
 markflow/
 ├── public/
 │   ├── plugin.json          # uTools 插件清单
-│   ├── preload.cjs          # uTools API 桥接 (window.markflow，CommonJS)
+│   ├── package.json         # type:commonjs，保证 preload.js 按 CJS 加载
+│   ├── preload.js           # uTools API 桥接 (window.markflow，CommonJS)
 │   └── logo.png             # 插件图标
 ├── src/
 │   ├── main.ts              # Vue 应用入口
@@ -272,10 +273,10 @@ markflow/
   "version": "1.1.0",
   "logo": "logo.png",
   "main": "index.html",
-  "preload": "preload.cjs",
+  "preload": "preload.js",
   "development": {
     "main": "http://localhost:5174",
-    "preload": "preload.cjs"
+    "preload": "preload.js"
   },
   "features": [{
     "code": "open-editor",

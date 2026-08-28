@@ -24,7 +24,7 @@ export default defineConfig({
         const publicDir = resolve(__dirname, 'public')
         const distDir = resolve(__dirname, 'dist')
         mkdirSync(distDir, { recursive: true })
-        for (const file of ['plugin.json', 'preload.cjs', 'logo.png']) {
+        for (const file of ['plugin.json', 'preload.js', 'package.json', 'logo.png']) {
           copyFileSync(resolve(publicDir, file), resolve(distDir, file))
         }
       },
