@@ -1,5 +1,6 @@
 /* global utools */
-// preload.js - uTools API 桥接层（CommonJS，不压缩）
+// preload.cjs - uTools API 桥接层（CommonJS，不压缩）
+// 必须用 .cjs：根 package.json 为 "type": "module"，Electron require() 不能加载 ESM preload
 // 挂载到 window.markflow，供 Vue 应用调用
 
 function isSafeChildPath(candidatePath, rootPath, path, fs) {
