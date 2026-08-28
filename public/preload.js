@@ -1,0 +1,871 @@
+/* global utools */
+// preload.js - uTools API 桥接层（CommonJS，不压缩）
+// 扩展名必须是 .js：uTools 打包 UPXS 会拒绝 .cjs（「preload 必须是 JS 文件」）
+// 语法必须是 CommonJS：同目录 public/package.json 声明 type:commonjs，
+// 避免被根 package.json 的 "type": "module" 当成 ESM
+// 挂载到 window.markflow，供 Vue 应用调用
+
+function isSafeChildPath(candidatePath, rootPath, path, fs) {
+  try {
+    var root = path.resolve(rootPath);
+    var candidate = path.resolve(candidatePath);
+    var relative = path.relative(root, candidate);
+    if (relative === '' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) return false;
+    if (fs.existsSync(candidate)) {
+      var realRoot = fs.realpathSync.native ? fs.realpathSync.native(root) : fs.realpathSync(root);
+      var realCandidate = fs.realpathSync.native ? fs.realpathSync.native(candidate) : fs.realpathSync(candidate);
+      var realRelative = path.relative(realRoot, realCandidate);
+      if (realRelative.startsWith('..' + path.sep) || path.isAbsolute(realRelative)) return false;
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function isSafeBackupFilename(filename, path) {
+  return typeof filename === 'string' && filename.length > 0 &&
+    filename === path.basename(filename) &&
+    /^markflow-backup-\\d{8}T\\d{6}\\.json$/.test(filename);
+}
+
+function appendPdfExportLog(message, extra) {
+  try {
+    var fs = require('fs');
+    var os = require('os');
+    var path = require('path');
+    var logPath = path.join(os.tmpdir(), 'markflow-pdf-export.log');
+    var line =
+      '[' +
+      new Date().toISOString() +
+      '] ' +
+      message +
+      (typeof extra === 'undefined' ? '' : ' ' + JSON.stringify(extra)) +
+      '\n';
+    fs.appendFileSync(logPath, line, 'utf8');
+    return logPath;
+  } catch (err) {
+    console.error('[MarkFlow] 写 PDF 导出日志失败:', err);
+    return '';
+  }
+}
+
+window.markflow = {
+  // ---- 笔记存储 ----
+  getNoteList: function () {
+    return utools.dbStorage.getItem('markflow_note_list') || [];
+  },
+
+  saveNoteList: function (list) {
+    utools.dbStorage.setItem('markflow_note_list', list);
+  },
+
+  getNote: function (id) {
+    return utools.dbStorage.getItem('markflow_note_' + id) || null;
+  },
+
+  saveNote: function (id, data) {
+    utools.dbStorage.setItem('markflow_note_' + id, data);
+  },
+
+  removeNote: function (id) {
+    utools.dbStorage.removeItem('markflow_note_' + id);
+  },
+
+  // ---- 文件夹存储 ----
+  getFolderList: function () {
+    return utools.dbStorage.getItem('markflow_folder_list') || [];
+  },
+
+  saveFolderList: function (list) {
+    utools.dbStorage.setItem('markflow_folder_list', list);
+  },
+
+  // ---- 设置 ----
+  getSettings: function () {
+    return utools.dbStorage.getItem('markflow_settings') || { theme: 'light', fontSize: 14 };
+  },
+
+  saveSettings: function (settings) {
+    utools.dbStorage.setItem('markflow_settings', settings);
+  },
+
+  // ---- 系统能力 ----
+  showNotification: function (msg) {
+    utools.showNotification(msg);
+  },
+
+  // 导出 .md 文件到本地
+  saveMarkdownFile: function (filename, content) {
+    var path = utools.showSaveDialog({
+      title: '导出 Markdown 文件',
+      defaultPath: filename,
+      filters: [{ name: 'Markdown', extensions: ['md'] }]
+    });
+    if (path) {
+      require('fs').writeFileSync(path, content, 'utf-8');
+      return true;
+    }
+    return false;
+  },
+
+  selectMarkdownSavePath: function (filename) {
+    var path = utools.showSaveDialog({
+      title: '瀵煎嚭 Markdown 鏂囦欢',
+      defaultPath: filename,
+      filters: [{ name: 'Markdown', extensions: ['md'] }]
+    });
+    if (!path) return { ok: false, reason: 'cancel' };
+    return { ok: true, path: path };
+  },
+
+  writeTextFile: function (filePath, content) {
+    try {
+      require('fs').writeFileSync(filePath, content, 'utf-8');
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, reason: 'error' };
+    }
+  },
+
+  // 读取本地 .md 文件（导入）
+  openMarkdownFile: function () {
+    var paths = utools.showOpenDialog({
+      title: '导入 Markdown 文件',
+      filters: [{ name: 'Markdown', extensions: ['md', 'txt'] }],
+      properties: ['openFile']
+    });
+    if (paths && paths.length > 0) {
+      var selectedPath = paths[0];
+      var path = require('path');
+      var fs = require('fs');
+      var content = fs.readFileSync(selectedPath, 'utf-8');
+      return {
+        content: content,
+        path: selectedPath,
+        name: path.basename(selectedPath),
+        images: collectImages(content, selectedPath, fs, path, path.dirname(selectedPath))
+      };
+    }
+    return null;
+  },
+
+  // 选择文件夹并扫描 Markdown 文件（导入文件夹，异步分批避免阻塞 UI）
+  openMarkdownFolder: function () {
+    var paths = utools.showOpenDialog({
+      title: '导入文件夹',
+      properties: ['openDirectory']
+    });
+    if (!paths || !paths.length) return Promise.resolve(null);
+    return scanMarkdownFolderAsync(paths[0]);
+  },
+
+  /**
+   * 导出 PDF（uTools 官方 ubrowser 路线：about:blank + evaluate 注入 HTML + pdf）
+   * options: { pageSize, margin, printBackground, landscape, scale, displayHeaderFooter, preferCssPageSize }
+   * 返回 Promise<{ ok: true } | { ok: false, reason: string }>
+   */
+  savePdfFromHtml: function (filename, html, options) {
+    var logPath = appendPdfExportLog('savePdfFromHtml:start', {
+      filename: filename,
+      htmlLength: typeof html === 'string' ? html.length : -1
+    });
+
+    try {
+      utools.showNotification('MarkFlow: 已进入 uTools 原生 PDF 导出');
+      console.log('[MarkFlow] 使用 uTools ubrowser 原生 PDF 导出');
+    } catch (notifyErr) {
+      console.warn('[MarkFlow] 原生 PDF 导出探针通知失败:', notifyErr);
+    }
+
+    var savePath = utools.showSaveDialog({
+      title: '导出 PDF',
+      defaultPath: filename.replace(/\.md$/, '.pdf'),
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    });
+    appendPdfExportLog('savePdfFromHtml:save-dialog', { savePath: savePath, logPath: logPath });
+    if (!savePath) return Promise.resolve({ ok: false, reason: 'cancel' });
+
+    var opts = options || {};
+    var pageSize = opts.pageSize || 'A4';
+    var landscape = opts.landscape === 'landscape';
+    var printBackground = opts.printBackground !== false;
+    var scale = typeof opts.scale === 'number' && isFinite(opts.scale) ? opts.scale : 1;
+    var displayHeaderFooter = opts.displayHeaderFooter === true;
+    var preferCssPageSize = opts.preferCssPageSize !== false;
+    var marginMap = {
+      default: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+      narrow: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
+      wide: { top: '25mm', right: '25mm', bottom: '25mm', left: '25mm' },
+      none: { top: '5mm', right: '5mm', bottom: '5mm', left: '5mm' }
+    };
+    var margin = marginMap[opts.margin] || marginMap.default;
+    var MAX_EVALUATE_HTML_CHARS = 4 * 1024 * 1024;
+
+    function createTempPrintFile(payload) {
+      var fs = require('fs');
+      var os = require('os');
+      var path = require('path');
+      var tempName =
+        'markflow-pdf-' + Date.now() + '-' + Math.random().toString(16).slice(2) + '.html';
+      var tempPath = path.join(os.tmpdir(), tempName);
+      fs.writeFileSync(tempPath, payload, 'utf8');
+      return tempPath;
+    }
+
+    function toFileUrl(filePath) {
+      var normalized = String(filePath).replace(/\\/g, '/');
+      if (normalized.charAt(0) !== '/') {
+        normalized = '/' + normalized;
+      }
+      return encodeURI('file://' + normalized);
+    }
+
+    try {
+      if (!utools.ubrowser || typeof utools.ubrowser.goto !== 'function') {
+        console.error('[MarkFlow] utools.ubrowser 不可用');
+        appendPdfExportLog('savePdfFromHtml:ubrowser-unavailable');
+        return Promise.resolve({ ok: false, reason: 'ubrowser-unavailable' });
+      }
+
+      if (typeof html !== 'string' || html.length > MAX_EVALUATE_HTML_CHARS) {
+        console.error('[MarkFlow] 打印 HTML 过大，不适合通过 evaluate 注入:', html ? html.length : 0);
+        appendPdfExportLog('savePdfFromHtml:html-too-large', {
+          htmlLength: html ? html.length : 0,
+          limit: MAX_EVALUATE_HTML_CHARS
+        });
+        return Promise.resolve({ ok: false, reason: 'write-temp-failed' });
+      }
+
+      var tempHtmlPath = '';
+      try {
+        tempHtmlPath = createTempPrintFile(html);
+        appendPdfExportLog('savePdfFromHtml:temp-html-created', { tempHtmlPath: tempHtmlPath });
+      } catch (writeErr) {
+        console.error('[MarkFlow] 写临时打印页面失败:', writeErr);
+        appendPdfExportLog('savePdfFromHtml:temp-html-failed', {
+          message: writeErr && writeErr.message ? writeErr.message : String(writeErr || '')
+        });
+        return Promise.resolve({ ok: false, reason: 'write-temp-failed' });
+      }
+
+      var fileUrl = toFileUrl(tempHtmlPath);
+      appendPdfExportLog('savePdfFromHtml:run-begin', {
+        savePath: savePath,
+        fileUrl: fileUrl,
+        pageSize: pageSize,
+        landscape: landscape,
+        scale: scale
+      });
+
+      return utools.ubrowser
+        .goto(fileUrl)
+        .wait(300)
+        .wait(function () {
+          return document.readyState === 'complete';
+        }, 20000)
+        .evaluate(function () {
+          return {
+            ready: window.__MARKFLOW_PDF_READY__ === true,
+            errored: window.__MARKFLOW_PDF_READY__ === 'error',
+            reason: window.__MARKFLOW_PDF_READY_REASON__ || ''
+          };
+        })
+        .hide()
+        .viewport(1280, 900)
+        .pdf(
+          {
+            printBackground: printBackground,
+            pageSize: pageSize,
+            landscape: landscape,
+            scale: scale,
+            displayHeaderFooter: displayHeaderFooter,
+            preferCSSPageSize: preferCssPageSize,
+            margin: margin
+          },
+          savePath
+        )
+        .run({
+          show: false,
+          width: 1280,
+          height: 900,
+          resizable: false,
+          movable: false,
+          minimizable: false,
+          maximizable: false,
+          fullscreenable: false
+        })
+        .then(function (result) {
+          appendPdfExportLog('savePdfFromHtml:run-resolved', {
+            resultLength: Array.isArray(result) ? result.length : -1
+          });
+          var status = Array.isArray(result) ? result[0] : null;
+          if (!status || status.errored || !status.ready) {
+            console.error('[MarkFlow] 打印页面未就绪:', status);
+            appendPdfExportLog('savePdfFromHtml:page-not-ready', status);
+            try {
+              utools.showNotification('MarkFlow: PDF 页面未就绪，详情见临时日志');
+            } catch (notifyErr) {
+              console.warn('[MarkFlow] 通知失败:', notifyErr);
+            }
+            return { ok: false, reason: 'page-init-failed' };
+          }
+
+          try {
+            var fs = require('fs');
+            if (!fs.existsSync(savePath)) {
+              console.error('[MarkFlow] PDF 文件未生成:', savePath);
+              appendPdfExportLog('savePdfFromHtml:file-missing', { savePath: savePath });
+              try {
+                utools.showNotification('MarkFlow: PDF 文件未生成，详情见临时日志');
+              } catch (notifyErr) {
+                console.warn('[MarkFlow] 通知失败:', notifyErr);
+              }
+              return { ok: false, reason: 'save-failed' };
+            }
+
+            var stat = fs.statSync(savePath);
+            if (!stat || !stat.isFile() || stat.size <= 0) {
+              console.error('[MarkFlow] PDF 文件为空:', savePath, stat ? stat.size : 0);
+              appendPdfExportLog('savePdfFromHtml:file-empty', {
+                savePath: savePath,
+                size: stat ? stat.size : 0
+              });
+              try {
+                utools.showNotification('MarkFlow: PDF 文件为空，详情见临时日志');
+              } catch (notifyErr) {
+                console.warn('[MarkFlow] 通知失败:', notifyErr);
+              }
+              return { ok: false, reason: 'save-failed' };
+            }
+          } catch (fsErr) {
+            console.error('[MarkFlow] PDF 落盘校验失败:', fsErr);
+            appendPdfExportLog('savePdfFromHtml:file-check-failed', {
+              message: fsErr && fsErr.message ? fsErr.message : String(fsErr || '')
+            });
+            return { ok: false, reason: 'save-failed' };
+          }
+
+          console.log('[MarkFlow] PDF 导出完成:', savePath);
+          appendPdfExportLog('savePdfFromHtml:success', { savePath: savePath });
+          try {
+            require('fs').unlinkSync(tempHtmlPath);
+            appendPdfExportLog('savePdfFromHtml:temp-html-removed', { tempHtmlPath: tempHtmlPath });
+          } catch (removeErr) {
+            appendPdfExportLog('savePdfFromHtml:temp-html-remove-failed', {
+              tempHtmlPath: tempHtmlPath,
+              message: removeErr && removeErr.message ? removeErr.message : String(removeErr || '')
+            });
+          }
+          return { ok: true };
+        })
+        .catch(function (err) {
+          console.error('[MarkFlow] PDF 导出失败:', err);
+          appendPdfExportLog('savePdfFromHtml:catch', {
+            message: err && err.message ? err.message : String(err || ''),
+            stack: err && err.stack ? err.stack : ''
+          });
+          try {
+            utools.showNotification('MarkFlow: PDF 导出失败，详情见临时日志');
+          } catch (notifyErr) {
+            console.warn('[MarkFlow] 通知失败:', notifyErr);
+          }
+          try {
+            if (tempHtmlPath) {
+              require('fs').unlinkSync(tempHtmlPath);
+              appendPdfExportLog('savePdfFromHtml:temp-html-removed-after-catch', {
+                tempHtmlPath: tempHtmlPath
+              });
+            }
+          } catch (removeErr) {
+            appendPdfExportLog('savePdfFromHtml:temp-html-remove-failed-after-catch', {
+              tempHtmlPath: tempHtmlPath,
+              message: removeErr && removeErr.message ? removeErr.message : String(removeErr || '')
+            });
+          }
+          var msg = err && err.message ? String(err.message) : String(err || '');
+          if (/print-page-init-failed|ready-script-error/i.test(msg)) {
+            return { ok: false, reason: 'page-init-failed' };
+          }
+          if (/wait|timeout/i.test(msg)) {
+            return { ok: false, reason: 'resource-timeout' };
+          }
+          return { ok: false, reason: 'save-failed' };
+        });
+    } catch (err) {
+      console.error('[MarkFlow] PDF 导出初始化失败:', err);
+      appendPdfExportLog('savePdfFromHtml:init-failed', {
+        message: err && err.message ? err.message : String(err || ''),
+        stack: err && err.stack ? err.stack : ''
+      });
+      return Promise.resolve({ ok: false, reason: 'error' });
+    }
+  },
+
+  openExternalUrl: function (url) {
+    try {
+      if (utools.shellOpenExternal) {
+        utools.shellOpenExternal(url);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('[MarkFlow] 打开外部链接失败:', err);
+      return false;
+    }
+  },
+
+  openLocalPath: function (pathOrFileUrl) {
+    try {
+      var path = pathOrFileUrl;
+      if (/^file:/i.test(pathOrFileUrl)) {
+        var fileURLToPath = require('url').fileURLToPath;
+        path = fileURLToPath(pathOrFileUrl);
+      }
+      if (utools.shellOpenPath) {
+        utools.shellOpenPath(path);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('[MarkFlow] 打开本地路径失败:', err);
+      return false;
+    }
+  },
+
+  getLinkOpenCapabilities: function () {
+    return {
+      version: 1,
+      external: typeof utools.shellOpenExternal === 'function',
+      localFile: typeof utools.shellOpenPath === 'function'
+    };
+  },
+
+
+
+  // 获取 uTools 主题（dark/light）
+  isDarkTheme: function () {
+    return utools.isDarkColors();
+  },
+
+  // 隐藏 uTools 主窗口
+  hideMainWindow: function () {
+    utools.hideMainWindow();
+  },
+
+  // 复制文本到剪贴板（uTools 原生 API，比 Clipboard API 更可靠）
+  copyText: function (text) {
+    try {
+      utools.copyText(text);
+      return true;
+    } catch (e) {
+      console.error('[MarkFlow] utools.copyText 失败:', e);
+      return false;
+    }
+  },
+
+  // ---- 图片资源存储 ----
+  getAssetIndex: function () {
+    return utools.dbStorage.getItem('markflow_asset_index') || [];
+  },
+
+  saveAssetIndex: function (index) {
+    utools.dbStorage.setItem('markflow_asset_index', index);
+  },
+
+  getAsset: function (id) {
+    return utools.dbStorage.getItem('markflow_asset_' + id) || null;
+  },
+
+  saveAsset: function (id, record) {
+    utools.dbStorage.setItem('markflow_asset_' + id, record);
+  },
+
+  removeAsset: function (id) {
+    utools.dbStorage.removeItem('markflow_asset_' + id);
+  },
+
+  ensureDirectory: function (dirPath) {
+    try {
+      require('fs').mkdirSync(dirPath, { recursive: true });
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, reason: 'error' };
+    }
+  },
+
+  writeAssetFile: function (filePath, base64) {
+    try {
+      var fs = require('fs');
+      var buffer = Buffer.from(base64, 'base64');
+      fs.writeFileSync(filePath, buffer);
+      return { ok: true, path: filePath };
+    } catch (e) {
+      return { ok: false, reason: 'error' };
+    }
+  },
+
+  movePath: function (fromPath, toPath) {
+    try {
+      var fs = require('fs');
+      var path = require('path');
+      var parent = path.dirname(toPath);
+      if (!fs.existsSync(parent)) {
+        fs.mkdirSync(parent, { recursive: true });
+      }
+      fs.renameSync(fromPath, toPath);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, reason: 'error' };
+    }
+  },
+
+  pathExists: function (targetPath) {
+    try {
+      return require('fs').existsSync(targetPath);
+    } catch (e) {
+      return false;
+    }
+  },
+
+  saveBackupFile: function (jsonString, defaultName) {
+    var path = utools.showSaveDialog({
+      title: '导出 MarkFlow 备份',
+      defaultPath: defaultName,
+      filters: [{ name: 'MarkFlow Backup', extensions: ['json'] }]
+    });
+    if (!path) return { ok: false, reason: 'cancel' };
+    try {
+      require('fs').writeFileSync(path, jsonString, 'utf-8');
+      return { ok: true, path: path };
+    } catch (e) {
+      return { ok: false, reason: 'error' };
+    }
+  },
+
+  openBackupFile: function () {
+    var paths = utools.showOpenDialog({
+      title: '从备份恢复',
+      filters: [{ name: 'MarkFlow Backup', extensions: ['json'] }],
+      properties: ['openFile']
+    });
+    if (paths && paths.length > 0) {
+      return require('fs').readFileSync(paths[0], 'utf-8');
+    }
+    return null;
+  },
+
+  selectBackupDirectory: function () {
+    var paths = utools.showOpenDialog({
+      title: '选择自动备份目录',
+      properties: ['openDirectory']
+    });
+    if (!paths || !paths.length) return null;
+    return paths[0];
+  },
+
+  writeBackupFileSilent: function (dirPath, filename, content) {
+    try {
+      var fs = require('fs');
+      var path = require('path');
+      if (!dirPath || !path.isAbsolute(dirPath) || !isSafeBackupFilename(filename, path)) {
+        return { ok: false, reason: 'error' };
+      }
+      if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+      }
+      var fullPath = path.join(dirPath, filename);
+      if (!isSafeChildPath(fullPath, dirPath, path, fs)) {
+        return { ok: false, reason: 'error' };
+      }
+      fs.writeFileSync(fullPath, content, { encoding: 'utf-8', flag: 'w' });
+      return { ok: true, path: fullPath };
+    } catch (e) {
+      return { ok: false, reason: 'error' };
+    }
+  },
+
+  cleanOldBackupFiles: function (dirPath, maxCopies) {
+    try {
+      var fs = require('fs');
+      var path = require('path');
+      if (!dirPath || !path.isAbsolute(dirPath)) {
+        return { ok: false, reason: 'error' };
+      }
+      if (!fs.existsSync(dirPath)) return { ok: true, deleted: 0 };
+      if (maxCopies <= 0) return { ok: true, deleted: 0 };
+      var entries = fs.readdirSync(dirPath)
+        .filter(function (f) { return /^markflow-backup-\d{8}T\d{6}\.json$/.test(f); })
+        .map(function (f) {
+          var full = path.join(dirPath, f);
+          return { full: full, mtime: fs.statSync(full).mtimeMs };
+        })
+        .sort(function (a, b) { return b.mtime - a.mtime; });
+      var toDelete = entries.slice(maxCopies);
+      for (var i = 0; i < toDelete.length; i++) {
+        fs.unlinkSync(toDelete[i].full);
+      }
+      return { ok: true, deleted: toDelete.length };
+    } catch (e) {
+      return { ok: false, reason: 'error' };
+    }
+  },
+
+  getDefaultBackupDirectory: function () {
+    try {
+      var fs = require('fs');
+      var path = require('path');
+      var base = utools.getPath('appData');
+      var dir = path.join(base, 'markflow-backups');
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      return dir;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  getAutoBackupCapabilities: function () {
+    return {
+      version: 1,
+      available: typeof this.selectBackupDirectory === 'function' &&
+        typeof this.writeBackupFileSilent === 'function' &&
+        typeof this.cleanOldBackupFiles === 'function' &&
+        typeof this.getDefaultBackupDirectory === 'function',
+      isDev: typeof utools.isDev === 'function' ? utools.isDev() : false
+    };
+  },
+
+  openBackupDirectory: function (dirPath) {
+    try {
+      if (!dirPath) return false;
+      utools.shellOpenPath(dirPath);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  // ---- 回收站存储 ----
+  getTrashNotes: function () {
+    return utools.dbStorage.getItem('markflow_trash_notes') || [];
+  },
+
+  saveTrashNotes: function (notes) {
+    utools.dbStorage.setItem('markflow_trash_notes', notes);
+  },
+
+  // ---- 文件夹回收站存储 ----
+  getTrashFolders: function () {
+    return utools.dbStorage.getItem('markflow_trash_folders') || [];
+  },
+
+  saveTrashFolders: function (entries) {
+    utools.dbStorage.setItem('markflow_trash_folders', entries);
+  }
+};
+
+// ---- 文件夹导入扫描（异步分批，扩展名规则与 importFolderHelpers.ts 保持一致） ----
+var SKIP_DIR_NAMES = { '.git': 1, node_modules: 1, '.svn': 1, __pycache__: 1, '.idea': 1, dist: 1, build: 1 };
+var TEXT_IMPORT_EXT = {
+  md: 1, markdown: 1, mdown: 1, mkd: 1, txt: 1, text: 1,
+  json: 1, jsonc: 1, yaml: 1, yml: 1, toml: 1, xml: 1, html: 1, htm: 1, css: 1, scss: 1, sass: 1, less: 1,
+  js: 1, mjs: 1, cjs: 1, jsx: 1, ts: 1, tsx: 1, vue: 1, svelte: 1,
+  py: 1, rb: 1, go: 1, rs: 1, java: 1, kt: 1, kts: 1, swift: 1, c: 1, cpp: 1, cc: 1, h: 1, hpp: 1, cs: 1,
+  sql: 1, sh: 1, bash: 1, zsh: 1, ps1: 1, bat: 1, cmd: 1,
+  ini: 1, cfg: 1, conf: 1, env: 1, properties: 1,
+  log: 1, csv: 1, tsv: 1,
+  adoc: 1, asciidoc: 1, org: 1, tex: 1, latex: 1, bib: 1, rst: 1
+};
+var IMAGE_IMPORT_EXT = { png: 1, jpg: 1, jpeg: 1, gif: 1, webp: 1, svg: 1, bmp: 1, ico: 1 };
+var SKIP_IMPORT_EXT = {
+  exe: 1, dll: 1, so: 1, dylib: 1, zip: 1, rar: 1, '7z': 1, tar: 1, gz: 1, bz2: 1, xz: 1,
+  pdf: 1, doc: 1, docx: 1, xls: 1, xlsx: 1, ppt: 1, pptx: 1,
+  mp3: 1, mp4: 1, avi: 1, mov: 1, mkv: 1, wav: 1, flac: 1, ogg: 1, webm: 1,
+  woff: 1, woff2: 1, ttf: 1, otf: 1, eot: 1,
+  bin: 1, obj: 1, o: 1, class: 1, jar: 1, wasm: 1, dmg: 1, iso: 1,
+  db: 1, sqlite: 1, sqlite3: 1
+};
+var TEXT_IMPORT_BASENAMES = {
+  dockerfile: 1, makefile: 1, license: 1, readme: 1, changelog: 1, authors: 1, contributing: 1
+};
+var IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i;
+var REL_IMAGE_MD_RE = /!\[[^\]]*\]\((?!https?:|markflow-asset:|data:)([^)\s]+)(?:\s+"[^"]*")?\)/g;
+var SCAN_MAX_DEPTH = 20;
+var SCAN_DIRS_PER_TICK = 12;
+var SCAN_MAX_FILES = 5000;
+var SCAN_MAX_FILE_BYTES = 10 * 1024 * 1024;
+var SCAN_MAX_TOTAL_BYTES = 100 * 1024 * 1024;
+var SCAN_MAX_IMAGE_BYTES = 50 * 1024 * 1024;
+
+function getFileExtension(name) {
+  var dot = name.lastIndexOf('.');
+  if (dot <= 0) return '';
+  return name.slice(dot + 1).toLowerCase();
+}
+
+function shouldSkipImportFilename(name) {
+  var ext = getFileExtension(name);
+  return !!(ext && SKIP_IMPORT_EXT[ext]);
+}
+
+function isImportableTextFilename(name) {
+  if (shouldSkipImportFilename(name)) return false;
+  var lower = name.toLowerCase();
+  if (TEXT_IMPORT_BASENAMES[lower]) return true;
+  var ext = getFileExtension(name);
+  return !!(ext && TEXT_IMPORT_EXT[ext]);
+}
+
+function isImportableImageFilename(name) {
+  if (shouldSkipImportFilename(name)) return false;
+  return !!IMAGE_IMPORT_EXT[getFileExtension(name)];
+}
+
+function mimeFromImagePath(fullPath, path) {
+  var ext = getFileExtension(path.basename(fullPath));
+  if (ext === 'jpg') return 'image/jpeg';
+  if (ext === 'svg') return 'image/svg+xml';
+  if (ext === 'ico') return 'image/x-icon';
+  if (ext === 'bmp') return 'image/bmp';
+  return 'image/' + ext;
+}
+
+function shouldSkipImportDir(name) {
+  if (SKIP_DIR_NAMES[name]) return true;
+  return name.charAt(0) === '.';
+}
+
+function collectImages(content, mdFullPath, fs, path, importRoot) {
+  var images = [];
+  var rootPath = path.resolve(importRoot || path.dirname(mdFullPath));
+  var m;
+  REL_IMAGE_MD_RE.lastIndex = 0;
+  while ((m = REL_IMAGE_MD_RE.exec(content)) !== null) {
+    var relImg = m[1].trim().replace(/^<|>$/g, '');
+    if (/^(?:[A-Za-z]:[\\/]|\\\\|file:)/.test(relImg)) continue;
+    var imgPath = path.resolve(path.dirname(mdFullPath), relImg);
+    try {
+      if (!isSafeChildPath(imgPath, rootPath, path, fs) || !fs.existsSync(imgPath) || !IMAGE_EXT_RE.test(imgPath)) continue;
+      var buf = fs.readFileSync(imgPath);
+      var ext = path.extname(imgPath).slice(1).toLowerCase();
+      var mime = ext === 'jpg' ? 'image/jpeg' : 'image/' + ext;
+      images.push({ relPath: relImg, base64: buf.toString('base64'), mime: mime });
+    } catch (e) {
+      /* skip unreadable image */
+    }
+  }
+  return images;
+}
+
+function scanMarkdownFolderAsync(rootPath) {
+  var fs = require('fs');
+  var path = require('path');
+  var files = [];
+  var totalBytes = 0;
+  var imageBytes = 0;
+  var queue = [{ dir: rootPath, relBase: '', depth: 0 }];
+  var visited = Object.create(null);
+
+  function resolveVisited(dir) {
+    try {
+      return fs.realpathSync.native ? fs.realpathSync.native(dir) : fs.realpathSync(dir);
+    } catch (e) {
+      return path.resolve(dir);
+    }
+  }
+
+  return new Promise(function (resolve) {
+    function processTick() {
+      var batch = 0;
+      while (queue.length > 0 && batch < SCAN_DIRS_PER_TICK) {
+        batch++;
+        var item = queue.shift();
+        if (item.depth > SCAN_MAX_DEPTH) continue;
+
+        var absDir = path.resolve(item.dir);
+        var visitKey = resolveVisited(absDir);
+        if (visited[visitKey]) continue;
+        visited[visitKey] = true;
+
+        var entries;
+        try {
+          entries = fs.readdirSync(absDir, { withFileTypes: true });
+        } catch (e) {
+          continue;
+        }
+
+        for (var i = 0; i < entries.length; i++) {
+          var entry = entries[i];
+          if (entry.isDirectory()) {
+            if (shouldSkipImportDir(entry.name)) continue;
+            var nextRel = item.relBase ? item.relBase + '/' + entry.name : entry.name;
+            queue.push({
+              dir: path.join(absDir, entry.name),
+              relBase: nextRel,
+              depth: item.depth + 1
+            });
+          } else if (entry.isFile()) {
+            var relPath = item.relBase ? item.relBase + '/' + entry.name : entry.name;
+            var fullPath = path.join(absDir, entry.name);
+            relPath = relPath.replace(/\\/g, '/');
+
+            if (files.length >= SCAN_MAX_FILES) {
+              resolve({ rootPath: rootPath, files: files, truncated: true, reason: 'limit' });
+              return;
+            }
+            var stats;
+            try { stats = fs.statSync(fullPath); } catch (e) { continue; }
+            if (stats.size > SCAN_MAX_FILE_BYTES || totalBytes + stats.size > SCAN_MAX_TOTAL_BYTES) {
+              resolve({ rootPath: rootPath, files: files, truncated: true, reason: 'limit' });
+              return;
+            }
+            totalBytes += stats.size;
+            if (isImportableImageFilename(entry.name)) {
+              if (imageBytes + stats.size > SCAN_MAX_IMAGE_BYTES) {
+                resolve({ rootPath: rootPath, files: files, truncated: true, reason: 'limit' });
+                return;
+              }
+              imageBytes += stats.size;
+              try {
+                var imgBuf = fs.readFileSync(fullPath);
+                files.push({
+                  relativePath: relPath,
+                  content: '',
+                  images: [],
+                  standaloneImage: {
+                    relPath: entry.name,
+                    base64: imgBuf.toString('base64'),
+                    mime: mimeFromImagePath(fullPath, path)
+                  }
+                });
+              } catch (e) {
+                /* skip unreadable image */
+              }
+            } else if (isImportableTextFilename(entry.name)) {
+              try {
+                var content = fs.readFileSync(fullPath, 'utf-8');
+                files.push({
+                  relativePath: relPath,
+                  content: content,
+                  images: collectImages(content, fullPath, fs, path, rootPath)
+                });
+              } catch (e) {
+                /* skip unreadable text */
+              }
+            }
+          }
+        }
+      }
+
+      if (queue.length > 0) {
+        setImmediate(processTick);
+      } else {
+        resolve({ rootPath: rootPath, files: files });
+      }
+    }
+
+    setImmediate(processTick);
+  });
+}
