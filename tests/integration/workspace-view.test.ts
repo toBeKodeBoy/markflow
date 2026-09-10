@@ -124,16 +124,6 @@ describe('workspace view', () => {
     expect(wrapper.find('[data-testid="workspace-trash"]').exists()).toBe(true)
   })
 
-  it('空库回收站不展示新手引导', async () => {
-    const wrapper = mountApp()
-    expect(wrapper.find('[data-testid="onboarding-coach"]').exists()).toBe(true)
-
-    await wrapper.get('[data-testid="sidebar-nav-trash"]').trigger('click')
-    await flushPromises()
-
-    expect(wrapper.find('[data-testid="onboarding-coach"]').exists()).toBe(false)
-  })
-
   it('在回收站按 Escape 回到文档或首页', async () => {
     const wrapper = mountApp()
     const workspace = useWorkspaceStore()

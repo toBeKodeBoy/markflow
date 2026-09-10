@@ -572,68 +572,6 @@ input:focus { border-color: var(--primary); }
   height: 100%;
 }
 
-.onboarding-coach {
-  position: fixed;
-  left: 50%;
-  bottom: 48px;
-  z-index: 40;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: min(360px, calc(100% - 32px));
-  transform: translateX(-50%);
-  pointer-events: none;
-}
-
-.onboarding-bubble,
-.onboarding-controls {
-  pointer-events: auto;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-toolbar);
-  box-shadow: var(--shadow-md);
-}
-
-.onboarding-bubble {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-}
-
-.onboarding-bubble p {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.onboarding-step-badge {
-  flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  border-radius: 999px;
-  background: var(--primary);
-  color: #fff;
-  font-size: 12px;
-  line-height: 20px;
-  text-align: center;
-}
-
-.onboarding-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.onboarding-controls button {
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--primary);
-}
-
 .mode-focus .editor-tab-bar { display: none; }
 
 .app-logo {

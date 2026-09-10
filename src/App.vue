@@ -124,14 +124,6 @@
       @done="closeImportFolder"
     />
 
-    <OnboardingCoach
-      :visible="onboardingVisible && workspace.view === 'home'"
-      :step="onboardingStep"
-      :total="3"
-      @skip="dismissOnboarding"
-      @dismiss="dismissOnboarding"
-      @next="nextOnboarding"
-    />
   </div>
 </template>
 
@@ -152,8 +144,6 @@ import AppIcon from './components/AppIcon.vue'
 import EditorTabBar from './components/EditorTabBar.vue'
 import EmptyHome from './components/EmptyHome.vue'
 import TrashPanel from './components/TRashPanel.vue'
-import OnboardingCoach from './components/OnboardingCoach.vue'
-import { useOnboarding } from './composables/useOnboarding'
 import { pickFolderScan } from './utils/importFolderDevScan'
 import { useNoteStore } from './stores/note'
 import { useEditorTabsStore } from './stores/editorTabs'
@@ -210,11 +200,6 @@ const hasOpenTabs = computed(() => tabsStore.tabs.length > 0)
 const isHomeView = computed(() => workspace.view === 'home' || (workspace.view === 'editor' && !hasOpenTabs.value))
 const isTrashView = computed(() => workspace.view === 'trash')
 const isEditorView = computed(() => workspace.view === 'editor' && hasOpenTabs.value)
-const emptyLibrary = computed(() => store.noteList.length === 0)
-const { visible: onboardingVisible, step: onboardingStep, dismiss: dismissOnboarding, next: nextOnboarding } = useOnboarding({
-  emptyLibrary,
-  hasOpenTabs,
-})
 const charCount = computed(() => store.liveContent.length || store.currentNote?.content.length || 0)
 
 const saveStatusText = computed(() => {

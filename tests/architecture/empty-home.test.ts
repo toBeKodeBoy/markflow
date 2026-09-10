@@ -26,7 +26,6 @@ describe('空白首页架构约束', () => {
   it('应存在 EmptyHome 组件与空态文案常量', () => {
     expect(existsSync(resolve(root, 'src/components/EmptyHome.vue'))).toBe(true)
     expect(existsSync(resolve(root, 'src/constants/emptyHomeCopy.ts'))).toBe(true)
-    expect(existsSync(resolve(root, 'src/components/OnboardingCoach.vue'))).toBe(true)
   })
 
   it('侧栏底栏不再放存储路径 caption', () => {

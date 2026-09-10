@@ -44,7 +44,6 @@
         type="button"
         class="toolbar-search-bar"
         data-testid="toolbar-search-bar"
-        data-onboarding="search"
         :title="SEARCH_DOCUMENTS_TITLE"
         :aria-label="SEARCH_DOCUMENTS_LABEL"
         @click="$emit('openSearch')"
