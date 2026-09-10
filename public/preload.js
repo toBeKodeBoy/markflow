@@ -26,7 +26,7 @@ function isSafeChildPath(candidatePath, rootPath, path, fs) {
 function isSafeBackupFilename(filename, path) {
   return typeof filename === 'string' && filename.length > 0 &&
     filename === path.basename(filename) &&
-    /^markflow-backup-\\d{8}T\\d{6}\\.json$/.test(filename);
+    /^markflow-backup-\d{8}T\d{6}\.json$/.test(filename)
 }
 
 function appendPdfExportLog(message, extra) {
