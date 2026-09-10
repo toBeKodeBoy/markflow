@@ -15,7 +15,6 @@
       type="button"
       class="btn-primary sidebar-create-note"
       data-testid="sidebar-create-note"
-      data-onboarding="create"
       @click="emit('createNote')"
     >
       <AppIcon name="plus" :size="16" />
