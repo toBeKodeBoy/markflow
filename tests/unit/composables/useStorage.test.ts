@@ -1,6 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { isProxy, reactive } from 'vue'
 import { useStorage } from '../../../src/composables/useStorage'
-import type { NoteListItem } from '../../../src/types'
+import type { Folder, NoteListItem, TrashFolderEntry, TrashNote } from '../../../src/types'
+
+function lastBridgeArg<T>(fn: (...args: never[]) => unknown): T {
+  const payload = vi.mocked(fn).mock.calls.at(-1)?.[0]
+  expect(payload).toBeDefined()
+  return payload as T
+}
+
+function expectIpcCloneable(payload: unknown) {
+  expect(isProxy(payload)).toBe(false)
+  expect(() => structuredClone(payload)).not.toThrow()
+}
 
 describe('useStorage', () => {
   let storage: ReturnType<typeof useStorage>
@@ -110,6 +122,89 @@ describe('useStorage', () => {
   it('saveFolderList persists folders', () => {
     storage.saveFolderList([{ id: 'f1', name: 'Work', order: 0 }])
     expect(storage.getFolderList()).toEqual([{ id: 'f1', name: 'Work', order: 0 }])
+  })
+
+  it('saveFolderList 写入桥接层前剥离 Vue Proxy，保证可 structuredClone', () => {
+    const folders = reactive<Folder[]>([
+      { id: 'f1', name: 'Work', order: 0 },
+      { id: 'f2', name: '子目录', order: 1, parentId: 'f1', pinned: true },
+    ])
+    expect(isProxy(folders)).toBe(true)
+
+    storage.saveFolderList(folders)
+
+    const payload = lastBridgeArg<Folder[]>(window.markflow.saveFolderList)
+    expectIpcCloneable(payload)
+    expect(payload).toEqual([
+      { id: 'f1', name: 'Work', order: 0 },
+      { id: 'f2', name: '子目录', order: 1, parentId: 'f1', pinned: true },
+    ])
+    expect(payload).not.toBe(folders)
+    expect(storage.getFolderList()).toEqual(payload)
+  })
+
+  it('saveSettings 写入桥接层前剥离 Vue Proxy，保证可 structuredClone', () => {
+    const settings = reactive({
+      theme: 'dark' as const,
+      fontSize: 16,
+      editorFontFamily: 'monospace',
+      previewVisible: true,
+      sidebarVisible: true,
+    })
+    expect(isProxy(settings)).toBe(true)
+
+    storage.saveSettings(settings)
+
+    const payload = lastBridgeArg(window.markflow.saveSettings)
+    expectIpcCloneable(payload)
+    expect(payload).not.toBe(settings)
+    expect(storage.getSettings().theme).toBe('dark')
+    expect(storage.getSettings().fontSize).toBe(16)
+  })
+
+  it('saveTrashNotes 写入桥接层前剥离 Vue Proxy，保证可 structuredClone', () => {
+    const notes = reactive<TrashNote[]>([{
+      id: 't1',
+      title: '回收',
+      content: '# 回收',
+      createdAt: 1,
+      updatedAt: 2,
+      deletedAt: 3,
+      deletedBy: 'user',
+    }])
+    expect(isProxy(notes)).toBe(true)
+
+    storage.saveTrashNote(notes[0])
+
+    const payload = lastBridgeArg<TrashNote[]>(window.markflow.saveTrashNotes)
+    expectIpcCloneable(payload)
+    expect(payload).not.toBe(notes)
+    expect(payload[0]).toMatchObject({ id: 't1', title: '回收', deletedBy: 'user' })
+  })
+
+  it('saveTrashFolders 写入桥接层前剥离 Vue Proxy，保证可 structuredClone', () => {
+    const entries = reactive<TrashFolderEntry[]>([{
+      folder: { id: 'f1', name: '已删', order: 0 },
+      descendantFolders: [{ id: 'f2', name: '子', order: 1, parentId: 'f1' }],
+      noteIds: ['n1'],
+      deletedAt: 1000,
+      deletedBy: 'user',
+      originalParentId: undefined,
+    }])
+    expect(isProxy(entries)).toBe(true)
+
+    storage.saveTrashFolders(entries)
+
+    const payload = lastBridgeArg<TrashFolderEntry[]>(window.markflow.saveTrashFolders)
+    expectIpcCloneable(payload)
+    expect(payload).not.toBe(entries)
+    expect(payload).toEqual([{
+      folder: { id: 'f1', name: '已删', order: 0 },
+      descendantFolders: [{ id: 'f2', name: '子', order: 1, parentId: 'f1' }],
+      noteIds: ['n1'],
+      deletedAt: 1000,
+      deletedBy: 'user',
+    }])
   })
 
   it('saveSettings persists settings', () => {
