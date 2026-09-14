@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { isProxy } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { useNoteStore } from '../../src/stores/note'
 
@@ -16,6 +17,23 @@ describe('文件夹操作方法', () => {
     store.clearTrash()
     store.clearTrashFolders()
     localStorage.clear()
+  })
+
+  describe('createFolder', () => {
+    it('持久化时传入可 structuredClone 的纯对象', () => {
+      const folder = store.createFolder('测试文件夹')
+      expect(folder).not.toBeNull()
+
+      const payload = vi.mocked(window.markflow.saveFolderList).mock.calls.at(-1)?.[0]
+      expect(payload).toBeDefined()
+      expect(isProxy(payload)).toBe(false)
+      expect(() => structuredClone(payload)).not.toThrow()
+      expect(payload).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: folder!.id, name: '测试文件夹' }),
+        ]),
+      )
+    })
   })
 
   describe('toggleFolderPinned', () => {

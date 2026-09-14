@@ -125,11 +125,19 @@ function defaultSettings(): AppSettings {
   }
 }
 
-/** 包装 uTools 存储写入方法，统一异常处理 */
+/** 将 Vue 响应式对象转为可 IPC / structuredClone 的纯 JSON */
+function toIpcPayload<T>(value: T): T {
+  if (value === undefined || value === null || typeof value !== 'object') {
+    return value
+  }
+  return JSON.parse(JSON.stringify(value)) as T
+}
+
+/** 包装 uTools 存储写入方法：先剥 Proxy，再统一异常处理 */
 function wrapBridgeSave<T extends (...args: never[]) => void>(fn: T, label: string): T {
   return ((...args: Parameters<T>) => {
     try {
-      fn(...args)
+      fn(...(args.map((arg) => toIpcPayload(arg)) as Parameters<T>))
     } catch (err) {
       handleStorageError(label, err)
       throw err
