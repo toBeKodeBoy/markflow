@@ -99,6 +99,21 @@ describe('TrashPanel', () => {
     expect(wrapper.emitted('permanent-delete-note')![0]).toEqual([note.id])
   })
 
+  it('标题只显示回收站，不显示条目数', async () => {
+    const store = useNoteStore()
+    store.loadNoteList()
+    const note = store.createNoteWithContent('# 任意笔记\n')
+    store.softDeleteNote(note.id)
+
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    expect(wrapper.find('.trash-count').exists()).toBe(false)
+    expect(wrapper.get('.trash-title').text()).toBe('回收站')
+    expect(wrapper.find('.trash-clear-btn').exists()).toBe(true)
+    expect(wrapper.find('.trash-empty').exists()).toBe(false)
+  })
+
   it('有条目时「清空」按钮存在', async () => {
     const store = useNoteStore()
     store.loadNoteList()

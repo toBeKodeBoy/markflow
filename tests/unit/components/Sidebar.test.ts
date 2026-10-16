@@ -260,7 +260,7 @@ describe('Sidebar', () => {
     expect(wrapper.text()).toContain('新建内容')
   })
 
-  it('trash nav opens the existing trash panel and keeps the badge', async () => {
+  it('trash nav opens the trash view without a count badge', async () => {
     const store = useNoteStore()
     const note = store.createNoteWithContent('# 待删笔记\n')
     const folder = store.createFolder('待删文件夹')
@@ -270,9 +270,7 @@ describe('Sidebar', () => {
     const wrapper = mountSidebar()
     await flushPromises()
 
-    const badge = wrapper.find('.trash-badge')
-    expect(badge.exists()).toBe(true)
-    expect(badge.text()).toBe('2')
+    expect(wrapper.find('.trash-badge').exists()).toBe(false)
 
     await wrapper.get('[data-testid="sidebar-nav-trash"]').trigger('click')
     await flushPromises()
@@ -418,7 +416,7 @@ describe('Sidebar', () => {
     expect(wrapper.text()).not.toMatch(/展开1级|展开2级|展开全部|折叠全部/)
   })
 
-  it('trash badge counts both trashed notes and folders', async () => {
+  it('does not show a trash badge when notes and folders are trashed', async () => {
     const store = useNoteStore()
     const note = store.createNoteWithContent('# 待删笔记\n')
     const folder = store.createFolder('待删文件夹')
@@ -428,9 +426,8 @@ describe('Sidebar', () => {
     const wrapper = mountSidebar()
     await flushPromises()
 
-    const badge = wrapper.find('.trash-badge')
-    expect(badge.exists()).toBe(true)
-    expect(badge.text()).toBe('2')
+    expect(wrapper.find('.trash-badge').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="sidebar-nav-trash"]').text()).toContain('回收站')
   })
 
   // ===== 「我的空间」根内容 =====

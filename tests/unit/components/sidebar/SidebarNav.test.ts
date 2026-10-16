@@ -24,7 +24,7 @@ describe('SidebarNav', () => {
     expect(wrapper.get('[data-testid="sidebar-nav-home"]').text()).toContain('首页')
     expect(wrapper.get('[data-testid="sidebar-nav-docs"]').text()).toContain('文档')
     expect(wrapper.get('[data-testid="sidebar-nav-trash"]').text()).toContain('回收站')
-    expect(wrapper.get('.trash-badge').text()).toBe('2')
+    expect(wrapper.find('.trash-badge').exists()).toBe(false)
   })
 
   it('点击导航项发出对应 select', async () => {

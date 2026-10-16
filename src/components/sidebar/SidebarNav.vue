@@ -29,7 +29,6 @@
     >
       <AppIcon name="trash" :size="16" />
       <span>{{ SIDEBAR_NAV_TRASH }}</span>
-      <span v-if="trashCount > 0" class="trash-badge">{{ trashCount }}</span>
     </button>
   </nav>
 </template>
@@ -45,7 +44,6 @@ import type { SidebarNavId } from './types'
 
 defineProps<{
   active: SidebarNavId
-  trashCount: number
 }>()
 
 const emit = defineEmits<{
@@ -82,16 +80,5 @@ const emit = defineEmits<{
 .sidebar-nav-item.active {
   background: var(--bg-active, var(--bg-hover));
   color: var(--primary);
-}
-
-.trash-badge {
-  margin-left: auto;
-  background: var(--color-danger, #e5484d);
-  color: white;
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 10px;
-  min-width: 18px;
-  text-align: center;
 }
 </style>
