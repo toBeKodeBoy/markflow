@@ -2,6 +2,22 @@ import { stripInlineMarkdown } from './stripInlineMarkdown'
 
 const TITLE_SCAN_LINES = 50
 
+function formatNoteDate(now: Date): string {
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/** 空白文档标题：当天第一篇为 yyyy-MM-dd，其后为 yyyy-MM-dd (1)、(2)… */
+export function buildBlankDocumentTitle(existing: string[], now = new Date()): string {
+  const base = formatNoteDate(now)
+  if (!existing.includes(base)) return base
+  let index = 1
+  while (existing.includes(`${base} (${index})`)) index += 1
+  return `${base} (${index})`
+}
+
 function extractFilenameStem(pathOrName?: string): string {
   if (!pathOrName) return ''
   const normalized = pathOrName.replace(/\\/g, '/')

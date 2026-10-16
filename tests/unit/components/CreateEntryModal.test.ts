@@ -36,6 +36,7 @@ describe('CreateEntryModal', () => {
     await flushPromises()
     expect(wrapper.find('[data-testid="create-entry-template-blank"]').text()).toBe('空白文档')
     expect(wrapper.text()).toContain('创建空白 Markdown 文档')
+    expect(wrapper.text()).toContain('标题为当天日期')
     expect(wrapper.text()).not.toContain('空白笔记')
     expect(wrapper.text()).not.toContain('Markdown 笔记')
   })
