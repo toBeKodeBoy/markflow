@@ -12,7 +12,6 @@
           <div class="trash-header-left">
             <AppIcon name="trash" class="trash-icon" />
             <h3 class="trash-title">回收站</h3>
-            <span v-if="totalCount > 0" class="trash-count">{{ totalCount }}</span>
           </div>
           <div class="trash-header-right">
             <button
@@ -247,16 +246,6 @@ function handleClearTrash() {
   font-size: 16px;
   font-weight: 600;
   color: var(--text-primary, var(--text, #333));
-}
-
-.trash-count {
-  background: var(--color-primary, var(--primary, #4f8cff));
-  color: white;
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 10px;
-  min-width: 18px;
-  text-align: center;
 }
 
 .trash-clear-btn {

@@ -4,7 +4,7 @@
       @create-note="openCreateModal('note', activeSpaceId ?? undefined)"
       @navigate-home="workspace.showHome()"
     />
-    <SidebarNav :active="activeNav" :trash-count="trashCount" @select="onNavSelect" />
+    <SidebarNav :active="activeNav" @select="onNavSelect" />
 
     <div v-if="selectedNoteIds.size > 0" class="sidebar-batch-bar">
       <span class="batch-count">已选 {{ selectedNoteIds.size }} 篇</span>
@@ -385,13 +385,6 @@ const createModalVisible = ref(false)
 const createModalKind = ref<'note' | 'folder'>('folder')
 const createModalDefaultParentId = ref<string | undefined>(undefined)
 const createModalLockedParentId = ref<string | null | undefined>(undefined)
-
-// 修复（R6 遗留）：角标同时统计回收站中的笔记与文件夹数量
-// 依赖 trashVersion：存储层数据非响应式，需通过版本号触发重新计算
-const trashCount = computed(() => {
-  void store.trashVersion
-  return store.getTrashNotes().length + store.getTrashFolders().length
-})
 
 const renamingFolderId = ref<string | null>(null)
 const renamingFolderName = ref('')
@@ -1127,17 +1120,6 @@ onUnmounted(() => document.removeEventListener('click', onGlobalClick))
 .trash-btn.has-items:hover {
   color: var(--color-warning);
   border-color: var(--color-warning);
-}
-
-.trash-badge {
-  background: var(--color-danger);
-  color: white;
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 10px;
-  min-width: 18px;
-  text-align: center;
-  margin-left: auto;
 }
 
 .trash-label {
