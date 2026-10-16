@@ -2,6 +2,7 @@
   <div class="editor-pane editor-canvas">
     <FormatToolbar
       :view-mode="viewMode"
+      :toc-visible="tocVisible"
       @bold="insertMarkdown('**', '**', '粗体')"
       @italic="insertMarkdown('*', '*', '斜体')"
       @strike="insertMarkdown('~~', '~~', '删除线')"
@@ -20,6 +21,7 @@
       @link="openLinkDialog()"
       @image-upload="onToolbarImageUpload"
       @set-view-mode="(mode) => emit('setViewMode', mode)"
+      @toggle-toc="emit('toggleToc')"
     />
     <div ref="editorEl" class="cm-host"></div>
     <LinkDialog
@@ -64,8 +66,8 @@ import HighlightTextModal from './HighlightTextModal.vue'
 import LinkDialog from './LinkDialog.vue'
 import type { ViewMode } from '../types'
 
-const props = defineProps<{ noteId: string; viewMode?: ViewMode }>()
-const emit = defineEmits<{ setViewMode: [mode: ViewMode] }>()
+const props = defineProps<{ noteId: string; viewMode?: ViewMode; tocVisible?: boolean }>()
+const emit = defineEmits<{ setViewMode: [mode: ViewMode]; toggleToc: [] }>()
 
 const viewMode = computed(() => props.viewMode ?? 'live')
 

@@ -31,9 +31,6 @@ vi.mock('../../../src/utils/exportMarkdownAssets', () => ({
 
 function mountToolbar() {
   return mount(Toolbar, {
-    props: {
-      tocVisible: false,
-    },
     global: {
       plugins: [pinia],
       stubs: {
@@ -307,18 +304,9 @@ describe('Toolbar', () => {
     )
   })
 
-  it('首页隐藏目录按钮，编辑视图才显示', () => {
-    const homeToolbar = mount(Toolbar, {
-      props: { tocVisible: false, tocAvailable: false },
-      global: {
-        plugins: [pinia],
-        stubs: { PdfExportModal: true, SettingsModal: true, ImportFolderModal: true, AppIcon: true },
-      },
-    })
-    expect(homeToolbar.find('[aria-label="目录"]').exists()).toBe(false)
-
-    const editorToolbar = mountToolbar()
-    expect(editorToolbar.find('[aria-label="目录"]').exists()).toBe(true)
+  it('顶栏不再渲染目录按钮', () => {
+    const wrapper = mountToolbar()
+    expect(wrapper.find('[aria-label="目录"]').exists()).toBe(false)
   })
 
   it('点击搜索条应派发 openSearch', async () => {

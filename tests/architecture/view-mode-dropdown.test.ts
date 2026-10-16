@@ -37,8 +37,15 @@ describe('ViewMode 工具栏下拉', () => {
     expect(icons).toMatch(/view-focus/)
   })
 
-  it('下拉推到工具栏右侧，且菜单项不被工具栏方按钮样式压成竖排', () => {
-    expect(css).toMatch(/\.view-mode-dropdown[\s\S]*?margin-left:\s*auto/)
+  it('目录与下拉作为一组推到工具栏右侧，专注模式浮动条间距保持 8px', () => {
+    const trailing = css.match(/\.editor-toolbar-trailing\s*\{[^}]*\}/)?.[0] ?? ''
+    expect(trailing).toMatch(/margin-left:\s*auto/)
+    expect(trailing).toMatch(/gap:\s*6px/)
+    const dropdown = css.match(/\.view-mode-dropdown\s*\{[^}]*\}/)?.[0] ?? ''
+    expect(dropdown).not.toMatch(/margin-left:\s*auto/)
+    const focusDropdown =
+      css.match(/\.focus-format-toolbar \.view-mode-dropdown\s*\{[^}]*\}/)?.[0] ?? ''
+    expect(focusDropdown).toMatch(/margin-left:\s*8px/)
     expect(css).toMatch(/\.editor-toolbar \.toolbar-group button[\s\S]*?width:\s*28px/)
     expect(css).toMatch(/\.view-mode-dropdown-menu button[\s\S]*?white-space:\s*nowrap/)
     expect(css).toMatch(/\.view-mode-dropdown-menu button[\s\S]*?width:\s*100%/)

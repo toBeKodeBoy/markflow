@@ -54,18 +54,6 @@
     </div>
 
     <div class="topbar-right">
-      <button
-        v-if="tocAvailable"
-        class="btn-icon btn-icon-text"
-        :class="{ active: tocVisible }"
-        @click="$emit('toggleToc')"
-        title="目录"
-        aria-label="目录"
-      >
-        <AppIcon name="toc" :size="16" />
-        <span class="btn-icon-label">目录</span>
-      </button>
-
       <div class="import-menu-wrap" ref="overflowMenuRef">
         <button
           class="btn-icon"
@@ -150,11 +138,7 @@ import {
   SEARCH_DOCUMENTS_TITLE,
 } from '../constants/sidebarShell'
 
-withDefaults(
-  defineProps<{ tocVisible: boolean; tocAvailable?: boolean }>(),
-  { tocAvailable: true },
-)
-defineEmits<{ toggleSidebar: []; toggleToc: []; openSearch: [] }>()
+defineEmits<{ toggleSidebar: []; openSearch: [] }>()
 
 const store = useNoteStore()
 const tabsStore = useEditorTabsStore()
