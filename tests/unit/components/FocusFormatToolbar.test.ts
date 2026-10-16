@@ -3,6 +3,13 @@ import { mount } from '@vue/test-utils'
 import FocusFormatToolbar from '../../../src/components/FocusFormatToolbar.vue'
 
 describe('FocusFormatToolbar', () => {
+  it('不渲染目录按钮', () => {
+    const wrapper = mount(FocusFormatToolbar, {
+      props: { visible: true, viewMode: 'focus' },
+    })
+    expect(wrapper.find('[aria-label="目录"]').exists()).toBe(false)
+  })
+
   it('renders mini formatting actions with icons', () => {
     const wrapper = mount(FocusFormatToolbar, {
       props: { visible: true },

@@ -1897,9 +1897,16 @@ input:focus { border-color: var(--primary); }
   min-height: 36px;
 }
 
+.editor-toolbar-trailing {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .view-mode-dropdown {
   position: relative;
-  margin-left: auto;
   flex-shrink: 0;
 }
 

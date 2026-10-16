@@ -109,12 +109,24 @@
       >
     </div>
 
-    <ViewModeDropdown
-      v-if="viewMode"
-      ref="viewModeDropdownRef"
-      :view-mode="viewMode"
-      @set-view-mode="(mode) => $emit('setViewMode', mode)"
-    />
+    <div v-if="viewMode" class="editor-toolbar-trailing" data-testid="editor-toolbar-trailing">
+      <button
+        type="button"
+        class="btn-icon btn-icon-text"
+        :class="{ active: tocVisible }"
+        title="目录"
+        aria-label="目录"
+        @click="$emit('toggleToc')"
+      >
+        <AppIcon name="toc" :size="16" />
+        <span class="btn-icon-label">目录</span>
+      </button>
+      <ViewModeDropdown
+        ref="viewModeDropdownRef"
+        :view-mode="viewMode"
+        @set-view-mode="(mode) => $emit('setViewMode', mode)"
+      />
+    </div>
   </div>
 </template>
 
@@ -128,9 +140,11 @@ withDefaults(
   defineProps<{
     showTaskListButton?: boolean
     viewMode?: ViewMode
+    tocVisible?: boolean
   }>(),
   {
     showTaskListButton: true,
+    tocVisible: false,
   },
 )
 
@@ -153,6 +167,7 @@ const emit = defineEmits<{
   link: []
   imageUpload: [file: File]
   setViewMode: [mode: ViewMode]
+  toggleToc: []
 }>()
 
 const imageInputRef = ref<HTMLInputElement>()

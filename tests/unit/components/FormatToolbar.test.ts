@@ -18,6 +18,34 @@ describe('FormatToolbar', () => {
     expect(wrapper.find('.char-count').exists()).toBe(false)
   })
 
+  it('把目录按钮放在视图模式下拉左侧，点击发出 toggleToc', async () => {
+    const wrapper = mount(FormatToolbar, {
+      props: { viewMode: 'live', tocVisible: false },
+    })
+
+    const cluster = wrapper.get('[data-testid="editor-toolbar-trailing"]')
+    const toc = cluster.get('[aria-label="目录"]')
+    expect(toc.attributes('title')).toBe('目录')
+    expect(toc.text()).toContain('目录')
+    expect(toc.classes()).not.toContain('active')
+
+    const html = cluster.html()
+    expect(html.indexOf('aria-label="目录"')).toBeGreaterThan(-1)
+    expect(html.indexOf('aria-label="目录"')).toBeLessThan(
+      html.indexOf('data-testid="view-mode-dropdown"'),
+    )
+
+    await toc.trigger('click')
+    expect(wrapper.emitted('toggleToc')).toEqual([[]])
+  })
+
+  it('目录打开时按钮带 active', () => {
+    const wrapper = mount(FormatToolbar, {
+      props: { viewMode: 'split', tocVisible: true },
+    })
+    expect(wrapper.get('[aria-label="目录"]').classes()).toContain('active')
+  })
+
   it('renders view mode dropdown when viewMode is provided', () => {
     const wrapper = mount(FormatToolbar, {
       props: { viewMode: 'live' },

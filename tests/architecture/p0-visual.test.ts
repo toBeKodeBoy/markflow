@@ -125,10 +125,28 @@ describe('P0 顶栏视觉', () => {
     expect(css).toMatch(/\.status-bar\s*\{[^}]*background:\s*var\(--bg-toolbar\)/)
   })
 
-  it('首页应隐藏目录按钮，仅编辑视图传入 tocAvailable', () => {
-    expect(toolbar).toMatch(/tocAvailable/)
-    expect(toolbar).toMatch(/v-if="tocAvailable"/)
-    expect(app).toMatch(/:toc-available="isEditorView"|:tocAvailable="isEditorView"/)
+  it('目录按钮不在顶栏，而在文档格式工具栏右侧紧挨视图下拉', () => {
+    const formatToolbar = readSrc('src/components/FormatToolbar.vue')
+    const editor = readSrc('src/components/Editor.vue')
+    const wysiwyg = readSrc('src/components/WysiwygEditor.vue')
+    const focus = readSrc('src/components/FocusFormatToolbar.vue')
+
+    expect(toolbar).not.toMatch(/aria-label="目录"/)
+    expect(toolbar).not.toMatch(/toggleToc|tocAvailable/)
+    expect(app).not.toMatch(/toc-available|tocAvailable/)
+
+    const trailing =
+      formatToolbar.match(/data-testid="editor-toolbar-trailing"[\s\S]*?<\/div>/)?.[0] ?? ''
+    expect(trailing).toMatch(/aria-label="目录"/)
+    expect(trailing).toMatch(/toggleToc/)
+    expect(trailing.indexOf('aria-label="目录"')).toBeLessThan(trailing.indexOf('ViewModeDropdown'))
+
+    expect(editor).toMatch(/:toc-visible="tocVisible"/)
+    expect(editor).toMatch(/@toggle-toc/)
+    expect(wysiwyg).toMatch(/:toc-visible="tocVisible"/)
+    expect(wysiwyg).toMatch(/@toggle-toc/)
+    expect(focus).not.toMatch(/aria-label="目录"/)
+    expect(app).toMatch(/tocVisible && viewMode !== 'focus'/)
   })
 })
 

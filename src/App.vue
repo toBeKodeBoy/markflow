@@ -1,10 +1,7 @@
 <template>
   <div :class="['app', 'mode-' + viewMode]">
     <Toolbar
-      :tocVisible="tocVisible"
-      :toc-available="isEditorView"
       @toggleSidebar="sidebarVisible = !sidebarVisible"
-      @toggleToc="toggleToc"
       @openSearch="toggleSearchModal"
     />
 
@@ -60,8 +57,10 @@
                 :note-id="tab.noteId"
                 :view-mode="viewMode"
                 :focusMode="viewMode === 'focus'"
+                :toc-visible="tocVisible"
                 class="editor-tab-pane"
                 @set-view-mode="setViewMode"
+                @toggle-toc="toggleToc"
               />
             </template>
 
@@ -72,8 +71,10 @@
                 v-show="tab.noteId === tabsStore.activeTabId"
                 :note-id="tab.noteId"
                 :view-mode="viewMode"
+                :toc-visible="tocVisible"
                 class="editor-tab-pane"
                 @set-view-mode="setViewMode"
+                @toggle-toc="toggleToc"
               />
 
               <Preview v-if="viewMode === 'split'" key="preview" />

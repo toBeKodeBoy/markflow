@@ -4,6 +4,7 @@
       v-if="!focusMode"
       :show-task-list-button="!focusMode"
       :view-mode="viewMode"
+      :toc-visible="tocVisible"
       @bold="onToolbarBold"
       @italic="onToolbarItalic"
       @strike="onToolbarStrike"
@@ -22,6 +23,7 @@
       @link="onToolbarLink"
       @image-upload="onToolbarImageUpload"
       @set-view-mode="(mode) => emit('setViewMode', mode)"
+      @toggle-toc="emit('toggleToc')"
     />
     <div class="wysiwyg-body">
       <div ref="containerRef" :class="['milkdown-host', { 'milkdown-dark': isDark }]"></div>
@@ -176,8 +178,13 @@ function sanitizePastedHTML(html: string): string {
   return body.innerHTML
 }
 
-const props = defineProps<{ noteId: string; focusMode?: boolean; viewMode?: ViewMode }>()
-const emit = defineEmits<{ setViewMode: [mode: ViewMode] }>()
+const props = defineProps<{
+  noteId: string
+  focusMode?: boolean
+  viewMode?: ViewMode
+  tocVisible?: boolean
+}>()
+const emit = defineEmits<{ setViewMode: [mode: ViewMode]; toggleToc: [] }>()
 const viewMode = computed(() => props.viewMode ?? 'live')
 
 const store = useNoteStore()
