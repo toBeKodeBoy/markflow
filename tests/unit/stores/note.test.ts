@@ -29,6 +29,23 @@ describe('useNoteStore', () => {
     expect(store.noteList).toHaveLength(1)
   })
 
+  it('createNote 以当天日期命名，同日重复则追加 (1)(2)，正文一级标题与标题一致', () => {
+    const store = useNoteStore()
+    const now = new Date()
+    const base = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+
+    const first = store.createNote()
+    const second = store.createNote()
+    const third = store.createNote()
+
+    expect(first.title).toBe(base)
+    expect(first.content).toBe(`# ${base}\n\n`)
+    expect(second.title).toBe(`${base} (1)`)
+    expect(second.content).toBe(`# ${base} (1)\n\n`)
+    expect(third.title).toBe(`${base} (2)`)
+    expect(third.content).toBe(`# ${base} (2)\n\n`)
+  })
+
   it('createNoteWithContent 会提取标题并更新搜索索引', () => {
     const store = useNoteStore()
     const note = store.createNoteWithContent('# Alpha\nbody')

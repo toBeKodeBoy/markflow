@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractNoteTitle } from '../../../src/utils/noteTitle'
+import { buildBlankDocumentTitle, extractNoteTitle } from '../../../src/utils/noteTitle'
 
 describe('extractNoteTitle', () => {
   it('优先返回文件名去扩展名', () => {
@@ -33,6 +33,23 @@ describe('extractNoteTitle', () => {
 
   it('未传入路径时回退到标题提取', () => {
     expect(extractNoteTitle('# 标题\n')).toBe('标题')
+  })
+
+  it('空白文档标题默认当天日期，同日重复从 (1) 递增', () => {
+    const now = new Date(2026, 9, 16)
+    expect(buildBlankDocumentTitle([], now)).toBe('2026-10-16')
+    expect(buildBlankDocumentTitle(['2026-10-16'], now)).toBe('2026-10-16 (1)')
+    expect(buildBlankDocumentTitle(['2026-10-16', '2026-10-16 (1)'], now)).toBe('2026-10-16 (2)')
+  })
+
+  it('空白文档标题跳过已被占用的序号', () => {
+    const now = new Date(2026, 9, 16)
+    expect(buildBlankDocumentTitle(['2026-10-16', '2026-10-16 (2)'], now)).toBe('2026-10-16 (1)')
+  })
+
+  it('其他日期或其他标题不占用当天序号', () => {
+    const now = new Date(2026, 9, 16)
+    expect(buildBlankDocumentTitle(['2026-10-15', '2026-10-15 (1)', '无标题'], now)).toBe('2026-10-16')
   })
 
   it('纯星号串标题剥离后保留原文', () => {

@@ -21,7 +21,7 @@ export const CREATE_BLANK_DOCUMENT_LABEL = '空白文档'
 export const CREATE_BLANK_DOCUMENT_DESC = '创建空白 Markdown 文档'
 
 export const CREATE_BLANK_DOCUMENT_HINT =
-  '将创建一份空白 Markdown 文档，标题可在创建后直接重命名。'
+  '将创建一份空白 Markdown 文档，标题为当天日期；同一天再创建会依次加上 (1)、(2)。'
 
 export const SIDEBAR_NAV_HOME = '首页'
 

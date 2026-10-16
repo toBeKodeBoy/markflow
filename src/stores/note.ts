@@ -18,7 +18,7 @@ import { sanitizeFilename } from '../utils/exportPdf'
 import { renderPathTemplate } from '../utils/pathTemplate'
 import type { ImportFolderOptions, ImportFolderProgress, ImportFolderResult, ImportFolderScanResult } from '../types/import'
 import type { Note, NoteListItem, Folder, TocJumpTarget, EditorContentPush, ImportedMarkdownFile, TrashNote, TrashFolderEntry } from '../types'
-import { extractNoteTitle } from '../utils/noteTitle'
+import { buildBlankDocumentTitle, extractNoteTitle } from '../utils/noteTitle'
 import { getTabContentCache, setTabContentCache } from './tabContentCache'
 import { notifyNoteDeleted, notifyLibraryReset } from './editorTabsBridge'
 import { touchRecentNote, clearRecentNote } from '../utils/recentNotes'
@@ -261,10 +261,11 @@ export const useNoteStore = defineStore('note', () => {
   /** 创建空白笔记，保存到存储，设为当前 */
   function createNote(folderId?: string) {
     const now = Date.now()
+    const title = buildBlankDocumentTitle(noteList.value.map((item) => item.title))
     const note: Note = {
       id: generateId(),
-      title: '无标题',
-      content: '# 无标题\n\n',
+      title,
+      content: `# ${title}\n\n`,
       folderId,
       assetPathMode: 'internal',
       createdAt: now,
